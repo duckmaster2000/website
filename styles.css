@@ -1,6 +1,6 @@
 body {
   margin: 0;
-  height: 100vh;
+  height: 1000vh;
   background: linear-gradient(to bottom, red, orange, yellow, green, blue, indigo, violet);
   font-family: sans-serif;
   color: white;
