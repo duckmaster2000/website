@@ -1,14 +1,5 @@
-html, body{
-  height: 25%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background-color: black;
-  overflow: hidden;
-  transform: scale(1.5);
-}
 /*button*/
-.btn{
+.btn {
   padding: 30px 80px;
   border: none;
   outline: none;
@@ -29,8 +20,7 @@ html, body{
   top: 0;
   border-radius: 20px;
 }
-
-.btn::before{
+.btn::before {
   content: "";
   background: linear-gradient(
     45deg, 
@@ -44,11 +34,16 @@ html, body{
   z-index: -1;
   width: calc(100% + 4px);
   height: calc(100% + 4px);
-  filter: blur(8px);
+  /* The change is here: remove the blur filter */
+  /* filter: blur(8px); */
   animation: glowing 20s linear infinite;
   transition: opacity .3s ease-in-out;
   border-radius: 20px;
   opacity: 0;
+  
+  /* These are the key new properties for the border effect */
+  background-clip: padding-box;
+  border: 2px solid transparent;
 }
 
 @keyframes glowing {
@@ -60,18 +55,10 @@ html, body{
 .btn:hover::before {
   opacity: 1;
 }
-.btn:active:after {
+.btn:active::after {
   background: transparent;
 }
 .btn:active {
   color: black;
   font-weight: bold;
 }
-
-
-
-
-
-
-
-
