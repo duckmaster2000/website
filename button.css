@@ -1,3 +1,12 @@
+html, body{
+  height: 25%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: black;
+  overflow: hidden;
+  transform: scale(1.5);
+}
 /*button*/
 .btn {
   padding: 30px 80px;
