@@ -14,21 +14,26 @@
                 <img src="gem.png" alt="Click this :D" class="gem-image" onclick="incrementGem()" draggable="false">
             </div>
             <div class="right">
-                <div class="upgrade">
+                <div class="upgrade" onclick = "buyClicker()">
                     <div class = "left-section">
-                        <img src="" alt="" class="src">
+                        <img src="clicker-white.png" alt="" class="upgrade-img">
                     </div>
                     <div class = "middle-section">
-
+                        <h4>Clicker</h4>
+                        <div class="cost-info">
+                            <p>Cost: <span class = "clicker-cost">10</span></p>
+                            <img src="gem.png" alt="" class="gem-img" draggable="false">
+                        </div>
                     </div>
-                    <div class = "right-section">
-
+                    <div class = "right-section"> Level <span class = "clickerLevel">0</span></div>
+                        
+                    <div class = "next-level-info">
+                        Each Clicker<br />is <br />+<span class = "clickerIncrease">1</span> gems <br /> per second
                     </div>
                 </div>
             </div>
         </div>
     </section>
-
     <script src="clicker.js"></script>
 </body>
 </html>
