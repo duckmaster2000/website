@@ -6,9 +6,403 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Cool Stuff</title>
   <link rel="stylesheet" href="button.css" />
+  <style>
+    :root {
+      --bg: #0a1220;
+      --panel: #101b2f;
+      --panel-2: #14243f;
+      --ink: #f3f6ff;
+      --muted: #9fb4da;
+      --accent: #43d3a8;
+      --danger: #ff5f6d;
+      --ok: #5bda78;
+      --ring: rgba(67, 211, 168, 0.35);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Trebuchet MS", Verdana, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 0% 0%, #183258 0%, transparent 40%),
+        radial-gradient(circle at 100% 0%, #2a174f 0%, transparent 33%),
+        linear-gradient(180deg, #08101d 0%, #050b15 100%);
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(1.8rem, 3vw, 2.8rem);
+      letter-spacing: 0.03em;
+    }
+
+    .subtitle {
+      margin: 0 0 28px;
+      color: var(--muted);
+      max-width: 65ch;
+    }
+
+    .toy-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+    }
+
+    .toy {
+      background: linear-gradient(155deg, var(--panel) 0%, var(--panel-2) 100%);
+      border: 1px solid rgba(159, 180, 218, 0.16);
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 10px 26px rgba(0, 0, 0, 0.35);
+    }
+
+    .toy h3 {
+      margin: 0 0 10px;
+      font-size: 1.05rem;
+    }
+
+    .toy p {
+      margin: 8px 0;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.45;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+      border-radius: 10px;
+      border: 1px solid rgba(159, 180, 218, 0.28);
+      padding: 8px 10px;
+      color: var(--ink);
+      background: #0b1730;
+    }
+
+    button {
+      cursor: pointer;
+      background: linear-gradient(180deg, #18345c 0%, #0f2241 100%);
+      transition: transform 0.08s ease, box-shadow 0.15s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 0 0 3px var(--ring);
+    }
+
+    .row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .output {
+      margin-top: 10px;
+      min-height: 1.5em;
+      font-weight: 600;
+    }
+
+    .big {
+      font-size: 1.4rem;
+      letter-spacing: 0.02em;
+    }
+
+    .swatch {
+      width: 100%;
+      height: 54px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.24);
+      margin-top: 10px;
+      background: #43d3a8;
+    }
+
+    .score {
+      color: var(--ok);
+      font-weight: 700;
+      margin-top: 8px;
+    }
+
+    .bad {
+      color: var(--danger);
+    }
+  </style>
 </head>
 <body>
-  <h3> The Button: </h3>
-  <button class="btn">Hover or click me!</button>
+  <h1>Cool Stuff Lab</h1>
+  <p class="subtitle">
+    Your original button toy plus 9 more internet-style mini toys.
+  </p>
+
+  <section class="toy-grid">
+    <article class="toy">
+      <h3>1) The Button</h3>
+      <p>Classic useless internet button. Click it and see what happens.</p>
+      <button class="btn" id="theButton">Hover or click me!</button>
+      <div class="output" id="buttonOutput"></div>
+    </article>
+
+    <article class="toy">
+      <h3>2) Random Color Generator</h3>
+      <p>Generate random hex colors and copy the code.</p>
+      <div class="row">
+        <button id="colorBtn">Generate Color</button>
+        <button id="copyColorBtn">Copy</button>
+      </div>
+      <div class="output" id="colorCode">#43D3A8</div>
+      <div class="swatch" id="colorSwatch"></div>
+    </article>
+
+    <article class="toy">
+      <h3>3) Dice Roller</h3>
+      <p>Roll a six-sided die.</p>
+      <button id="rollDiceBtn">Roll Dice</button>
+      <div class="output big" id="diceOutput">-</div>
+    </article>
+
+    <article class="toy">
+      <h3>4) Coin Flip</h3>
+      <p>Heads or tails?</p>
+      <button id="flipCoinBtn">Flip Coin</button>
+      <div class="output big" id="coinOutput">-</div>
+    </article>
+
+    <article class="toy">
+      <h3>5) Magic 8 Ball</h3>
+      <p>Ask a yes/no question and reveal your fate.</p>
+      <input id="eightBallInput" type="text" placeholder="Will I be lucky today?" />
+      <div class="row" style="margin-top: 8px;">
+        <button id="eightBallBtn">Ask</button>
+      </div>
+      <div class="output" id="eightBallOutput"></div>
+    </article>
+
+    <article class="toy">
+      <h3>6) Rock Paper Scissors</h3>
+      <p>Try to beat the computer.</p>
+      <div class="row">
+        <button class="rpsBtn" data-choice="Rock">Rock</button>
+        <button class="rpsBtn" data-choice="Paper">Paper</button>
+        <button class="rpsBtn" data-choice="Scissors">Scissors</button>
+      </div>
+      <div class="output" id="rpsOutput"></div>
+      <div class="score" id="rpsScore">You 0 : 0 CPU</div>
+    </article>
+
+    <article class="toy">
+      <h3>7) Guess The Number</h3>
+      <p>Guess a secret number from 1 to 20.</p>
+      <div class="row">
+        <input id="guessInput" type="number" min="1" max="20" placeholder="1-20" />
+        <button id="guessBtn">Guess</button>
+      </div>
+      <div class="output" id="guessOutput"></div>
+      <button id="resetGuessBtn" style="margin-top: 8px;">Reset</button>
+    </article>
+
+    <article class="toy">
+      <h3>8) Fortune Cookie</h3>
+      <p>Click for a random fortune line.</p>
+      <button id="fortuneBtn">Crack Fortune</button>
+      <div class="output" id="fortuneOutput"></div>
+    </article>
+
+    <article class="toy">
+      <h3>9) Password Generator</h3>
+      <p>Generate a quick random password.</p>
+      <div class="row">
+        <label for="pwLength">Length</label>
+        <input id="pwLength" type="number" value="12" min="6" max="24" />
+      </div>
+      <button id="pwBtn" style="margin-top: 8px;">Generate Password</button>
+      <div class="output" id="pwOutput"></div>
+    </article>
+
+    <article class="toy">
+      <h3>10) Text Scrambler</h3>
+      <p>Type text and scramble the letters for fun.</p>
+      <input id="scrambleInput" type="text" placeholder="Type a sentence" />
+      <button id="scrambleBtn" style="margin-top: 8px;">Scramble</button>
+      <div class="output" id="scrambleOutput"></div>
+    </article>
+  </section>
+
+  <script>
+    const buttonMessages = [
+      "Button says hi.",
+      "Nothing happened... or did it?",
+      "You found a secret click.",
+      "Internet certified fun.",
+      "One more click for luck."
+    ];
+    let buttonClicks = 0;
+
+    document.getElementById("theButton").addEventListener("click", () => {
+      buttonClicks += 1;
+      const msg = buttonMessages[Math.floor(Math.random() * buttonMessages.length)];
+      document.getElementById("buttonOutput").textContent = msg + " Total clicks: " + buttonClicks;
+    });
+
+    const toHex = (num) => num.toString(16).padStart(2, "0").toUpperCase();
+
+    document.getElementById("colorBtn").addEventListener("click", () => {
+      const r = Math.floor(Math.random() * 256);
+      const g = Math.floor(Math.random() * 256);
+      const b = Math.floor(Math.random() * 256);
+      const color = "#" + toHex(r) + toHex(g) + toHex(b);
+      document.getElementById("colorCode").textContent = color;
+      document.getElementById("colorSwatch").style.background = color;
+    });
+
+    document.getElementById("copyColorBtn").addEventListener("click", async () => {
+      const text = document.getElementById("colorCode").textContent;
+      try {
+        await navigator.clipboard.writeText(text);
+        document.getElementById("colorCode").textContent = text + " (copied)";
+      } catch {
+        document.getElementById("colorCode").textContent = text + " (copy failed)";
+      }
+    });
+
+    document.getElementById("rollDiceBtn").addEventListener("click", () => {
+      const value = Math.floor(Math.random() * 6) + 1;
+      document.getElementById("diceOutput").textContent = "Rolled: " + value;
+    });
+
+    document.getElementById("flipCoinBtn").addEventListener("click", () => {
+      const value = Math.random() < 0.5 ? "Heads" : "Tails";
+      document.getElementById("coinOutput").textContent = value;
+    });
+
+    const ballAnswers = [
+      "Yes.",
+      "No.",
+      "Try again later.",
+      "Very likely.",
+      "Doubtful.",
+      "Absolutely.",
+      "Not today."
+    ];
+
+    document.getElementById("eightBallBtn").addEventListener("click", () => {
+      const q = document.getElementById("eightBallInput").value.trim();
+      if (!q) {
+        document.getElementById("eightBallOutput").textContent = "Type a question first.";
+        return;
+      }
+      const answer = ballAnswers[Math.floor(Math.random() * ballAnswers.length)];
+      document.getElementById("eightBallOutput").textContent = answer;
+    });
+
+    let playerScore = 0;
+    let cpuScore = 0;
+    const rpsChoices = ["Rock", "Paper", "Scissors"];
+
+    function getRpsResult(player, cpu) {
+      if (player === cpu) return "Draw";
+      if (
+        (player === "Rock" && cpu === "Scissors") ||
+        (player === "Paper" && cpu === "Rock") ||
+        (player === "Scissors" && cpu === "Paper")
+      ) {
+        return "Win";
+      }
+      return "Lose";
+    }
+
+    document.querySelectorAll(".rpsBtn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const player = btn.dataset.choice;
+        const cpu = rpsChoices[Math.floor(Math.random() * rpsChoices.length)];
+        const result = getRpsResult(player, cpu);
+        if (result === "Win") playerScore += 1;
+        if (result === "Lose") cpuScore += 1;
+        document.getElementById("rpsOutput").textContent = "You: " + player + " | CPU: " + cpu + " => " + result;
+        document.getElementById("rpsScore").textContent = "You " + playerScore + " : " + cpuScore + " CPU";
+      });
+    });
+
+    let target = Math.floor(Math.random() * 20) + 1;
+
+    document.getElementById("guessBtn").addEventListener("click", () => {
+      const value = Number(document.getElementById("guessInput").value);
+      const out = document.getElementById("guessOutput");
+      out.classList.remove("bad");
+
+      if (!Number.isInteger(value) || value < 1 || value > 20) {
+        out.textContent = "Enter a valid number 1-20.";
+        out.classList.add("bad");
+        return;
+      }
+
+      if (value === target) {
+        out.textContent = "Correct!";
+        return;
+      }
+
+      out.textContent = value < target ? "Too low." : "Too high.";
+    });
+
+    document.getElementById("resetGuessBtn").addEventListener("click", () => {
+      target = Math.floor(Math.random() * 20) + 1;
+      document.getElementById("guessInput").value = "";
+      document.getElementById("guessOutput").textContent = "Game reset.";
+      document.getElementById("guessOutput").classList.remove("bad");
+    });
+
+    const fortunes = [
+      "A fresh idea will make your day better.",
+      "You will discover a useful shortcut soon.",
+      "A tiny win today becomes a big win later.",
+      "Luck favors your next brave click.",
+      "Share a joke and double your luck."
+    ];
+
+    document.getElementById("fortuneBtn").addEventListener("click", () => {
+      const fortune = fortunes[Math.floor(Math.random() * fortunes.length)];
+      document.getElementById("fortuneOutput").textContent = fortune;
+    });
+
+    const pwChars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
+
+    document.getElementById("pwBtn").addEventListener("click", () => {
+      const lengthInput = Number(document.getElementById("pwLength").value);
+      const length = Math.min(24, Math.max(6, Number.isFinite(lengthInput) ? lengthInput : 12));
+      let result = "";
+      for (let i = 0; i < length; i += 1) {
+        result += pwChars[Math.floor(Math.random() * pwChars.length)];
+      }
+      document.getElementById("pwOutput").textContent = result;
+    });
+
+    function shuffleWord(word) {
+      const letters = word.split("");
+      for (let i = letters.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [letters[i], letters[j]] = [letters[j], letters[i]];
+      }
+      return letters.join("");
+    }
+
+    document.getElementById("scrambleBtn").addEventListener("click", () => {
+      const input = document.getElementById("scrambleInput").value.trim();
+      if (!input) {
+        document.getElementById("scrambleOutput").textContent = "Type something first.";
+        return;
+      }
+
+      const scrambled = input
+        .split(" ")
+        .map((word) => (word.length > 3 ? shuffleWord(word) : word))
+        .join(" ");
+
+      document.getElementById("scrambleOutput").textContent = scrambled;
+    });
+  </script>
 </body>
 </html>
