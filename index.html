@@ -4,81 +4,98 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Caleb Liu's Homepage</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Audiowide&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 
 <body>
-  <div class="container">
-  <h1>About Me:</h1>
-  <h1>Hi! My name is Caleb Liu.</h1>
-  <hr>
+  <div class="bg-grid" aria-hidden="true"></div>
+  <main class="container">
+    <header class="hero panel">
+      <p class="eyebrow">PERSONAL TERMINAL</p>
+      <h1>Hi! My name is Caleb Liu.</h1>
+      <p>
+        Welcome to my corner of the internet. This page is my home base for projects,
+        photos, random favorites, and very specific hobbies.
+      </p>
+    </header>
 
-  <h1>Feel free to check out the random pages I have created so far:</h1>
-  <ul>
-    <li>
-      <h3 style="display:inline">this is my page on </h3>
-      <a href="something.html">a bunch of quotes that I collected</a>
-    </li>
-    <li>
-      <h3 style="display:inline">this is my page on some </h3>
-      <a href="coolstuff.html">cool stuff</a>
-    </li>
-    <li>
-      <h3 style="display:inline">this is a random </h3>
-      <a href="clicker.html">cookie clicker-ish page</a>
-    </li>
-  </ul>
-  <hr>
+    <section class="panel">
+      <h2>Explore My Pages</h2>
+      <div class="link-grid">
+        <a class="chip" href="something.html">Quotes I collected</a>
+        <a class="chip" href="coolstuff.html">Cool stuff</a>
+        <a class="chip" href="clicker.html">Cookie clicker-ish page</a>
+      </div>
+    </section>
 
-  <h1>Here are some random pictures I took:</h1>
-  <br />
-  <img src="image.jpeg" alt="Sorry, it did not load!" width="256" />
-  <br />
-  <img src="IMG_0390-1.jpg" alt="Sorry, it did not load!" width="256" />
-  <hr />
+    <section class="panel">
+      <h2>Photo Feed</h2>
+      <div class="photo-grid">
+        <figure>
+          <img src="image.jpeg" alt="A photo taken by Caleb" />
+        </figure>
+        <figure>
+          <img src="IMG_0390-1.jpg" alt="Another photo taken by Caleb" />
+        </figure>
+      </div>
+    </section>
 
-  <h3><a href="https://xkcd.com/">xkcd.com</a> is a really fun website; You should check it out!</h3>
+    <section class="split">
+      <article class="panel">
+        <h2>Favorite Things</h2>
+        <ul class="clean-list">
+          <li>My favorite book is "What If?" by Randall Munroe, creator of xkcd.</li>
+          <li>My favorite food is probably pizza.</li>
+          <li>My favorite movie is probably Kung Fu Panda 4 or Interstellar.</li>
+          <li>My favorite movie character is Po because he is so funny.</li>
+          <li>My favorite sport to play and watch is basketball.</li>
+          <li>My favorite color is yellow, with sky blue close behind.</li>
+          <li>My favorite school subject is Speech and Debate.</li>
+          <li>My favorite meme: "I'm on a seafood diet. I see food, and I eat it."</li>
+          <li>My favorite song is Blinding Lights by The Weeknd.</li>
+          <li>My favorite word is supercalifragilisticexpialidocious.</li>
+        </ul>
+      </article>
 
-  <h2>Here are some of my favorite things:</h2>
-  <ul>
-    <li>My favorite book is "What if?" by Randall Munroe. He is also the creator of xkcd.com!</li>
-    <li>My favorite food is probably pizza.</li>
-    <li>My favorite movie is probably Kung Fu Panda 4 or Interstellar.</li>
-    <li>My favorite movie character is Po since he is so funny.</li>
-    <li>My favorite sport to play and watch is basketball.</li>
-    <li>My favorite color is yellow, although sky blue is also beautiful.</li>
-    <li>My favorite school subject is Speech and Debate since debating is an extremely important necessity in your family life.</li>
-    <li>My favorite meme is probably the one that says, "I'm on a seafood diet. I see food, and I eat it."</li>
-    <li>My favorite song is Blinding Lights by the Weeknd.</li>
-    <li>My favorite word is supercalifragilisticexpialidocious since it's so fun to say (thanks, Mary Poppins!).</li>
-  </ul>
+      <article class="panel">
+        <h2>Hobby Log</h2>
+        <ul class="clean-list">
+          <li>Math</li>
+          <li>Chess</li>
+          <li>Coding</li>
+          <li>Reading</li>
+          <li>Basketball</li>
+          <li>Playing video games</li>
+          <li>Perfecting tiny details</li>
+          <li>Debating with my sister</li>
+          <li>Trying not to daydream while daydreaming</li>
+          <li>Collecting Monopoly game versions</li>
+          <li>Binge watching funny videos on YouTube</li>
+        </ul>
+      </article>
+    </section>
 
-  <h2>Some of my hobbies include:</h2>
-  <ul>
-    <li>Math</li>
-    <li>Chess</li>
-    <li>Coding</li>
-    <li>Reading</li>
-    <li>Basketball</li>
-    <li>Playing Video Games</li>
-    <li>Getting frustrated for the most random thing not being perfect</li>
-    <li>Arguing with my sister and winning most of the time</li>
-    <li>Trying to not think about daydreaming so I can actually start daydreaming</li> 
-    <li>Collecting as many Monopoly game versions as I can for no particular reason</li>
-    <li>Binge watching Peppa Pig try not to laugh videos on YouTube (who doesn't do that at least once in their life?)</li>
-  </ul>
-  <br />
+    <section class="panel center">
+      <h2>Signal Boost</h2>
+      <p>
+        <a href="https://xkcd.com/" target="_blank" rel="noopener noreferrer">xkcd.com</a>
+        is a really fun website. You should check it out.
+      </p>
+      <p>Any questions, comments, or suggestions?</p>
+      <a class="contact" href="mailto:hicalebliu@gmail.com">Contact me at hicalebliu@gmail.com</a>
+    </section>
 
-  <div align="center" style="border-style:solid; border-color:black; width:500px; border-width:medium;">
-    <h4>Any questions, comments, or suggestions?</h4>
-    <h4>Feel free to ask!</h4>
-    <a href="mailto:hicalebliu@gmail.com">Contact me at hicalebliu@gmail.com</a>
-  </div>
-  <a href="https://www.digits.net" target="_blank">
-  <img src="https://counter.digits.net/?counter={b25d2dd1-9899-bfc4-a96e-fe479badc5cb}&template=simple" 
-   alt="Hit Counter by Digits" border="0"  />
-  </a>
-
-  </div>
+    <footer class="footer">
+      <a href="https://www.digits.net" target="_blank" rel="noopener noreferrer">
+        <img
+          src="https://counter.digits.net/?counter={b25d2dd1-9899-bfc4-a96e-fe479badc5cb}&template=simple"
+          alt="Hit Counter by Digits"
+        />
+      </a>
+    </footer>
+  </main>
 </body>
 </html>
