@@ -97,6 +97,8 @@ Entries:
 - 2026-03-13 | coolstuff.html | Fixed layout bug where toys appeared oversized/off-screen and crowded right by removing global button.css dependency and scoping button effect styles locally in coolstuff page.
 - 2026-03-13 | coolstuff.html | Added camera mini-game "Color Hunt Cam" using getUserMedia with Start/Stop camera controls, 15-second color matching round, score/timer tracking, and camera permission fallback messaging.
 - 2026-03-13 | coolstuff.html | Added "Mini Mario Runner" canvas game with jump controls (keyboard + button), moving pipe obstacles, increasing speed, score tracking, and saved best score.
+- 2026-03-13 | coolstuff.html | Upgraded Mini Mario Runner with sprite-based visuals, oscillator sound effects, collectible coins, star shield power-up, 3-life system, and level progression with scaling speed/difficulty.
+- 2026-03-13 | coolstuff.html | Added Mario pause/resume system (button + P key), introduced enemy types (ground + flying with stomp interaction), and added animated level transition overlays between levels.
 
 ## Next Suggested Improvements
 

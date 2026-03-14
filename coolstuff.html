@@ -359,15 +359,16 @@
 
     <article class="toy">
       <h3>12) Mini Mario Runner</h3>
-      <p>Jump over incoming pipes and survive as long as possible.</p>
+      <p>Jump over pipes, collect coins, grab stars, and survive through levels.</p>
       <canvas id="marioCanvas" class="mario-canvas" width="420" height="190"></canvas>
       <div class="row" style="margin-top: 8px;">
         <button id="marioStartBtn">Start</button>
+        <button id="marioPauseBtn">Pause</button>
         <button id="marioJumpBtn">Jump</button>
       </div>
-      <div class="score" id="marioScore">Score: 0 | Best: 0</div>
-      <div class="output" id="marioOutput">Press Start, then Space/Arrow Up/W (or Jump button).</div>
-      <div class="hint">Mobile: tap Jump button repeatedly.</div>
+      <div class="score" id="marioScore">Score: 0 | Best: 0 | Coins: 0 | Lives: 3 | Level: 1</div>
+      <div class="output" id="marioOutput">Press Start, then Space/Arrow Up/W (or Jump button). Collect stars for shield.</div>
+      <div class="hint">Mobile: tap Jump button repeatedly. Keyboard: press P to pause/resume.</div>
     </article>
   </section>
 
@@ -690,6 +691,7 @@
     const marioCanvas = document.getElementById("marioCanvas");
     const marioCtx = marioCanvas.getContext("2d");
     const marioStartBtn = document.getElementById("marioStartBtn");
+    const marioPauseBtn = document.getElementById("marioPauseBtn");
     const marioJumpBtn = document.getElementById("marioJumpBtn");
     const marioScoreEl = document.getElementById("marioScore");
     const marioOutputEl = document.getElementById("marioOutput");
@@ -697,9 +699,21 @@
     const marioGroundY = marioCanvas.height - 28;
     let marioRunning = false;
     let marioScore = 0;
+    let marioCoinsCollected = 0;
+    let marioLives = 3;
+    let marioLevel = 1;
+    let marioShieldFrames = 0;
+    let marioHitCooldown = 0;
+    let marioPaused = false;
+    let marioTransitionFrames = 0;
     let marioBest = Number(localStorage.getItem("marioBestScore") || "0");
+    let marioBestCoins = Number(localStorage.getItem("marioBestCoins") || "0");
     let marioSpawnCounter = 0;
+    let marioCoinSpawnCounter = 0;
+    let marioPowerupSpawnCounter = 0;
+    let marioEnemySpawnCounter = 0;
     let marioFrameId = null;
+    let marioAudioCtx = null;
 
     const marioPlayer = {
       x: 48,
@@ -711,26 +725,109 @@
     };
 
     let marioObstacles = [];
+    let marioCoins = [];
+    let marioPowerups = [];
+    let marioEnemies = [];
+
+    function makeSvgSprite(svgMarkup) {
+      const img = new Image();
+      img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgMarkup);
+      return img;
+    }
+
+    const marioSprites = {
+      player: makeSvgSprite('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="30" viewBox="0 0 24 30"><rect x="4" y="2" width="16" height="6" rx="2" fill="#be2e35"/><rect x="5" y="8" width="14" height="9" rx="2" fill="#f7c593"/><rect x="3" y="16" width="18" height="10" rx="2" fill="#be2e35"/><rect x="3" y="26" width="7" height="4" fill="#2e3b4f"/><rect x="14" y="26" width="7" height="4" fill="#2e3b4f"/></svg>'),
+      pipe: makeSvgSprite('<svg xmlns="http://www.w3.org/2000/svg" width="28" height="48" viewBox="0 0 28 48"><rect x="2" y="8" width="24" height="40" rx="2" fill="#2ba24f"/><rect x="0" y="0" width="28" height="10" rx="2" fill="#1f8e43"/><rect x="4" y="2" width="20" height="3" fill="#58c16f"/></svg>'),
+      enemyGround: makeSvgSprite('<svg xmlns="http://www.w3.org/2000/svg" width="22" height="16" viewBox="0 0 22 16"><ellipse cx="11" cy="10" rx="10" ry="6" fill="#8d5b35"/><circle cx="7" cy="9" r="1.2" fill="#111"/><circle cx="15" cy="9" r="1.2" fill="#111"/></svg>'),
+      enemyFly: makeSvgSprite('<svg xmlns="http://www.w3.org/2000/svg" width="22" height="18" viewBox="0 0 22 18"><ellipse cx="11" cy="11" rx="8" ry="5" fill="#6b4ea6"/><ellipse cx="6" cy="6" rx="4" ry="2" fill="#9f84d8"/><ellipse cx="16" cy="6" rx="4" ry="2" fill="#9f84d8"/></svg>'),
+      coin: makeSvgSprite('<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18"><circle cx="9" cy="9" r="8" fill="#f5d34b"/><circle cx="9" cy="9" r="5" fill="#ffd95f"/></svg>'),
+      star: makeSvgSprite('<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><polygon points="10,1 12.8,7 19,7.4 14.2,11.5 15.8,18 10,14.3 4.2,18 5.8,11.5 1,7.4 7.2,7" fill="#7dd6ff"/></svg>')
+    };
+
+    function marioInitAudio() {
+      if (marioAudioCtx) return;
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      marioAudioCtx = new Ctx();
+    }
+
+    function playMarioSound(type) {
+      if (!marioAudioCtx) return;
+      const osc = marioAudioCtx.createOscillator();
+      const gain = marioAudioCtx.createGain();
+      osc.type = "square";
+      osc.connect(gain);
+      gain.connect(marioAudioCtx.destination);
+
+      const now = marioAudioCtx.currentTime;
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.14, now + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+
+      if (type === "jump") {
+        osc.frequency.setValueAtTime(440, now);
+        osc.frequency.exponentialRampToValueAtTime(660, now + 0.12);
+      } else if (type === "coin") {
+        osc.frequency.setValueAtTime(880, now);
+        osc.frequency.exponentialRampToValueAtTime(1320, now + 0.08);
+      } else if (type === "power") {
+        osc.frequency.setValueAtTime(520, now);
+        osc.frequency.exponentialRampToValueAtTime(1040, now + 0.16);
+      } else if (type === "hit") {
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(240, now);
+        osc.frequency.exponentialRampToValueAtTime(120, now + 0.14);
+      } else if (type === "level") {
+        osc.frequency.setValueAtTime(620, now);
+        osc.frequency.exponentialRampToValueAtTime(930, now + 0.14);
+      } else {
+        osc.frequency.setValueAtTime(300, now);
+      }
+
+      osc.start(now);
+      osc.stop(now + 0.2);
+    }
 
     function updateMarioScoreText() {
-      marioScoreEl.textContent = "Score: " + marioScore + " | Best: " + marioBest;
+      marioScoreEl.textContent = "Score: " + marioScore +
+        " | Best: " + marioBest +
+        " | Coins: " + marioCoinsCollected +
+        " | Lives: " + marioLives +
+        " | Level: " + marioLevel;
     }
 
     function marioResetState() {
       marioScore = 0;
+      marioCoinsCollected = 0;
+      marioLives = 3;
+      marioLevel = 1;
+      marioShieldFrames = 0;
+      marioHitCooldown = 0;
+      marioPaused = false;
+      marioTransitionFrames = 0;
       marioSpawnCounter = 0;
+      marioCoinSpawnCounter = 0;
+      marioPowerupSpawnCounter = 0;
+      marioEnemySpawnCounter = 0;
       marioObstacles = [];
+      marioCoins = [];
+      marioPowerups = [];
+      marioEnemies = [];
       marioPlayer.y = marioGroundY - marioPlayer.h;
       marioPlayer.vy = 0;
       marioPlayer.onGround = true;
+      marioPauseBtn.textContent = "Pause";
       updateMarioScoreText();
     }
 
     function marioJump() {
       if (!marioRunning) return;
+      if (marioPaused) return;
+      if (marioTransitionFrames > 0) return;
       if (!marioPlayer.onGround) return;
       marioPlayer.vy = -9;
       marioPlayer.onGround = false;
+      playMarioSound("jump");
     }
 
     function marioCollides(a, b) {
@@ -757,38 +854,102 @@
       marioCtx.fillStyle = "#6fbe47";
       marioCtx.fillRect(0, marioGroundY, marioCanvas.width, marioCanvas.height - marioGroundY);
 
-      marioCtx.fillStyle = "#be2e35";
-      marioCtx.fillRect(marioPlayer.x, marioPlayer.y, marioPlayer.w, marioPlayer.h);
-      marioCtx.fillStyle = "#f6c18a";
-      marioCtx.fillRect(marioPlayer.x + 2, marioPlayer.y + 5, marioPlayer.w - 4, 8);
-      marioCtx.fillStyle = "#1f2d3a";
-      marioCtx.fillRect(marioPlayer.x + 2, marioPlayer.y + marioPlayer.h - 5, 6, 5);
-      marioCtx.fillRect(marioPlayer.x + marioPlayer.w - 8, marioPlayer.y + marioPlayer.h - 5, 6, 5);
+      for (let i = 0; i < 3; i += 1) {
+        const cloudX = (i * 140 + (marioScore * 0.4)) % (marioCanvas.width + 80) - 80;
+        marioCtx.fillStyle = "rgba(255,255,255,0.7)";
+        marioCtx.beginPath();
+        marioCtx.ellipse(cloudX, 34 + i * 12, 24, 10, 0, 0, Math.PI * 2);
+        marioCtx.fill();
+      }
 
       marioObstacles.forEach((obs) => {
-        marioCtx.fillStyle = "#2ba24f";
-        marioCtx.fillRect(obs.x, obs.y, obs.w, obs.h);
-        marioCtx.fillStyle = "#1c7d3b";
-        marioCtx.fillRect(obs.x + 2, obs.y + 2, obs.w - 4, 4);
+        marioCtx.drawImage(marioSprites.pipe, obs.x, obs.y, obs.w, obs.h);
       });
+
+      marioCoins.forEach((coin) => {
+        marioCtx.drawImage(marioSprites.coin, coin.x, coin.y, coin.w, coin.h);
+      });
+
+      marioPowerups.forEach((pow) => {
+        marioCtx.drawImage(marioSprites.star, pow.x, pow.y, pow.w, pow.h);
+      });
+
+      marioEnemies.forEach((enemy) => {
+        const sprite = enemy.type === "fly" ? marioSprites.enemyFly : marioSprites.enemyGround;
+        marioCtx.drawImage(sprite, enemy.x, enemy.y, enemy.w, enemy.h);
+      });
+
+      marioCtx.save();
+      if (marioShieldFrames > 0 && Math.floor(marioShieldFrames / 4) % 2 === 0) {
+        marioCtx.globalAlpha = 0.55;
+      }
+      marioCtx.drawImage(marioSprites.player, marioPlayer.x - 3, marioPlayer.y - 6, 24, 30);
+      marioCtx.restore();
+
+      if (marioShieldFrames > 0) {
+        marioCtx.strokeStyle = "#7dd6ff";
+        marioCtx.lineWidth = 2;
+        marioCtx.beginPath();
+        marioCtx.arc(marioPlayer.x + marioPlayer.w / 2, marioPlayer.y + marioPlayer.h / 2, 16, 0, Math.PI * 2);
+        marioCtx.stroke();
+      }
+
+      if (marioTransitionFrames > 0) {
+        marioCtx.fillStyle = "rgba(5, 11, 21, 0.42)";
+        marioCtx.fillRect(0, 0, marioCanvas.width, marioCanvas.height);
+        marioCtx.fillStyle = "#f3f6ff";
+        marioCtx.font = "bold 24px Trebuchet MS";
+        marioCtx.textAlign = "center";
+        marioCtx.fillText("Level " + marioLevel, marioCanvas.width / 2, marioCanvas.height / 2);
+      }
+
+      if (marioPaused) {
+        marioCtx.fillStyle = "rgba(5, 11, 21, 0.55)";
+        marioCtx.fillRect(0, 0, marioCanvas.width, marioCanvas.height);
+        marioCtx.fillStyle = "#f3f6ff";
+        marioCtx.font = "bold 22px Trebuchet MS";
+        marioCtx.textAlign = "center";
+        marioCtx.fillText("Paused", marioCanvas.width / 2, marioCanvas.height / 2);
+      }
     }
 
     function marioEndGame() {
       marioRunning = false;
+      marioPaused = false;
       if (marioFrameId) cancelAnimationFrame(marioFrameId);
       marioFrameId = null;
-      marioOutputEl.textContent = "Game over! Press Start to play again.";
+      marioOutputEl.textContent = "Game over! Final score " + marioScore + ". Press Start to play again.";
       marioStartBtn.textContent = "Restart";
+      marioPauseBtn.textContent = "Pause";
     }
 
     function marioLoop() {
       if (!marioRunning) return;
+
+      if (marioPaused) {
+        drawMarioScene();
+        marioFrameId = requestAnimationFrame(marioLoop);
+        return;
+      }
 
       marioScore += 1;
       if (marioScore > marioBest) {
         marioBest = marioScore;
         localStorage.setItem("marioBestScore", String(marioBest));
       }
+      if (marioCoinsCollected > marioBestCoins) {
+        marioBestCoins = marioCoinsCollected;
+        localStorage.setItem("marioBestCoins", String(marioBestCoins));
+      }
+
+      const nextLevel = 1 + Math.floor(marioScore / 700);
+      if (nextLevel !== marioLevel) {
+        marioLevel = nextLevel;
+        marioTransitionFrames = 50;
+        playMarioSound("level");
+        marioOutputEl.textContent = "Level " + marioLevel + " reached!";
+      }
+
       updateMarioScoreText();
 
       marioPlayer.vy += 0.42;
@@ -799,9 +960,16 @@
         marioPlayer.onGround = true;
       }
 
+      if (marioHitCooldown > 0) marioHitCooldown -= 1;
+      if (marioShieldFrames > 0) marioShieldFrames -= 1;
+
       marioSpawnCounter += 1;
-      const speed = 3.2 + Math.min(2.6, marioScore / 420);
-      const spawnGap = Math.max(52, 110 - Math.floor(marioScore / 180));
+      marioCoinSpawnCounter += 1;
+      marioPowerupSpawnCounter += 1;
+      marioEnemySpawnCounter += 1;
+
+      const speed = 3.1 + Math.min(3.8, marioScore / 360) + (marioLevel - 1) * 0.25;
+      const spawnGap = Math.max(40, 108 - Math.floor(marioScore / 170) - (marioLevel - 1) * 2);
       if (marioSpawnCounter > spawnGap) {
         marioSpawnCounter = 0;
         const h = 20 + Math.floor(Math.random() * 22);
@@ -813,28 +981,168 @@
         });
       }
 
+      const coinGap = Math.max(46, 94 - Math.floor(marioScore / 200));
+      if (marioCoinSpawnCounter > coinGap) {
+        marioCoinSpawnCounter = 0;
+        marioCoins.push({
+          x: marioCanvas.width + 8,
+          y: marioGroundY - 80 - Math.floor(Math.random() * 40),
+          w: 16,
+          h: 16
+        });
+      }
+
+      if (marioPowerupSpawnCounter > 560) {
+        marioPowerupSpawnCounter = 0;
+        marioPowerups.push({
+          x: marioCanvas.width + 8,
+          y: marioGroundY - 72,
+          w: 18,
+          h: 18
+        });
+      }
+
+      const enemyGap = Math.max(78, 180 - (marioLevel - 1) * 9 - Math.floor(marioScore / 500));
+      if (marioEnemySpawnCounter > enemyGap) {
+        marioEnemySpawnCounter = 0;
+        const enemyType = Math.random() < 0.55 ? "ground" : "fly";
+        if (enemyType === "ground") {
+          marioEnemies.push({
+            type: "ground",
+            x: marioCanvas.width + 8,
+            y: marioGroundY - 15,
+            w: 22,
+            h: 15
+          });
+        } else {
+          marioEnemies.push({
+            type: "fly",
+            x: marioCanvas.width + 8,
+            y: marioGroundY - 64 - Math.floor(Math.random() * 16),
+            w: 22,
+            h: 16
+          });
+        }
+      }
+
       marioObstacles.forEach((obs) => {
         obs.x -= speed;
       });
+      marioCoins.forEach((coin) => {
+        coin.x -= speed + 0.5;
+      });
+      marioPowerups.forEach((pow) => {
+        pow.x -= speed;
+      });
+      marioEnemies.forEach((enemy) => {
+        enemy.x -= speed + (enemy.type === "fly" ? 1.1 : 0.3);
+      });
+
       marioObstacles = marioObstacles.filter((obs) => obs.x + obs.w > -4);
+      marioCoins = marioCoins.filter((coin) => coin.x + coin.w > -4);
+      marioPowerups = marioPowerups.filter((pow) => pow.x + pow.w > -4);
+      marioEnemies = marioEnemies.filter((enemy) => enemy.x + enemy.w > -4);
+
+      marioCoins = marioCoins.filter((coin) => {
+        if (marioCollides(marioPlayer, coin)) {
+          marioCoinsCollected += 1;
+          marioScore += 60;
+          playMarioSound("coin");
+          marioOutputEl.textContent = "Coin collected!";
+          return false;
+        }
+        return true;
+      });
+
+      marioPowerups = marioPowerups.filter((pow) => {
+        if (marioCollides(marioPlayer, pow)) {
+          marioShieldFrames = 260;
+          playMarioSound("power");
+          marioOutputEl.textContent = "Star shield active!";
+          return false;
+        }
+        return true;
+      });
+
+      for (const enemy of marioEnemies) {
+        if (marioCollides(marioPlayer, enemy)) {
+          if (marioShieldFrames > 0) {
+            marioScore += 45;
+            enemy.x = -100;
+            continue;
+          }
+
+          const playerBottom = marioPlayer.y + marioPlayer.h;
+          const enemyTop = enemy.y;
+          const stomp = marioPlayer.vy > 0 && playerBottom - enemyTop < 12;
+          if (stomp) {
+            marioScore += 90;
+            marioPlayer.vy = -6.3;
+            marioPlayer.onGround = false;
+            playMarioSound("coin");
+            enemy.x = -100;
+            marioOutputEl.textContent = "Stomped enemy!";
+            continue;
+          }
+
+          if (marioHitCooldown <= 0) {
+            marioLives -= 1;
+            marioHitCooldown = 50;
+            playMarioSound("hit");
+            marioOutputEl.textContent = "Enemy hit! Lives left: " + marioLives;
+            if (marioLives <= 0) {
+              drawMarioScene();
+              marioEndGame();
+              return;
+            }
+          }
+        }
+      }
 
       for (const obs of marioObstacles) {
         if (marioCollides(marioPlayer, obs)) {
-          drawMarioScene();
-          marioEndGame();
-          return;
+          if (marioShieldFrames > 0) {
+            marioScore += 30;
+            continue;
+          }
+
+          if (marioHitCooldown <= 0) {
+            marioLives -= 1;
+            marioHitCooldown = 50;
+            playMarioSound("hit");
+            marioOutputEl.textContent = "Ouch! Lives left: " + marioLives;
+            if (marioLives <= 0) {
+              drawMarioScene();
+              marioEndGame();
+              return;
+            }
+          }
         }
+      }
+
+      if (marioTransitionFrames > 0) {
+        marioTransitionFrames -= 1;
       }
 
       drawMarioScene();
       marioFrameId = requestAnimationFrame(marioLoop);
     }
 
+    function marioTogglePause() {
+      if (!marioRunning) return;
+      marioPaused = !marioPaused;
+      marioPauseBtn.textContent = marioPaused ? "Resume" : "Pause";
+      marioOutputEl.textContent = marioPaused ? "Paused." : "Resumed.";
+    }
+
     function marioStartGame() {
+      marioInitAudio();
       marioResetState();
       marioRunning = true;
-      marioOutputEl.textContent = "Run! Jump over the pipes.";
+      marioPaused = false;
+      marioOutputEl.textContent = "Run! Collect coins and avoid pipes.";
       marioStartBtn.textContent = "Restart";
+      marioPauseBtn.textContent = "Pause";
       drawMarioScene();
       marioFrameId = requestAnimationFrame(marioLoop);
     }
@@ -845,9 +1153,14 @@
         event.preventDefault();
         marioJump();
       }
+      if (key === "p") {
+        event.preventDefault();
+        marioTogglePause();
+      }
     });
 
     marioStartBtn.addEventListener("click", marioStartGame);
+    marioPauseBtn.addEventListener("click", marioTogglePause);
     marioJumpBtn.addEventListener("click", marioJump);
 
     updateMarioScoreText();
