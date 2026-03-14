@@ -4,36 +4,77 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Clicker Game :D</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Space+Grotesk:wght@400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="clicker.css">
 </head>
 <body>
-    <section>
-        <div class="main">
-            <div class="left">
-                <h3>Gems: <span class="gem-cost">0</span></h3>
-                <img src="gem.png" alt="Click this :D" class="gem-image" onclick="incrementGem()" draggable="false">
+    <div class="stars" aria-hidden="true"></div>
+    <main class="main">
+        <section class="left panel">
+            <p class="eyebrow">CALYX MINING STATION</p>
+            <h1>Gem Reactor</h1>
+            <div class="stat-line">
+                <span>Gems</span>
+                <strong class="gem-cost">0</strong>
             </div>
-            <div class="right">
-                <div class="upgrade" onclick = "buyClicker()">
-                    <div class = "left-section">
-                        <img src="clicker-white.png" alt="" class="upgrade-img">
-                    </div>
-                    <div class = "middle-section">
-                        <h4>Clicker</h4>
-                        <div class="cost-info">
-                            <p>Cost: <span class = "clicker-cost">10</span></p>
-                            <img src="gem.png" alt="" class="gem-img" draggable="false">
-                        </div>
-                    </div>
-                    <div class = "right-section"> Level <span class = "clickerLevel">0</span></div>
-                        
-                    <div class = "next-level-info">
-                        Each Clicker<br />is <br />+<span class = "clickerIncrease">1</span> gems <br /> per second
+            <div class="stat-line">
+                <span>Gems / Click</span>
+                <strong class="gpc-value">1</strong>
+            </div>
+            <div class="stat-line">
+                <span>Gems / Second</span>
+                <strong class="gps-value">0</strong>
+            </div>
+            <button class="gem-button" type="button" aria-label="Mine gems">
+                <img src="gem.png" alt="Glowing gem" class="gem-image" draggable="false">
+                <span class="pulse"></span>
+            </button>
+            <p class="hint">Click the reactor core to mine gems and buy upgrades.</p>
+        </section>
+
+        <section class="right panel">
+            <h2>Upgrades</h2>
+
+            <button class="upgrade" data-upgrade="clicker" type="button">
+                <div class="left-section">
+                    <img src="clicker-white.png" alt="Clicker upgrade" class="upgrade-img">
+                </div>
+                <div class="middle-section">
+                    <h3>Quantum Clicker</h3>
+                    <p>Boosts gems per click.</p>
+                    <div class="cost-info">
+                        <span>Cost: <span class="clicker-cost">10</span></span>
+                        <img src="gem.png" alt="Gem" class="gem-img" draggable="false">
                     </div>
                 </div>
-            </div>
-        </div>
-    </section>
+                <div class="right-section">Lv <span class="clickerLevel">0</span></div>
+                <div class="next-level-info">+<span class="clickerIncrease">1</span> gems per click</div>
+            </button>
+
+            <button class="upgrade" data-upgrade="miner" type="button">
+                <div class="left-section">
+                    <img src="miner.png" alt="Miner upgrade" class="upgrade-img">
+                </div>
+                <div class="middle-section">
+                    <h3>Auto Miner</h3>
+                    <p>Generates gems every second.</p>
+                    <div class="cost-info">
+                        <span>Cost: <span class="miner-cost">30</span></span>
+                        <img src="gem.png" alt="Gem" class="gem-img" draggable="false">
+                    </div>
+                </div>
+                <div class="right-section">Lv <span class="minerLevel">0</span></div>
+                <div class="next-level-info">+<span class="minerIncrease">1</span> gems per second</div>
+            </button>
+        </section>
+    </main>
+
+    <div class="floating-layer" aria-hidden="true"></div>
+
+    <audio id="click-sound" src="click.mp3" preload="auto"></audio>
+    <audio id="upgrade-sound" src="upgrade.mp3" preload="auto"></audio>
     <script src="clicker.js"></script>
 </body>
 </html>
