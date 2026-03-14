@@ -196,12 +196,40 @@
     .bad {
       color: var(--danger);
     }
+
+    .camera-wrap {
+      display: grid;
+      gap: 8px;
+    }
+
+    .camera-view {
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: #050b15;
+      aspect-ratio: 4 / 3;
+      object-fit: cover;
+    }
+
+    .cam-target {
+      font-weight: 700;
+      margin-top: 2px;
+    }
+
+    .cam-chip {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      margin-left: 6px;
+      font-size: 0.84rem;
+    }
   </style>
 </head>
 <body>
   <h1>Cool Stuff Lab</h1>
   <p class="subtitle">
-    Your original button toy plus 9 more internet-style mini toys.
+    Your original button toy plus internet-style mini toys, including a camera game.
   </p>
 
   <section class="toy-grid">
@@ -294,6 +322,23 @@
       <input id="scrambleInput" type="text" placeholder="Type a sentence" />
       <button id="scrambleBtn" style="margin-top: 8px;">Scramble</button>
       <div class="output" id="scrambleOutput"></div>
+    </article>
+
+    <article class="toy">
+      <h3>11) Color Hunt Cam</h3>
+      <p>Allow camera, then match the target color with any object near your webcam. You get 15 seconds.</p>
+      <div class="camera-wrap">
+        <video id="camVideo" class="camera-view" autoplay muted playsinline></video>
+        <canvas id="camCanvas" width="160" height="120" hidden></canvas>
+        <div class="cam-target" id="camTarget">Target: -</div>
+        <div class="row">
+          <button id="camStartBtn">Start Camera</button>
+          <button id="camGameBtn">Start Round</button>
+          <button id="camStopBtn">Stop Camera</button>
+        </div>
+        <div class="score" id="camScore">Score: 0 | Time: 15</div>
+        <div class="output" id="camOutput">Tip: Use bright colored objects for easier matching.</div>
+      </div>
     </article>
   </section>
 
@@ -468,6 +513,150 @@
 
       document.getElementById("scrambleOutput").textContent = scrambled;
     });
+
+    const camVideo = document.getElementById("camVideo");
+    const camCanvas = document.getElementById("camCanvas");
+    const camCtx = camCanvas.getContext("2d", { willReadFrequently: true });
+    const camTargetEl = document.getElementById("camTarget");
+    const camScoreEl = document.getElementById("camScore");
+    const camOutputEl = document.getElementById("camOutput");
+    const camStartBtn = document.getElementById("camStartBtn");
+    const camGameBtn = document.getElementById("camGameBtn");
+    const camStopBtn = document.getElementById("camStopBtn");
+
+    const camTargets = [
+      { name: "Red", rgb: [220, 60, 60], hex: "#DC3C3C" },
+      { name: "Green", rgb: [65, 180, 90], hex: "#41B45A" },
+      { name: "Blue", rgb: [70, 120, 235], hex: "#4678EB" },
+      { name: "Yellow", rgb: [230, 200, 60], hex: "#E6C83C" },
+      { name: "Orange", rgb: [230, 135, 55], hex: "#E68737" },
+      { name: "Purple", rgb: [160, 95, 205], hex: "#A05FCD" }
+    ];
+
+    let camStream = null;
+    let camGameTimer = null;
+    let camScanTimer = null;
+    let camTimeLeft = 15;
+    let camScore = 0;
+    let camCurrentTarget = null;
+
+    function pickCamTarget() {
+      camCurrentTarget = camTargets[Math.floor(Math.random() * camTargets.length)];
+      camTargetEl.innerHTML = "Target: " + camCurrentTarget.name +
+        '<span class="cam-chip" style="background:' + camCurrentTarget.hex + '; color: #0b1020;">' +
+        camCurrentTarget.hex + "</span>";
+    }
+
+    function camColorDistance(rgbA, rgbB) {
+      const dr = rgbA[0] - rgbB[0];
+      const dg = rgbA[1] - rgbB[1];
+      const db = rgbA[2] - rgbB[2];
+      return Math.sqrt(dr * dr + dg * dg + db * db);
+    }
+
+    function getCenterAverageRgb() {
+      if (!camVideo.videoWidth || !camVideo.videoHeight) return null;
+      camCtx.drawImage(camVideo, 0, 0, camCanvas.width, camCanvas.height);
+      const size = 24;
+      const sx = (camCanvas.width - size) / 2;
+      const sy = (camCanvas.height - size) / 2;
+      const data = camCtx.getImageData(sx, sy, size, size).data;
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      const pixels = data.length / 4;
+
+      for (let i = 0; i < data.length; i += 4) {
+        r += data[i];
+        g += data[i + 1];
+        b += data[i + 2];
+      }
+
+      return [Math.round(r / pixels), Math.round(g / pixels), Math.round(b / pixels)];
+    }
+
+    async function startCamera() {
+      if (camStream) return true;
+      try {
+        camStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
+          audio: false
+        });
+        camVideo.srcObject = camStream;
+        camOutputEl.textContent = "Camera ready. Press Start Round.";
+        return true;
+      } catch {
+        camOutputEl.textContent = "Camera access blocked or unavailable. Use HTTPS and allow permission.";
+        camOutputEl.classList.add("bad");
+        return false;
+      }
+    }
+
+    function stopCamera() {
+      if (camGameTimer) clearInterval(camGameTimer);
+      if (camScanTimer) clearInterval(camScanTimer);
+      camGameTimer = null;
+      camScanTimer = null;
+
+      if (camStream) {
+        camStream.getTracks().forEach((track) => track.stop());
+        camStream = null;
+      }
+
+      camVideo.srcObject = null;
+      camTargetEl.textContent = "Target: -";
+      camOutputEl.classList.remove("bad");
+      camOutputEl.textContent = "Camera stopped.";
+    }
+
+    function updateCamScoreText() {
+      camScoreEl.textContent = "Score: " + camScore + " | Time: " + camTimeLeft;
+    }
+
+    async function startCamRound() {
+      camOutputEl.classList.remove("bad");
+      const ok = await startCamera();
+      if (!ok) return;
+
+      if (camGameTimer) clearInterval(camGameTimer);
+      if (camScanTimer) clearInterval(camScanTimer);
+
+      camScore = 0;
+      camTimeLeft = 15;
+      pickCamTarget();
+      updateCamScoreText();
+      camOutputEl.textContent = "Find and show the target color in the center of your camera.";
+
+      camGameTimer = setInterval(() => {
+        camTimeLeft -= 1;
+        updateCamScoreText();
+        if (camTimeLeft <= 0) {
+          clearInterval(camGameTimer);
+          clearInterval(camScanTimer);
+          camGameTimer = null;
+          camScanTimer = null;
+          camOutputEl.textContent = "Round finished. Final score: " + camScore;
+        }
+      }, 1000);
+
+      camScanTimer = setInterval(() => {
+        if (!camCurrentTarget) return;
+        const sample = getCenterAverageRgb();
+        if (!sample) return;
+
+        const dist = camColorDistance(sample, camCurrentTarget.rgb);
+        if (dist < 85) {
+          camScore += 1;
+          updateCamScoreText();
+          camOutputEl.textContent = "Nice match: " + camCurrentTarget.name + "! Next target...";
+          pickCamTarget();
+        }
+      }, 220);
+    }
+
+    camStartBtn.addEventListener("click", startCamera);
+    camGameBtn.addEventListener("click", startCamRound);
+    camStopBtn.addEventListener("click", stopCamera);
   </script>
 </body>
 </html>
