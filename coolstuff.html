@@ -224,6 +224,22 @@
       margin-left: 6px;
       font-size: 0.84rem;
     }
+
+    .mario-canvas {
+      width: 100%;
+      max-width: 420px;
+      height: auto;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      background: #87ceeb;
+      display: block;
+    }
+
+    .hint {
+      font-size: 0.84rem;
+      color: var(--muted);
+      margin-top: 8px;
+    }
   </style>
 </head>
 <body>
@@ -339,6 +355,19 @@
         <div class="score" id="camScore">Score: 0 | Time: 15</div>
         <div class="output" id="camOutput">Tip: Use bright colored objects for easier matching.</div>
       </div>
+    </article>
+
+    <article class="toy">
+      <h3>12) Mini Mario Runner</h3>
+      <p>Jump over incoming pipes and survive as long as possible.</p>
+      <canvas id="marioCanvas" class="mario-canvas" width="420" height="190"></canvas>
+      <div class="row" style="margin-top: 8px;">
+        <button id="marioStartBtn">Start</button>
+        <button id="marioJumpBtn">Jump</button>
+      </div>
+      <div class="score" id="marioScore">Score: 0 | Best: 0</div>
+      <div class="output" id="marioOutput">Press Start, then Space/Arrow Up/W (or Jump button).</div>
+      <div class="hint">Mobile: tap Jump button repeatedly.</div>
     </article>
   </section>
 
@@ -657,6 +686,172 @@
     camStartBtn.addEventListener("click", startCamera);
     camGameBtn.addEventListener("click", startCamRound);
     camStopBtn.addEventListener("click", stopCamera);
+
+    const marioCanvas = document.getElementById("marioCanvas");
+    const marioCtx = marioCanvas.getContext("2d");
+    const marioStartBtn = document.getElementById("marioStartBtn");
+    const marioJumpBtn = document.getElementById("marioJumpBtn");
+    const marioScoreEl = document.getElementById("marioScore");
+    const marioOutputEl = document.getElementById("marioOutput");
+
+    const marioGroundY = marioCanvas.height - 28;
+    let marioRunning = false;
+    let marioScore = 0;
+    let marioBest = Number(localStorage.getItem("marioBestScore") || "0");
+    let marioSpawnCounter = 0;
+    let marioFrameId = null;
+
+    const marioPlayer = {
+      x: 48,
+      y: marioGroundY - 24,
+      w: 18,
+      h: 24,
+      vy: 0,
+      onGround: true
+    };
+
+    let marioObstacles = [];
+
+    function updateMarioScoreText() {
+      marioScoreEl.textContent = "Score: " + marioScore + " | Best: " + marioBest;
+    }
+
+    function marioResetState() {
+      marioScore = 0;
+      marioSpawnCounter = 0;
+      marioObstacles = [];
+      marioPlayer.y = marioGroundY - marioPlayer.h;
+      marioPlayer.vy = 0;
+      marioPlayer.onGround = true;
+      updateMarioScoreText();
+    }
+
+    function marioJump() {
+      if (!marioRunning) return;
+      if (!marioPlayer.onGround) return;
+      marioPlayer.vy = -9;
+      marioPlayer.onGround = false;
+    }
+
+    function marioCollides(a, b) {
+      return (
+        a.x < b.x + b.w &&
+        a.x + a.w > b.x &&
+        a.y < b.y + b.h &&
+        a.y + a.h > b.y
+      );
+    }
+
+    function drawMarioScene() {
+      marioCtx.clearRect(0, 0, marioCanvas.width, marioCanvas.height);
+
+      marioCtx.fillStyle = "#87ceeb";
+      marioCtx.fillRect(0, 0, marioCanvas.width, marioCanvas.height);
+
+      marioCtx.fillStyle = "#b7e08a";
+      marioCtx.beginPath();
+      marioCtx.ellipse(90, marioGroundY + 5, 80, 40, 0, 0, Math.PI * 2);
+      marioCtx.ellipse(250, marioGroundY + 8, 95, 36, 0, 0, Math.PI * 2);
+      marioCtx.fill();
+
+      marioCtx.fillStyle = "#6fbe47";
+      marioCtx.fillRect(0, marioGroundY, marioCanvas.width, marioCanvas.height - marioGroundY);
+
+      marioCtx.fillStyle = "#be2e35";
+      marioCtx.fillRect(marioPlayer.x, marioPlayer.y, marioPlayer.w, marioPlayer.h);
+      marioCtx.fillStyle = "#f6c18a";
+      marioCtx.fillRect(marioPlayer.x + 2, marioPlayer.y + 5, marioPlayer.w - 4, 8);
+      marioCtx.fillStyle = "#1f2d3a";
+      marioCtx.fillRect(marioPlayer.x + 2, marioPlayer.y + marioPlayer.h - 5, 6, 5);
+      marioCtx.fillRect(marioPlayer.x + marioPlayer.w - 8, marioPlayer.y + marioPlayer.h - 5, 6, 5);
+
+      marioObstacles.forEach((obs) => {
+        marioCtx.fillStyle = "#2ba24f";
+        marioCtx.fillRect(obs.x, obs.y, obs.w, obs.h);
+        marioCtx.fillStyle = "#1c7d3b";
+        marioCtx.fillRect(obs.x + 2, obs.y + 2, obs.w - 4, 4);
+      });
+    }
+
+    function marioEndGame() {
+      marioRunning = false;
+      if (marioFrameId) cancelAnimationFrame(marioFrameId);
+      marioFrameId = null;
+      marioOutputEl.textContent = "Game over! Press Start to play again.";
+      marioStartBtn.textContent = "Restart";
+    }
+
+    function marioLoop() {
+      if (!marioRunning) return;
+
+      marioScore += 1;
+      if (marioScore > marioBest) {
+        marioBest = marioScore;
+        localStorage.setItem("marioBestScore", String(marioBest));
+      }
+      updateMarioScoreText();
+
+      marioPlayer.vy += 0.42;
+      marioPlayer.y += marioPlayer.vy;
+      if (marioPlayer.y >= marioGroundY - marioPlayer.h) {
+        marioPlayer.y = marioGroundY - marioPlayer.h;
+        marioPlayer.vy = 0;
+        marioPlayer.onGround = true;
+      }
+
+      marioSpawnCounter += 1;
+      const speed = 3.2 + Math.min(2.6, marioScore / 420);
+      const spawnGap = Math.max(52, 110 - Math.floor(marioScore / 180));
+      if (marioSpawnCounter > spawnGap) {
+        marioSpawnCounter = 0;
+        const h = 20 + Math.floor(Math.random() * 22);
+        marioObstacles.push({
+          x: marioCanvas.width + 8,
+          y: marioGroundY - h,
+          w: 16 + Math.floor(Math.random() * 10),
+          h: h
+        });
+      }
+
+      marioObstacles.forEach((obs) => {
+        obs.x -= speed;
+      });
+      marioObstacles = marioObstacles.filter((obs) => obs.x + obs.w > -4);
+
+      for (const obs of marioObstacles) {
+        if (marioCollides(marioPlayer, obs)) {
+          drawMarioScene();
+          marioEndGame();
+          return;
+        }
+      }
+
+      drawMarioScene();
+      marioFrameId = requestAnimationFrame(marioLoop);
+    }
+
+    function marioStartGame() {
+      marioResetState();
+      marioRunning = true;
+      marioOutputEl.textContent = "Run! Jump over the pipes.";
+      marioStartBtn.textContent = "Restart";
+      drawMarioScene();
+      marioFrameId = requestAnimationFrame(marioLoop);
+    }
+
+    document.addEventListener("keydown", (event) => {
+      const key = event.key.toLowerCase();
+      if (key === " " || key === "arrowup" || key === "w") {
+        event.preventDefault();
+        marioJump();
+      }
+    });
+
+    marioStartBtn.addEventListener("click", marioStartGame);
+    marioJumpBtn.addEventListener("click", marioJump);
+
+    updateMarioScoreText();
+    drawMarioScene();
   </script>
 </body>
 </html>

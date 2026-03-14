@@ -96,6 +96,7 @@ Entries:
 - 2026-03-13 | coolstuff.html | Expanded Cool Stuff page from 1 toy to 10 total by adding 9 new interactive mini toys (color generator, dice, coin flip, magic 8 ball, rock-paper-scissors, guess number, fortune cookie, password generator, text scrambler), plus responsive card layout and styling.
 - 2026-03-13 | coolstuff.html | Fixed layout bug where toys appeared oversized/off-screen and crowded right by removing global button.css dependency and scoping button effect styles locally in coolstuff page.
 - 2026-03-13 | coolstuff.html | Added camera mini-game "Color Hunt Cam" using getUserMedia with Start/Stop camera controls, 15-second color matching round, score/timer tracking, and camera permission fallback messaging.
+- 2026-03-13 | coolstuff.html | Added "Mini Mario Runner" canvas game with jump controls (keyboard + button), moving pipe obstacles, increasing speed, score tracking, and saved best score.
 
 ## Next Suggested Improvements
 
