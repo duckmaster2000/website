@@ -85,9 +85,18 @@ Infrastructure and domain:
 - Browser local storage is used by the clicker game to persist progress.
 - The quotes page game state is session based unless extended later.
 
+## Update Log
+
+Use this section to record each meaningful update.
+
+Format:
+- YYYY-MM-DD | Area | Summary
+
+Entries:
+- 2026-03-13 | coolstuff.html | Expanded Cool Stuff page from 1 toy to 10 total by adding 9 new interactive mini toys (color generator, dice, coin flip, magic 8 ball, rock-paper-scissors, guess number, fortune cookie, password generator, text scrambler), plus responsive card layout and styling.
+
 ## Next Suggested Improvements
 
 1. Add a shared navigation header across all pages for consistent UX.
 2. Add a global design token file for colors, spacing, and typography reuse.
-3. Add a compact CHANGELOG section to track future updates by date.
-4. Add accessibility passes for color contrast and keyboard interaction.
+3. Add accessibility passes for color contrast and keyboard interaction.
