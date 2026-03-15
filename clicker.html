@@ -27,10 +27,22 @@
                 <span>Gems / Second</span>
                 <strong class="gps-value">0</strong>
             </div>
+            <div class="stat-line">
+                <span>Combo Bonus</span>
+                <strong class="combo-value">x1.00</strong>
+            </div>
+            <div class="stat-line">
+                <span>Frenzy</span>
+                <strong class="frenzy-value">OFF</strong>
+            </div>
+            <div class="combo-track" aria-hidden="true">
+                <span class="combo-fill"></span>
+            </div>
             <button class="gem-button" type="button" aria-label="Mine gems">
                 <img src="gem.png" alt="Glowing gem" class="gem-image" draggable="false">
                 <span class="pulse"></span>
             </button>
+            <button class="golden-gem hidden" type="button" aria-label="Collect golden gem">GOLDEN GEM</button>
             <p class="hint">Click the reactor core to mine gems and buy upgrades.</p>
         </section>
 
@@ -68,6 +80,53 @@
                 <div class="right-section">Lv <span class="minerLevel">0</span></div>
                 <div class="next-level-info">+<span class="minerIncrease">1</span> gems per second</div>
             </button>
+
+            <button class="upgrade" data-upgrade="factory" type="button">
+                <div class="left-section">
+                    <img src="factory.png" alt="Factory upgrade" class="upgrade-img">
+                </div>
+                <div class="middle-section">
+                    <h3>Crystal Factory</h3>
+                    <p>Heavy passive production boost.</p>
+                    <div class="cost-info">
+                        <span>Cost: <span class="factory-cost">120</span></span>
+                        <img src="gem.png" alt="Gem" class="gem-img" draggable="false">
+                    </div>
+                </div>
+                <div class="right-section">Lv <span class="factoryLevel">0</span></div>
+                <div class="next-level-info">+<span class="factoryIncrease">5</span> gems per second</div>
+            </button>
+
+            <button class="upgrade" data-upgrade="alchemy" type="button">
+                <div class="left-section">
+                    <img src="potion.png" alt="Alchemy upgrade" class="upgrade-img">
+                </div>
+                <div class="middle-section">
+                    <h3>Gem Alchemy</h3>
+                    <p>Raises crit and golden gem chance.</p>
+                    <div class="cost-info">
+                        <span>Cost: <span class="alchemy-cost">90</span></span>
+                        <img src="gem.png" alt="Gem" class="gem-img" draggable="false">
+                    </div>
+                </div>
+                <div class="right-section">Lv <span class="alchemyLevel">0</span></div>
+                <div class="next-level-info">+<span class="alchemyIncrease">2</span>% crit chance</div>
+            </button>
+
+            <div class="terminal">
+                <h3>Secret Code Console</h3>
+                <p>Enter a secret code to unlock hidden systems.</p>
+                <div class="terminal-row">
+                    <input id="secretCodeInput" type="text" placeholder="Enter code">
+                    <button id="secretCodeBtn" type="button">Apply</button>
+                </div>
+                <div class="terminal-feedback" id="secretFeedback">Console ready.</div>
+            </div>
+
+            <div class="achievements">
+                <h3>Achievements</h3>
+                <div class="achievement-list" id="achievementList"></div>
+            </div>
         </section>
     </main>
 

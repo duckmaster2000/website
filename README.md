@@ -99,6 +99,7 @@ Entries:
 - 2026-03-13 | coolstuff.html | Added "Mini Mario Runner" canvas game with jump controls (keyboard + button), moving pipe obstacles, increasing speed, score tracking, and saved best score.
 - 2026-03-13 | coolstuff.html | Upgraded Mini Mario Runner with sprite-based visuals, oscillator sound effects, collectible coins, star shield power-up, 3-life system, and level progression with scaling speed/difficulty.
 - 2026-03-13 | coolstuff.html | Added Mario pause/resume system (button + P key), introduced enemy types (ground + flying with stomp interaction), and added animated level transition overlays between levels.
+- 2026-03-14 | clicker.html/clicker.css/clicker.js | Major clicker overhaul: added combo/frenzy/crit systems, golden gem event clicks with bonus rewards, two new upgrades (Crystal Factory and Gem Alchemy), achievements panel, stronger VFX polish, save migration to v3, and a secret code console where typing "Caleb" unlocks a one-time hack boost.
 
 ## Next Suggested Improvements
 
