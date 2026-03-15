@@ -100,6 +100,7 @@ Entries:
 - 2026-03-13 | coolstuff.html | Upgraded Mini Mario Runner with sprite-based visuals, oscillator sound effects, collectible coins, star shield power-up, 3-life system, and level progression with scaling speed/difficulty.
 - 2026-03-13 | coolstuff.html | Added Mario pause/resume system (button + P key), introduced enemy types (ground + flying with stomp interaction), and added animated level transition overlays between levels.
 - 2026-03-14 | clicker.html/clicker.css/clicker.js | Major clicker overhaul: added combo/frenzy/crit systems, golden gem event clicks with bonus rewards, two new upgrades (Crystal Factory and Gem Alchemy), achievements panel, stronger VFX polish, save migration to v3, and a secret code console where typing "Caleb" unlocks a one-time hack boost.
+- 2026-03-14 | clicker.js/clicker.css/clicker.html | Debugged and fixed all reported bugs: stale goldenGemActive save preventing golden gems from ever spawning after reload; silent upgrade failures replaced with "Need X gems" feedback message; full state validation on load to guard against NaN/corrupted saves; transient combo/frenzy state no longer persisted across reloads; achievement rendering throttled from 200 ms to once per second; buyFeedback element wired into all purchase paths.
 
 ## Next Suggested Improvements
 
