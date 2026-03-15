@@ -3,125 +3,79 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Clicker Game :D</title>
+    <title>Calyx Space Bakery</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Space+Grotesk:wght@400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Press+Start+2P&family=Space+Grotesk:wght@400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="clicker.css">
 </head>
 <body>
     <div class="stars" aria-hidden="true"></div>
     <main class="main">
         <section class="left panel">
-            <p class="eyebrow">CALYX MINING STATION</p>
-            <h1>Gem Reactor</h1>
-            <div class="stat-line">
-                <span>Gems</span>
-                <strong class="gem-cost">0</strong>
-            </div>
-            <div class="stat-line">
-                <span>Gems / Click</span>
-                <strong class="gpc-value">1</strong>
-            </div>
-            <div class="stat-line">
-                <span>Gems / Second</span>
-                <strong class="gps-value">0</strong>
-            </div>
-            <div class="stat-line">
-                <span>Combo Bonus</span>
-                <strong class="combo-value">x1.00</strong>
-            </div>
-            <div class="stat-line">
-                <span>Frenzy</span>
-                <strong class="frenzy-value">OFF</strong>
-            </div>
-            <div class="combo-track" aria-hidden="true">
-                <span class="combo-fill"></span>
-            </div>
+            <p class="eyebrow">CALYX ORBITAL BAKERY STATION</p>
+            <h1>Stellar Gem Bakery</h1>
+            <div class="stat-line"><span>Gems</span><strong class="gem-cost">0</strong></div>
+            <div class="stat-line"><span>Gems / Click</span><strong class="gpc-value">1</strong></div>
+            <div class="stat-line"><span>Gems / Second</span><strong class="gps-value">0</strong></div>
+            <div class="stat-line"><span>Total Buildings</span><strong class="building-total">0</strong></div>
+            <div class="stat-line"><span>Research Unlocked</span><strong class="research-total">0</strong></div>
+            <div class="stat-line"><span>Combo Bonus</span><strong class="combo-value">x1</strong></div>
+            <div class="stat-line"><span>Frenzy</span><strong class="frenzy-value">OFF</strong></div>
+            <div class="stat-line"><span>Defense Wins</span><strong class="td-wins">0</strong></div>
+
+            <div class="combo-track" aria-hidden="true"><span class="combo-fill"></span></div>
+
             <button class="gem-button" type="button" aria-label="Mine gems">
                 <img src="gem.png" alt="Glowing gem" class="gem-image" draggable="false">
                 <span class="pulse"></span>
             </button>
-            <button class="golden-gem hidden" type="button" aria-label="Collect golden gem">GOLDEN GEM</button>
-            <p class="hint">Click the reactor core to mine gems and buy upgrades.</p>
+            <button class="golden-gem hidden" type="button" aria-label="Collect golden gem">SOLAR GEM EVENT</button>
+            <p class="hint">Click the gem core, grow your orbital economy, and hold off alien raiders.</p>
         </section>
 
         <section class="right panel">
-            <h2>Upgrades</h2>
+            <div class="section-head">
+                <h2>Building Fleet</h2>
+                <p>Cookie-clicker style growth: buy buildings for passive production.</p>
+            </div>
             <div class="buy-feedback" id="buyFeedback"></div>
+            <div class="building-list" id="buildingList"></div>
 
-            <button class="upgrade" data-upgrade="clicker" type="button">
-                <div class="left-section">
-                    <img src="clicker-white.png" alt="Clicker upgrade" class="upgrade-img">
-                </div>
-                <div class="middle-section">
-                    <h3>Quantum Clicker</h3>
-                    <p>Boosts gems per click.</p>
-                    <div class="cost-info">
-                        <span>Cost: <span class="clicker-cost">10</span></span>
-                        <img src="gem.png" alt="Gem" class="gem-img" draggable="false">
-                    </div>
-                </div>
-                <div class="right-section">Lv <span class="clickerLevel">0</span></div>
-                <div class="next-level-info">+<span class="clickerIncrease">1</span> gems per click</div>
-            </button>
-
-            <button class="upgrade" data-upgrade="miner" type="button">
-                <div class="left-section">
-                    <img src="miner.png" alt="Miner upgrade" class="upgrade-img">
-                </div>
-                <div class="middle-section">
-                    <h3>Auto Miner</h3>
-                    <p>Generates gems every second.</p>
-                    <div class="cost-info">
-                        <span>Cost: <span class="miner-cost">30</span></span>
-                        <img src="gem.png" alt="Gem" class="gem-img" draggable="false">
-                    </div>
-                </div>
-                <div class="right-section">Lv <span class="minerLevel">0</span></div>
-                <div class="next-level-info">+<span class="minerIncrease">1</span> gems per second</div>
-            </button>
-
-            <button class="upgrade" data-upgrade="factory" type="button">
-                <div class="left-section">
-                    <img src="factory.png" alt="Factory upgrade" class="upgrade-img">
-                </div>
-                <div class="middle-section">
-                    <h3>Crystal Factory</h3>
-                    <p>Heavy passive production boost.</p>
-                    <div class="cost-info">
-                        <span>Cost: <span class="factory-cost">120</span></span>
-                        <img src="gem.png" alt="Gem" class="gem-img" draggable="false">
-                    </div>
-                </div>
-                <div class="right-section">Lv <span class="factoryLevel">0</span></div>
-                <div class="next-level-info">+<span class="factoryIncrease">5</span> gems per second</div>
-            </button>
-
-            <button class="upgrade" data-upgrade="alchemy" type="button">
-                <div class="left-section">
-                    <img src="potion.png" alt="Alchemy upgrade" class="upgrade-img">
-                </div>
-                <div class="middle-section">
-                    <h3>Gem Alchemy</h3>
-                    <p>Raises crit and golden gem chance.</p>
-                    <div class="cost-info">
-                        <span>Cost: <span class="alchemy-cost">90</span></span>
-                        <img src="gem.png" alt="Gem" class="gem-img" draggable="false">
-                    </div>
-                </div>
-                <div class="right-section">Lv <span class="alchemyLevel">0</span></div>
-                <div class="next-level-info">+<span class="alchemyIncrease">2</span>% crit chance</div>
-            </button>
+            <div class="section-head">
+                <h2>Research Upgrades</h2>
+                <p>Overclock your buildings with compact upgrade chips.</p>
+            </div>
+            <div class="research-list" id="researchList"></div>
 
             <div class="terminal">
                 <h3>Secret Code Console</h3>
-                <p>Enter a secret code to unlock hidden systems.</p>
+                <p>Enter a hidden code to unlock station override systems.</p>
                 <div class="terminal-row">
                     <input id="secretCodeInput" type="text" placeholder="Enter code">
                     <button id="secretCodeBtn" type="button">Apply</button>
                 </div>
                 <div class="terminal-feedback" id="secretFeedback">Console ready.</div>
+            </div>
+
+            <div class="minigame">
+                <div class="minigame-head">
+                    <h3>Minigame: Astrobakery Defense</h3>
+                    <p>Spend tower tokens generated from your buildings to defend your base from space monsters.</p>
+                </div>
+                <div class="td-stats">
+                    <span>Base HP: <strong id="tdBaseHp">20</strong></span>
+                    <span>Wave: <strong id="tdWave">0</strong></span>
+                    <span>Tower Tokens: <strong id="tdTokens">0</strong></span>
+                    <span>Monsters Defeated: <strong id="tdKills">0</strong></span>
+                </div>
+                <div class="td-controls">
+                    <button id="tdStartBtn" type="button">Start Defense</button>
+                    <button id="tdResetBtn" type="button">Reset Grid</button>
+                </div>
+                <canvas id="tdCanvas" width="560" height="220" aria-label="Tower defense arena"></canvas>
+                <p class="td-help">Click a grid cell to place a tower. Each tower costs 1 token. Survive 60 seconds for a gem payout.</p>
+                <div class="terminal-feedback" id="tdFeedback">Defense bay idle.</div>
             </div>
 
             <div class="achievements">
