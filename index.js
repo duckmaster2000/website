@@ -1,7 +1,7 @@
 const ACH_STORAGE_KEY = 'caleb_home_achievements_v1';
 
 // Change this passcode any time to keep edit access private.
-const ACH_EDIT_PASSCODE = 'caleb';
+const ACH_EDIT_PASSCODE = '1ydzpU1y!';
 
 const el = {
   list: document.getElementById('achList'),
@@ -99,7 +99,7 @@ function renderAchievements() {
   if (!el.list) return;
 
   if (achievements.length === 0) {
-    el.list.innerHTML = '<li class="ach-item"><span class="ach-text">No achievements yet. Unlock edit mode and add one with +</span></li>';
+    el.list.innerHTML = '<li class="ach-empty">No achievements yet. Unlock edit mode and add one with +</li>';
     return;
   }
 

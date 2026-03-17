@@ -139,6 +139,15 @@ figure img {
 
 .ach-sub {
   margin: 0 0 0.55rem;
+  color: #bad5ec;
+}
+
+.achievements-panel {
+  background:
+    radial-gradient(700px 240px at 0% 0%, rgba(60, 242, 255, 0.14), transparent 60%),
+    radial-gradient(700px 260px at 100% 100%, rgba(154, 245, 122, 0.1), transparent 58%),
+    rgba(10, 27, 51, 0.76);
+  border-color: rgba(133, 216, 255, 0.48);
 }
 
 .ach-toolbar {
@@ -152,12 +161,19 @@ figure img {
 #achUnlockBtn,
 #achAddBtn,
 .ach-delete {
-  border: 1px solid rgba(60, 242, 255, 0.45);
+  border: 1px solid rgba(117, 225, 255, 0.62);
   border-radius: 10px;
-  background: rgba(8, 30, 56, 0.82);
+  background: linear-gradient(180deg, rgba(31, 72, 116, 0.95), rgba(18, 48, 80, 0.92));
   color: var(--text);
   font-family: "Space Grotesk", "Segoe UI", sans-serif;
   cursor: pointer;
+}
+
+#achUnlockBtn:hover,
+#achAddBtn:hover,
+.ach-delete:hover {
+  border-color: rgba(154, 245, 122, 0.74);
+  box-shadow: 0 0 16px rgba(60, 242, 255, 0.24);
 }
 
 #achUnlockBtn {
@@ -166,7 +182,8 @@ figure img {
 
 #achStatus {
   font-size: 0.9rem;
-  color: var(--muted);
+  color: #d9ecff;
+  font-weight: 600;
 }
 
 .ach-add-row {
@@ -178,11 +195,12 @@ figure img {
 
 #achInput {
   width: 100%;
-  border: 1px solid rgba(113, 196, 255, 0.36);
+  border: 1px solid rgba(144, 214, 255, 0.52);
   border-radius: 10px;
   padding: 0.56rem 0.66rem;
-  background: rgba(7, 24, 45, 0.8);
+  background: rgba(13, 36, 64, 0.9);
   color: var(--text);
+  font-size: 1rem;
 }
 
 #achInput:disabled {
@@ -207,9 +225,9 @@ figure img {
   display: flex;
   align-items: center;
   gap: 0.55rem;
-  border: 1px solid rgba(113, 196, 255, 0.28);
+  border: 1px solid rgba(125, 208, 255, 0.46);
   border-radius: 12px;
-  background: rgba(8, 22, 45, 0.65);
+  background: rgba(17, 41, 69, 0.8);
   padding: 0.44rem 0.55rem;
 }
 
@@ -234,6 +252,15 @@ figure img {
 
 .ach-delete[hidden] {
   display: none;
+}
+
+.ach-empty {
+  list-style: none;
+  border: 1px dashed rgba(130, 203, 255, 0.45);
+  border-radius: 12px;
+  background: rgba(14, 36, 64, 0.62);
+  padding: 0.56rem 0.65rem;
+  color: #d4eaff;
 }
 
 a {
