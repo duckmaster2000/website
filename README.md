@@ -1,4 +1,4 @@
-# Caleb Liu Website
+# My Website :D
 
 A personal multi-page website with custom mini-projects, media, and game pages.
 
