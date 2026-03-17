@@ -23,6 +23,8 @@
             <div class="stat-line"><span>Combo Bonus</span><strong class="combo-value">x1</strong></div>
             <div class="stat-line"><span>Frenzy</span><strong class="frenzy-value">OFF</strong></div>
             <div class="stat-line"><span>Defense Wins</span><strong class="td-wins">0</strong></div>
+            <div class="stat-line"><span>Prestige Shards</span><strong class="prestige-shards">0</strong></div>
+            <div class="stat-line"><span>Prestige Multiplier</span><strong class="prestige-mult">x1.00</strong></div>
 
             <div class="combo-track" aria-hidden="true"><span class="combo-fill"></span></div>
 
@@ -48,6 +50,20 @@
             </div>
             <div class="research-list" id="researchList"></div>
 
+            <div class="prestige">
+                <h3>Stellar Prestige</h3>
+                <p>Reset your economy for permanent shard-based boosts.</p>
+                <div class="prestige-row">
+                    <span>Current Shards: <strong id="prestigeShards">0</strong></span>
+                    <span>On Reset: <strong id="prestigeGain">0</strong></span>
+                </div>
+                <div class="prestige-row">
+                    <span>Permanent GPS Bonus: <strong id="prestigeGpsBonus">0%</strong></span>
+                    <span>Permanent TD Bonus: <strong id="prestigeTdBonus">0%</strong></span>
+                </div>
+                <button id="prestigeBtn" type="button">Prestige Reset</button>
+            </div>
+
             <div class="terminal">
                 <h3>Secret Code Console</h3>
                 <p>Enter a hidden code to unlock station override systems.</p>
@@ -68,13 +84,28 @@
                     <span>Wave: <strong id="tdWave">0</strong></span>
                     <span>Tower Tokens: <strong id="tdTokens">0</strong></span>
                     <span>Monsters Defeated: <strong id="tdKills">0</strong></span>
+                    <span>Strike Energy: <strong id="tdEnergy">0</strong></span>
                 </div>
                 <div class="td-controls">
                     <button id="tdStartBtn" type="button">Start Defense</button>
                     <button id="tdResetBtn" type="button">Reset Grid</button>
+                    <button id="tdAbilityBtn" type="button">Orbital Strike (25)</button>
+                </div>
+                <div class="td-tower-types" id="tdTowerTypes">
+                    <button class="td-type active" data-td-type="laser" type="button">Laser Tower</button>
+                    <button class="td-type" data-td-type="cannon" type="button">Cannon Tower</button>
+                    <button class="td-type" data-td-type="frost" type="button">Frost Tower</button>
+                </div>
+                <div class="td-upgrade-panel">
+                    <p id="tdSelectedLabel">Select a tower on the grid to upgrade it.</p>
+                    <div class="td-upgrade-actions">
+                        <button id="tdUpgradeA" type="button">Path A Upgrade</button>
+                        <button id="tdUpgradeB" type="button">Path B Upgrade</button>
+                        <button id="tdSellTower" type="button">Sell Tower</button>
+                    </div>
                 </div>
                 <canvas id="tdCanvas" width="560" height="220" aria-label="Tower defense arena"></canvas>
-                <p class="td-help">Click a grid cell to place a tower. Each tower costs 1 token. Survive 60 seconds for a gem payout.</p>
+                <p class="td-help">Pick a tower type, place on open cells, then click placed towers to branch into Path A/Path B upgrades. Later waves include fast, tanky, and split enemies.</p>
                 <div class="terminal-feedback" id="tdFeedback">Defense bay idle.</div>
             </div>
 

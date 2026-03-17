@@ -336,11 +336,31 @@ h3 {
 
 .terminal,
 .achievements,
-.minigame {
+.minigame,
+.prestige {
     border: 1px solid rgba(139, 207, 255, 0.28);
     border-radius: 14px;
     padding: 0.75rem;
     background: rgba(9, 24, 44, 0.78);
+}
+
+.prestige {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.prestige p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.82rem;
+}
+
+.prestige-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    color: #cbe5fb;
+    font-size: 0.78rem;
 }
 
 .terminal-row {
@@ -361,7 +381,13 @@ h3 {
 
 #secretCodeBtn,
 #tdStartBtn,
-#tdResetBtn {
+#tdResetBtn,
+#tdAbilityBtn,
+#prestigeBtn,
+#tdUpgradeA,
+#tdUpgradeB,
+#tdSellTower,
+.td-type {
     border: 1px solid rgba(138, 214, 255, 0.45);
     border-radius: 10px;
     background: rgba(23, 53, 88, 0.95);
@@ -374,8 +400,27 @@ h3 {
 
 #secretCodeBtn:hover,
 #tdStartBtn:hover,
-#tdResetBtn:hover {
+#tdResetBtn:hover,
+#tdAbilityBtn:hover,
+#prestigeBtn:hover,
+#tdUpgradeA:hover,
+#tdUpgradeB:hover,
+#tdSellTower:hover,
+.td-type:hover {
     border-color: var(--accent);
+}
+
+#tdAbilityBtn {
+    border-color: rgba(255, 215, 90, 0.55);
+}
+
+#tdSellTower {
+    border-color: rgba(255, 140, 140, 0.6);
+}
+
+.td-type.active {
+    border-color: rgba(157, 255, 146, 0.72);
+    background: rgba(34, 78, 63, 0.9);
 }
 
 .terminal-feedback {
@@ -403,6 +448,36 @@ h3 {
     margin-top: 0.52rem;
     display: flex;
     gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.td-tower-types {
+    margin-top: 0.5rem;
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.td-upgrade-panel {
+    margin-top: 0.55rem;
+    border: 1px solid rgba(138, 214, 255, 0.24);
+    border-radius: 10px;
+    padding: 0.5rem;
+    background: rgba(8, 20, 40, 0.65);
+    display: grid;
+    gap: 0.45rem;
+}
+
+.td-upgrade-panel p {
+    margin: 0;
+    color: #cbe5fb;
+    font-size: 0.78rem;
+}
+
+.td-upgrade-actions {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
 }
 
 #tdCanvas {
