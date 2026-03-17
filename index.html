@@ -32,6 +32,20 @@
     </section>
 
     <section class="panel">
+      <h2>My Achievements</h2>
+      <p class="ach-sub">Simple personal checklist. Unlock edit mode to add or remove items.</p>
+      <div class="ach-toolbar">
+        <button id="achUnlockBtn" type="button">Unlock Edit</button>
+        <span id="achStatus">View mode</span>
+      </div>
+      <div class="ach-add-row">
+        <input id="achInput" type="text" placeholder="Write a new achievement..." aria-label="New achievement" disabled />
+        <button id="achAddBtn" type="button" aria-label="Add achievement" disabled>+</button>
+      </div>
+      <ul id="achList" class="ach-list" aria-live="polite"></ul>
+    </section>
+
+    <section class="panel">
       <h2>Photo Feed</h2>
       <div class="photo-grid">
         <figure>
@@ -97,5 +111,6 @@
       </a>
     </footer>
   </main>
+  <script src="index.js"></script>
 </body>
 </html>

@@ -137,6 +137,105 @@ figure img {
   line-height: 1.45;
 }
 
+.ach-sub {
+  margin: 0 0 0.55rem;
+}
+
+.ach-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-bottom: 0.6rem;
+}
+
+#achUnlockBtn,
+#achAddBtn,
+.ach-delete {
+  border: 1px solid rgba(60, 242, 255, 0.45);
+  border-radius: 10px;
+  background: rgba(8, 30, 56, 0.82);
+  color: var(--text);
+  font-family: "Space Grotesk", "Segoe UI", sans-serif;
+  cursor: pointer;
+}
+
+#achUnlockBtn {
+  padding: 0.42rem 0.72rem;
+}
+
+#achStatus {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.ach-add-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.45rem;
+  margin-bottom: 0.7rem;
+}
+
+#achInput {
+  width: 100%;
+  border: 1px solid rgba(113, 196, 255, 0.36);
+  border-radius: 10px;
+  padding: 0.56rem 0.66rem;
+  background: rgba(7, 24, 45, 0.8);
+  color: var(--text);
+}
+
+#achInput:disabled {
+  opacity: 0.62;
+}
+
+#achAddBtn {
+  width: 44px;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.ach-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.ach-item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  border: 1px solid rgba(113, 196, 255, 0.28);
+  border-radius: 12px;
+  background: rgba(8, 22, 45, 0.65);
+  padding: 0.44rem 0.55rem;
+}
+
+.ach-item input[type="checkbox"] {
+  transform: scale(1.12);
+}
+
+.ach-text {
+  flex: 1;
+  color: #dff1ff;
+}
+
+.ach-item.done .ach-text {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.ach-delete {
+  padding: 0.25rem 0.45rem;
+  font-size: 0.82rem;
+}
+
+.ach-delete[hidden] {
+  display: none;
+}
+
 a {
   color: var(--accent);
 }
