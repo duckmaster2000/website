@@ -114,7 +114,9 @@ const el = {
     buyFeedback: document.getElementById('buyFeedback'),
 
     buildingList: document.getElementById('buildingList'),
+    buildingBulkMode: document.getElementById('buildingBulkMode'),
     researchList: document.getElementById('researchList'),
+    buyAllUpgradesBtn: document.getElementById('buyAllUpgradesBtn'),
 
     prestigeShards: document.getElementById('prestigeShards'),
     prestigeGain: document.getElementById('prestigeGain'),
@@ -525,26 +527,41 @@ function renderBuildings() {
         const cost = state.buildingCosts[b.id];
         const eachGps = buildingProduction(b);
         const disabled = canAfford(cost) ? '' : 'disabled';
+        const ten = previewBulkCost(b.id, 10);
+        const hundred = previewBulkCost(b.id, 100);
+        const all = previewBulkCost(b.id, 'all');
 
         return `
-            <button class="building ${disabled}" data-building="${b.id}" type="button">
-                <div class="icon-wrap"><img src="${b.img}" alt="${b.name}" draggable="false"></div>
-                <div class="building-main">
-                    <h4>${b.name}</h4>
-                    <p>${b.desc}</p>
-                    <div class="meta-row">
-                        <span>Cost: ${fmt(cost)}</span>
-                        <span>Each: +${fmtDec(eachGps, 2)} gps</span>
-                        <span>Total: +${fmtDec(eachGps * count, 2)} gps</span>
+            <div class="building-card ${disabled}">
+                <div class="building-top">
+                    <div class="icon-wrap"><img src="${b.img}" alt="${b.name}" draggable="false"></div>
+                    <div class="building-main">
+                        <h4>${b.name}</h4>
+                        <p>${b.desc}</p>
+                        <div class="meta-row">
+                            <span>Next Cost: ${fmt(cost)}</span>
+                            <span>Each: +${fmtDec(eachGps, 2)} gps</span>
+                            <span>Total: +${fmtDec(eachGps * count, 2)} gps</span>
+                        </div>
+                    </div>
+                    <div class="side-amount">
+                        <span>Owned</span>
+                        <strong>${fmt(count)}</strong>
                     </div>
                 </div>
-                <div class="side-amount">
-                    <span>Owned</span>
-                    <strong>${fmt(count)}</strong>
+                <div class="building-buy-controls">
+                    <button data-building-buy="${b.id}" data-amount="1" type="button">Buy 1 (${fmt(cost)})</button>
+                    <button data-building-buy="${b.id}" data-amount="10" type="button">Buy 10 (${ten.count > 0 ? fmt(ten.totalCost) : 'N/A'})</button>
+                    <button data-building-buy="${b.id}" data-amount="100" type="button">Buy 100 (${hundred.count > 0 ? fmt(hundred.totalCost) : 'N/A'})</button>
+                    <button data-building-buy="${b.id}" data-amount="all" type="button">Buy All (${all.count > 0 ? all.count : 0})</button>
                 </div>
-            </button>
+            </div>
         `;
     }).join('');
+
+    if (el.buildingBulkMode) {
+        el.buildingBulkMode.textContent = 'Use each building card for 1x, 10x, 100x, or All';
+    }
 }
 
 function renderResearch() {
@@ -744,6 +761,108 @@ function buyBuilding(id) {
     saveGame();
 }
 
+function previewBulkCost(id, amount) {
+    let countBought = 0;
+    let totalCost = 0;
+    let simulatedGems = state.gems;
+    let simulatedCost = state.buildingCosts[id];
+    let simulatedOwned = state.buildings[id];
+    const max = amount === 'all' ? Number.POSITIVE_INFINITY : Number(amount);
+
+    while (countBought < max && simulatedGems >= simulatedCost) {
+        simulatedGems -= simulatedCost;
+        totalCost += simulatedCost;
+        simulatedOwned += 1;
+        simulatedCost = Math.round(simulatedCost * 1.15 + simulatedOwned * 0.35);
+        countBought += 1;
+    }
+
+    return {
+        count: countBought,
+        totalCost,
+        nextCost: simulatedCost,
+        gemsLeft: simulatedGems,
+        owned: simulatedOwned
+    };
+}
+
+function buyBuildingBulk(id, amount) {
+    const building = BUILDINGS.find((b) => b.id === id);
+    if (!building) return;
+
+    const preview = previewBulkCost(id, amount);
+    if (preview.count <= 0) {
+        showBuyFeedback(`Not enough gems to buy ${building.name}.`);
+        return;
+    }
+
+    state.gems -= preview.totalCost;
+    state.buildings[id] = preview.owned;
+    state.buildingCosts[id] = preview.nextCost;
+
+    const amountLabel = amount === 'all' ? `ALL (${preview.count})` : amount;
+    showBuyFeedback(`${building.name}: bought ${amountLabel}.`);
+    playSound(el.upgradeSound, 0.5);
+    renderAll();
+    saveGame();
+}
+
+function buyAllAffordableResearch() {
+    let purchased = 0;
+    let progressed = true;
+
+    while (progressed) {
+        progressed = false;
+
+        for (const research of RESEARCH) {
+            if (state.researchBought[research.id]) continue;
+            if (state.gems < research.cost) continue;
+
+            state.gems -= research.cost;
+            state.researchBought[research.id] = true;
+            state.researchCount += 1;
+            purchased += 1;
+
+            if (research.target === 'globalGps') {
+                state.globalGpsMult *= research.amount;
+            } else if (research.target === 'goldenChance') {
+                state.goldenChance = Math.min(0.95, state.goldenChance + research.amount);
+            } else if (research.target === 'clickAndCrit') {
+                state.gpc += 3;
+                state.critChance = Math.min(0.95, state.critChance + 0.07);
+            } else if (research.target === 'clickAndCrit2') {
+                state.gpc += 8;
+                state.critChance = Math.min(0.95, state.critChance + 0.08);
+            } else if (research.target === 'tdTokens') {
+                state.tdBonusTokens += research.amount;
+            } else if (research.target === 'tdDamage') {
+                state.tdDamageBonus += research.amount;
+            } else if (research.target === 'tdEnergy') {
+                state.tdEnergyBonus += research.amount;
+            } else if (research.target === 'tdSpawnSlow') {
+                state.tdSpawnSlow += research.amount;
+            } else if (research.target === 'combo') {
+                state.comboSoftCap += 0.5;
+                state.comboDecayDelay += 350;
+            } else {
+                state.buildingMults[research.target] *= research.mult;
+            }
+
+            progressed = true;
+        }
+    }
+
+    if (purchased <= 0) {
+        showBuyFeedback('No affordable upgrades right now.');
+        return;
+    }
+
+    showBuyFeedback(`Installed ${purchased} upgrade(s).`);
+    playSound(el.upgradeSound, 0.64);
+    renderAll();
+    saveGame();
+}
+
 function buyResearch(id) {
     const research = RESEARCH.find((r) => r.id === id);
     if (!research) return;
@@ -904,11 +1023,11 @@ function timedTick() {
 }
 
 function tdBaseHpForRun() {
-    return 25 + Math.floor(totalBuildings() / 45) + state.prestigeShards;
+    return 20 + Math.floor(totalBuildings() / 90) + Math.floor(state.prestigeShards / 2);
 }
 
 function tdTokenStartForRun() {
-    return Math.max(4, Math.floor(totalBuildings() / 5) + state.tdBonusTokens + Math.floor(state.prestigeShards / 2));
+    return Math.max(3, Math.floor(totalBuildings() / 8) + state.tdBonusTokens + Math.floor(state.prestigeShards / 3));
 }
 
 function tdResetState() {
@@ -942,9 +1061,9 @@ function tdTowerAtCell(col, row) {
 
 function tdEnemyBaseStats(typeName) {
     const type = ENEMY_TYPES[typeName];
-    const waveScale = Math.pow(1.18, Math.max(0, td.wave - 1));
+    const waveScale = Math.pow(1.28, Math.max(0, td.wave - 1));
     const baseHp = 16 * waveScale * type.hpMult;
-    const baseSpeed = (30 + td.wave * 1.2) * type.speedMult;
+    const baseSpeed = (30 + td.wave * 2.8) * type.speedMult;
     return {
         hp: baseHp,
         speed: baseSpeed
@@ -980,11 +1099,11 @@ function tdWavePool() {
 function tdStartNextWave() {
     td.wave += 1;
     td.waveActive = true;
-    td.enemiesToSpawn = 6 + td.wave * 2;
+    td.enemiesToSpawn = 10 + td.wave * 4;
     td.spawnClock = 0;
-    td.spawnDelay = Math.max(0.24, (0.95 - td.wave * 0.02) + Math.max(0, 0.18 - state.tdSpawnSlow));
+    td.spawnDelay = Math.max(0.13, (0.82 - td.wave * 0.025) + Math.max(0, 0.14 - state.tdSpawnSlow));
 
-    td.tokens += Math.max(1, Math.floor(td.wave / 3));
+    td.tokens += td.wave % 3 === 0 ? 1 : 0;
     if (el.tdFeedback) {
         el.tdFeedback.textContent = `Wave ${td.wave} started. Incoming monsters: ${td.enemiesToSpawn}.`;
     }
@@ -1034,7 +1153,7 @@ function tdTowerStats(tower) {
 }
 
 function tdUpgradeCost(tower, path) {
-    const base = 6 + td.wave;
+    const base = 12 + td.wave;
     if (path === 'A') return Math.round(base + tower.pathA * 7 + tower.pathB * 3);
     return Math.round(base + tower.pathB * 7 + tower.pathA * 3);
 }
@@ -1161,9 +1280,9 @@ function tdUpdate(delta) {
         if (td.enemiesToSpawn <= 0 && td.enemies.length === 0) {
             td.waveActive = false;
             td.nextWaveClock = 2.4;
-            const waveReward = Math.round(160 + td.wave * 38 + totalBuildings() * 2.5);
+            const waveReward = Math.round(95 + td.wave * 22 + totalBuildings() * 1.4);
             addGems(waveReward);
-            td.tokens += 1;
+            if (td.wave % 4 === 0) td.tokens += 1;
             if (el.tdFeedback) el.tdFeedback.textContent = `Wave ${td.wave} cleared. +${fmt(waveReward)} gems.`;
         }
     }
@@ -1348,7 +1467,7 @@ function tdStopRun(message) {
 function tdFinishRun() {
     state.tdBestKills = Math.max(state.tdBestKills, td.kills);
 
-    const reward = Math.round(td.kills * 26 + td.wave * 120 + totalBuildings() * 3.5);
+    const reward = Math.round(td.kills * 16 + td.wave * 72 + totalBuildings() * 2.1);
     addGems(reward);
     state.tdWins += td.wave > 0 ? 1 : 0;
 
@@ -1562,9 +1681,14 @@ function bindEvents() {
 
     if (el.buildingList) {
         el.buildingList.addEventListener('click', (event) => {
-            const button = event.target.closest('[data-building]');
-            if (!button) return;
-            buyBuilding(button.dataset.building);
+            const bulkButton = event.target.closest('[data-building-buy]');
+            if (!bulkButton) return;
+
+            const amount = bulkButton.dataset.amount === 'all'
+                ? 'all'
+                : Number(bulkButton.dataset.amount || '1');
+
+            buyBuildingBulk(bulkButton.dataset.buildingBuy, amount);
         });
     }
 
@@ -1584,6 +1708,7 @@ function bindEvents() {
     }
 
     if (el.prestigeBtn) el.prestigeBtn.addEventListener('click', performPrestige);
+    if (el.buyAllUpgradesBtn) el.buyAllUpgradesBtn.addEventListener('click', buyAllAffordableResearch);
 
     if (el.tdStartBtn) el.tdStartBtn.addEventListener('click', tdStart);
     if (el.tdResetBtn) el.tdResetBtn.addEventListener('click', tdResetGrid);
