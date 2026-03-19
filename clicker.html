@@ -96,12 +96,16 @@
                 <div class="td-controls">
                     <button id="tdStartBtn" type="button">Start Defense</button>
                     <button id="tdResetBtn" type="button">Reset Grid</button>
+                    <button id="tdNextWaveBtn" type="button">Call Next Wave</button>
+                    <button id="tdSpeedBtn" type="button">Speed x1</button>
                     <button id="tdAbilityBtn" type="button">Orbital Strike (25)</button>
                 </div>
                 <div class="td-tower-types" id="tdTowerTypes">
                     <button class="td-type active" data-td-type="laser" type="button">Laser Tower</button>
                     <button class="td-type" data-td-type="cannon" type="button">Cannon Tower</button>
                     <button class="td-type" data-td-type="frost" type="button">Frost Tower</button>
+                    <button class="td-type" data-td-type="tesla" type="button">Tesla Tower</button>
+                    <button class="td-type" data-td-type="missile" type="button">Missile Tower</button>
                 </div>
                 <div class="td-upgrade-panel">
                     <p id="tdSelectedLabel">Select a tower on the grid to upgrade it.</p>
@@ -112,13 +116,25 @@
                     </div>
                 </div>
                 <canvas id="tdCanvas" width="560" height="220" aria-label="Tower defense arena"></canvas>
-                <p class="td-help">Pick a tower type, place on open cells, then click placed towers to branch into Path A/Path B upgrades. Later waves include fast, tanky, and split enemies.</p>
+                <p class="td-help">Pick a tower type, place on open cells, then click placed towers to branch into Path A/Path B upgrades. Use Next Wave and Speed controls to push faster, and survive boss waves for bonus rewards.</p>
                 <div class="terminal-feedback" id="tdFeedback">Defense bay idle.</div>
             </div>
 
             <div class="achievements">
                 <h3>Achievements</h3>
                 <div class="achievement-list" id="achievementList"></div>
+            </div>
+
+            <div class="leaderboard">
+                <h3>Global Leaderboard</h3>
+                <p>Track strongest commanders by economy, defense, and combined score.</p>
+                <div class="leaderboard-controls">
+                    <input id="lbNameInput" type="text" maxlength="16" placeholder="Commander Name">
+                    <button id="lbSubmitBtn" type="button">Submit Score</button>
+                    <button id="lbRefreshBtn" type="button">Refresh</button>
+                </div>
+                <div class="terminal-feedback" id="lbStatus">Leaderboard ready.</div>
+                <div class="leaderboard-list" id="leaderboardList"></div>
             </div>
         </section>
     </main>

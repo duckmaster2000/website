@@ -442,6 +442,8 @@ h3 {
 #secretCodeBtn,
 #tdStartBtn,
 #tdResetBtn,
+#tdNextWaveBtn,
+#tdSpeedBtn,
 #tdAbilityBtn,
 #prestigeBtn,
 #tdUpgradeA,
@@ -461,6 +463,8 @@ h3 {
 #secretCodeBtn:hover,
 #tdStartBtn:hover,
 #tdResetBtn:hover,
+#tdNextWaveBtn:hover,
+#tdSpeedBtn:hover,
 #tdAbilityBtn:hover,
 #prestigeBtn:hover,
 #tdUpgradeA:hover,
@@ -472,6 +476,14 @@ h3 {
 
 #tdAbilityBtn {
     border-color: rgba(255, 215, 90, 0.55);
+}
+
+#tdNextWaveBtn {
+    border-color: rgba(157, 255, 146, 0.55);
+}
+
+#tdSpeedBtn {
+    border-color: rgba(170, 145, 255, 0.55);
 }
 
 #tdSellTower {
@@ -580,6 +592,100 @@ h3 {
 .badge.locked {
     opacity: 0.42;
     filter: grayscale(0.78);
+}
+
+.leaderboard {
+    border: 1px solid rgba(139, 207, 255, 0.28);
+    border-radius: 14px;
+    padding: 0.75rem;
+    background: rgba(9, 24, 44, 0.78);
+    display: grid;
+    gap: 0.48rem;
+}
+
+.leaderboard p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.82rem;
+}
+
+.leaderboard-controls {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 0.4rem;
+}
+
+#lbNameInput {
+    width: 100%;
+    border: 1px solid rgba(138, 214, 255, 0.35);
+    border-radius: 10px;
+    padding: 0.52rem 0.62rem;
+    background: rgba(5, 15, 30, 0.9);
+    color: var(--text);
+}
+
+#lbSubmitBtn,
+#lbRefreshBtn {
+    border: 1px solid rgba(138, 214, 255, 0.45);
+    border-radius: 10px;
+    background: rgba(23, 53, 88, 0.95);
+    color: var(--text);
+    cursor: pointer;
+    font-family: "Orbitron", sans-serif;
+    font-size: 0.76rem;
+    padding: 0.45rem 0.68rem;
+}
+
+#lbSubmitBtn:hover,
+#lbRefreshBtn:hover {
+    border-color: var(--accent);
+}
+
+.leaderboard-list {
+    display: grid;
+    gap: 0.35rem;
+}
+
+.lb-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 0.55rem;
+    align-items: center;
+    border: 1px solid rgba(138, 214, 255, 0.24);
+    border-radius: 10px;
+    padding: 0.38rem 0.5rem;
+    background: rgba(8, 20, 40, 0.6);
+    font-size: 0.76rem;
+}
+
+.lb-rank {
+    font-family: "Orbitron", sans-serif;
+    color: var(--accent-2);
+}
+
+.lb-main {
+    display: grid;
+    gap: 0.12rem;
+}
+
+.lb-main strong {
+    font-size: 0.78rem;
+}
+
+.lb-sub {
+    color: var(--muted);
+    font-size: 0.7rem;
+}
+
+.lb-score {
+    font-family: "Orbitron", sans-serif;
+    color: #fff7c7;
+}
+
+@media (max-width: 720px) {
+    .leaderboard-controls {
+        grid-template-columns: 1fr;
+    }
 }
 
 .floating-layer {

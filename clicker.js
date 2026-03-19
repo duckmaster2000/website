@@ -1,6 +1,9 @@
-const SAVE_KEY = 'caleb_clicker_save_v5_space';
+const SAVE_KEY = 'caleb_clicker_save_v6_space';
+const LEGACY_V5_KEY = 'caleb_clicker_save_v5_space';
 const LEGACY_V4_KEY = 'caleb_clicker_save_v4_space';
 const LEGACY_V3_KEY = 'caleb_clicker_save_v3';
+const LEADERBOARD_KEY = 'calyx_space_global_leaderboard_v1';
+const LEADERBOARD_LIMIT = 30;
 
 const BUILDINGS = [
     { id: 'drone', name: 'Scout Drone', baseCost: 15, baseGps: 0.2, img: 'clicker-white.png', desc: 'Tiny orbit scouts gather crystal dust.' },
@@ -12,7 +15,18 @@ const BUILDINGS = [
     { id: 'reactor', name: 'Dark Reactor', baseCost: 185000, baseGps: 1850, img: 'skill1.png', desc: 'Reactor stacks synthesize dense gems.' },
     { id: 'cluster', name: 'Dyson Cluster', baseCost: 1020000, baseGps: 7800, img: 'gem.png', desc: 'Solar swarms beam direct gem energy.' },
     { id: 'bakery', name: 'Star Bakery', baseCost: 5600000, baseGps: 31500, img: 'question.png', desc: 'Themed cosmic bakery lines print gems.' },
-    { id: 'core', name: 'Singularity Core', baseCost: 30000000, baseGps: 128000, img: 'gem.png', desc: 'Endgame gravity engines bend matter.' }
+    { id: 'core', name: 'Singularity Core', baseCost: 30000000, baseGps: 128000, img: 'gem.png', desc: 'Endgame gravity engines bend matter.' },
+    { id: 'mirror', name: 'Prism Mirror Array', baseCost: 170000000, baseGps: 520000, img: 'gem.png', desc: 'Hyper prisms split starlight into gem streams.' },
+    { id: 'harvester', name: 'Comet Harvester', baseCost: 980000000, baseGps: 2100000, img: 'pickaxe.png', desc: 'Autonomous hooks mine comet tails mid-warp.' },
+    { id: 'chrono', name: 'Chrono Vault', baseCost: 5600000000, baseGps: 8600000, img: 'question.png', desc: 'Time loops compound production windows.' },
+    { id: 'hive', name: 'Void Hive', baseCost: 31000000000, baseGps: 34500000, img: 'skill1.png', desc: 'Nanite swarms convert dark matter into gems.' },
+    { id: 'temple', name: 'Aurora Temple', baseCost: 180000000000, baseGps: 140000000, img: 'potion.png', desc: 'Solar chants stabilize rare aurora crystals.' },
+    { id: 'anchor', name: 'Gravity Anchor', baseCost: 1000000000000, baseGps: 565000000, img: 'factory.png', desc: 'Planetary anchors compress ore at absurd pressure.' },
+    { id: 'citadel', name: 'Starlord Citadel', baseCost: 5800000000000, baseGps: 2250000000, img: 'clicker.png', desc: 'Command citadels orchestrate sector-wide extraction.' },
+    { id: 'engine', name: 'Entropy Engine', baseCost: 34000000000000, baseGps: 9000000000, img: 'gem.png', desc: 'Controlled collapse yields pure entropy shards.' },
+    { id: 'archive', name: 'Archive Planet', baseCost: 195000000000000, baseGps: 36000000000, img: 'question.png', desc: 'Entire worlds catalog and print gem formulas.' },
+    { id: 'rift', name: 'Rift Conduit', baseCost: 1120000000000000, baseGps: 146000000000, img: 'skill1.png', desc: 'Interdimensional funnels route exotic gem matter.' },
+    { id: 'throne', name: 'Cosmic Throne', baseCost: 6500000000000000, baseGps: 590000000000, img: 'gem.png', desc: 'Dominion cores mint gems from stellar law.' }
 ];
 
 const TOWER_TYPES = {
@@ -42,6 +56,24 @@ const TOWER_TYPES = {
         slowAmount: 0.32,
         slowTime: 1.15,
         color: '#95d1ff'
+    },
+    tesla: {
+        name: 'Tesla Tower',
+        tokenCost: 3,
+        range: 125,
+        fireRate: 0.62,
+        damage: 9,
+        chain: 2,
+        color: '#c6b4ff'
+    },
+    missile: {
+        name: 'Missile Tower',
+        tokenCost: 4,
+        range: 160,
+        fireRate: 1.15,
+        damage: 28,
+        splash: 38,
+        color: '#ff9c90'
     }
 };
 
@@ -49,7 +81,8 @@ const ENEMY_TYPES = {
     scout: { hpMult: 0.85, speedMult: 1.45, reward: 1, radius: 7, color: '#ff8c74' },
     brute: { hpMult: 2.4, speedMult: 0.67, reward: 3, radius: 10, color: '#ff596d' },
     splitter: { hpMult: 1.2, speedMult: 1.05, reward: 2, radius: 8, color: '#d98eff', split: true },
-    shield: { hpMult: 1.8, speedMult: 0.9, reward: 3, radius: 9, color: '#9eff90', armor: 0.24 }
+    shield: { hpMult: 1.8, speedMult: 0.9, reward: 3, radius: 9, color: '#9eff90', armor: 0.24 },
+    boss: { hpMult: 7.4, speedMult: 0.55, reward: 14, radius: 13, color: '#ffd16e', armor: 0.12 }
 };
 
 function buildResearchData() {
@@ -59,7 +92,9 @@ function buildResearchData() {
         { suffix: 'Mk-II', mult: 1.45, cost: 22 },
         { suffix: 'Mk-III', mult: 1.7, cost: 46 },
         { suffix: 'Mk-IV', mult: 2.05, cost: 98 },
-        { suffix: 'Mk-V', mult: 2.45, cost: 190 }
+        { suffix: 'Mk-V', mult: 2.45, cost: 190 },
+        { suffix: 'Mk-VI', mult: 2.95, cost: 360 },
+        { suffix: 'Mk-VII', mult: 3.55, cost: 700 }
     ];
 
     BUILDINGS.forEach((b, idx) => {
@@ -87,8 +122,15 @@ function buildResearchData() {
         { id: 'global_combo_relay', name: 'Combo Relay', desc: 'Combo cap raised and decay slowed', target: 'combo', amount: 1, cost: 1200000, img: 'clicker.png' },
         { id: 'global_defense_training', name: 'Defense Academy', desc: 'Tower defense starts with +5 tokens', target: 'tdTokens', amount: 5, cost: 1400000, img: 'skill1.png' },
         { id: 'global_defense_ai', name: 'Defense AI', desc: 'Tower damage +10% permanently', target: 'tdDamage', amount: 0.1, cost: 3200000, img: 'skill1.png' },
+        { id: 'global_defense_ai_2', name: 'Defense AI II', desc: 'Tower damage +14% permanently', target: 'tdDamage', amount: 0.14, cost: 41000000, img: 'skill1.png' },
         { id: 'global_energy_core', name: 'Energy Core', desc: 'TD energy gain +25%', target: 'tdEnergy', amount: 0.25, cost: 7200000, img: 'gem.png' },
-        { id: 'global_wave_divider', name: 'Wave Divider', desc: 'Enemies spawn slightly slower', target: 'tdSpawnSlow', amount: 0.08, cost: 9800000, img: 'question.png' }
+        { id: 'global_energy_core_2', name: 'Energy Core II', desc: 'TD energy gain +35%', target: 'tdEnergy', amount: 0.35, cost: 92000000, img: 'gem.png' },
+        { id: 'global_wave_divider', name: 'Wave Divider', desc: 'Enemies spawn slightly slower', target: 'tdSpawnSlow', amount: 0.08, cost: 9800000, img: 'question.png' },
+        { id: 'global_wave_divider_2', name: 'Wave Divider II', desc: 'Enemies spawn slower again', target: 'tdSpawnSlow', amount: 0.12, cost: 145000000, img: 'question.png' },
+        { id: 'global_orbital_reactor', name: 'Orbital Reactor', desc: 'Start each defense with +20 energy', target: 'tdStartEnergy', amount: 20, cost: 65000000, img: 'factory.png' },
+        { id: 'global_tower_logistics', name: 'Tower Logistics', desc: 'Start each defense with +3 tokens', target: 'tdTokens', amount: 3, cost: 72000000, img: 'clicker.png' },
+        { id: 'global_photon_glove', name: 'Photon Glove', desc: 'Gems per click +22 and crit +5%', target: 'clickAndCrit3', amount: 1, cost: 138000000, img: 'clicker-white.png' },
+        { id: 'global_combo_core', name: 'Combo Core', desc: 'Combo cap +0.7 and slower decay', target: 'combo2', amount: 1, cost: 84000000, img: 'clicker.png' }
     ];
 
     return list.concat(globals);
@@ -133,6 +175,8 @@ const el = {
     tdStartBtn: document.getElementById('tdStartBtn'),
     tdResetBtn: document.getElementById('tdResetBtn'),
     tdAbilityBtn: document.getElementById('tdAbilityBtn'),
+    tdNextWaveBtn: document.getElementById('tdNextWaveBtn'),
+    tdSpeedBtn: document.getElementById('tdSpeedBtn'),
     tdUpgradeA: document.getElementById('tdUpgradeA'),
     tdUpgradeB: document.getElementById('tdUpgradeB'),
     tdSellTower: document.getElementById('tdSellTower'),
@@ -146,6 +190,12 @@ const el = {
     tdKills: document.getElementById('tdKills'),
     tdEnergy: document.getElementById('tdEnergy'),
     tdFeedback: document.getElementById('tdFeedback'),
+
+    lbNameInput: document.getElementById('lbNameInput'),
+    lbSubmitBtn: document.getElementById('lbSubmitBtn'),
+    lbRefreshBtn: document.getElementById('lbRefreshBtn'),
+    lbStatus: document.getElementById('lbStatus'),
+    leaderboardList: document.getElementById('leaderboardList'),
 
     clickSound: document.getElementById('click-sound'),
     upgradeSound: document.getElementById('upgrade-sound')
@@ -168,9 +218,12 @@ const DEFAULTS = {
     tdBonusTokens: 0,
     tdWins: 0,
     tdBestKills: 0,
+    tdBestWave: 0,
     tdDamageBonus: 0,
     tdEnergyBonus: 0,
+    tdStartEnergy: 0,
     tdSpawnSlow: 0,
+    playerName: 'Pilot',
 
     prestigeShards: 0,
     prestigeRuns: 0,
@@ -219,10 +272,13 @@ const td = {
     ],
 
     baseHp: 20,
+    maxHp: 20,
     wave: 0,
     kills: 0,
     tokens: 0,
     energy: 0,
+    speedMult: 1,
+    victoryWave: 20,
 
     waveActive: false,
     enemiesToSpawn: 0,
@@ -267,6 +323,7 @@ const ACHIEVEMENTS = [
 
 let feedbackTimer = null;
 let achievementTick = -1;
+let leaderboardEntries = [];
 
 function fmt(n) {
     return Math.floor(n).toLocaleString();
@@ -344,6 +401,132 @@ function showBuyFeedback(msg) {
     }, 2200);
 }
 
+function normalizeCommanderName(raw) {
+    const safe = String(raw || '').replace(/[^a-zA-Z0-9 _-]/g, '').trim();
+    return (safe || 'Pilot').slice(0, 16);
+}
+
+function leaderboardScorePack() {
+    const economy = Math.floor(
+        state.lifetimeGems * 0.7 +
+        state.gps * 260 +
+        totalBuildings() * 3200 +
+        state.researchCount * 14000 +
+        state.prestigeShards * 50000
+    );
+    const defense = Math.floor(
+        state.tdBestKills * 420 +
+        state.tdBestWave * 2100 +
+        state.tdWins * 5200 +
+        state.prestigeShards * 1400
+    );
+    const overall = economy + defense;
+    return { economy, defense, overall };
+}
+
+function loadLeaderboard() {
+    try {
+        const raw = localStorage.getItem(LEADERBOARD_KEY);
+        if (!raw) {
+            leaderboardEntries = [];
+            return;
+        }
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) {
+            leaderboardEntries = [];
+            return;
+        }
+        leaderboardEntries = parsed.slice(0, LEADERBOARD_LIMIT);
+    } catch (_e) {
+        leaderboardEntries = [];
+    }
+}
+
+function saveLeaderboard() {
+    localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(leaderboardEntries.slice(0, LEADERBOARD_LIMIT)));
+}
+
+function addLeaderboardEntry(entry) {
+    leaderboardEntries.push(entry);
+    leaderboardEntries.sort((a, b) => b.score - a.score);
+    leaderboardEntries = leaderboardEntries.slice(0, LEADERBOARD_LIMIT);
+    saveLeaderboard();
+}
+
+function submitLeaderboardEntry(mode = 'manual') {
+    const name = normalizeCommanderName(state.playerName);
+    const scores = leaderboardScorePack();
+    const stamp = Date.now();
+
+    const entries = [
+        {
+            name,
+            category: 'overall',
+            score: scores.overall,
+            wave: state.tdBestWave,
+            kills: state.tdBestKills,
+            shards: state.prestigeShards,
+            createdAt: stamp
+        },
+        {
+            name,
+            category: 'economy',
+            score: scores.economy,
+            wave: state.tdBestWave,
+            kills: state.tdBestKills,
+            shards: state.prestigeShards,
+            createdAt: stamp
+        },
+        {
+            name,
+            category: 'defense',
+            score: scores.defense,
+            wave: state.tdBestWave,
+            kills: state.tdBestKills,
+            shards: state.prestigeShards,
+            createdAt: stamp
+        }
+    ];
+
+    entries.forEach(addLeaderboardEntry);
+    renderLeaderboard();
+
+    if (el.lbStatus) {
+        el.lbStatus.textContent = mode === 'manual'
+            ? 'Score submitted to leaderboard.'
+            : 'Leaderboard auto-updated from your latest run.';
+    }
+}
+
+function renderLeaderboard() {
+    if (!el.leaderboardList) return;
+
+    const top = leaderboardEntries.slice(0, 12);
+    if (top.length <= 0) {
+        el.leaderboardList.innerHTML = '<div class="lb-row"><span class="lb-rank">#--</span><div class="lb-main"><strong>No scores yet</strong><span class="lb-sub">Play and submit your first run.</span></div><span class="lb-score">0</span></div>';
+        return;
+    }
+
+    el.leaderboardList.innerHTML = top.map((row, idx) => {
+        const cat = row.category === 'overall'
+            ? 'Overall'
+            : row.category === 'economy'
+                ? 'Economy'
+                : 'Defense';
+
+        return `
+            <div class="lb-row">
+                <span class="lb-rank">#${idx + 1}</span>
+                <div class="lb-main">
+                    <strong>${row.name}</strong>
+                    <span class="lb-sub">${cat} | Wave ${fmt(row.wave || 0)} | Kills ${fmt(row.kills || 0)} | Shards ${fmt(row.shards || 0)}</span>
+                </div>
+                <span class="lb-score">${fmt(row.score || 0)}</span>
+            </div>
+        `;
+    }).join('');
+}
+
 function deepCopyDefaults() {
     return {
         ...structuredClone(DEFAULTS),
@@ -363,6 +546,8 @@ function validateState() {
             if (state[key] < 0 && key !== 'frenzyTime') state[key] = fresh[key];
         } else if (typeof fresh[key] === 'boolean') {
             if (typeof state[key] !== 'boolean') state[key] = fresh[key];
+        } else if (typeof fresh[key] === 'string') {
+            if (typeof state[key] !== 'string' || !state[key].trim()) state[key] = fresh[key];
         }
     });
 
@@ -378,6 +563,8 @@ function validateState() {
 
     state.critChance = Math.min(Math.max(state.critChance, 0), 0.95);
     state.goldenChance = Math.min(Math.max(state.goldenChance, 0.01), 0.95);
+    state.playerName = state.playerName.trim().slice(0, 16) || 'Pilot';
+    state.tdBestWave = Math.max(state.tdBestWave, 0);
 
     state.researchCount = Object.keys(state.researchBought).length;
 
@@ -407,9 +594,12 @@ function saveGame() {
         tdBonusTokens: state.tdBonusTokens,
         tdWins: state.tdWins,
         tdBestKills: state.tdBestKills,
+        tdBestWave: state.tdBestWave,
         tdDamageBonus: state.tdDamageBonus,
         tdEnergyBonus: state.tdEnergyBonus,
+        tdStartEnergy: state.tdStartEnergy,
         tdSpawnSlow: state.tdSpawnSlow,
+        playerName: state.playerName,
 
         prestigeShards: state.prestigeShards,
         prestigeRuns: state.prestigeRuns,
@@ -457,6 +647,9 @@ function applyV4LegacyMigration(v4) {
     state.tdBonusTokens = Number(v4.tdBonusTokens || 0);
     state.tdWins = Number(v4.tdWins || 0);
     state.tdBestKills = Number(v4.tdBestKills || 0);
+    state.tdBestWave = Number(v4.tdBestWave || 0);
+    state.tdStartEnergy = Number(v4.tdStartEnergy || 0);
+    state.playerName = String(v4.playerName || 'Pilot');
 
     state.buildings = { ...DEFAULTS.buildings, ...(v4.buildings || {}) };
     state.buildingCosts = { ...DEFAULTS.buildingCosts, ...(v4.buildingCosts || {}) };
@@ -478,6 +671,24 @@ function loadGame() {
             return;
         } catch (_e) {
             localStorage.removeItem(SAVE_KEY);
+        }
+    }
+
+    const rawV5 = localStorage.getItem(LEGACY_V5_KEY);
+    if (rawV5) {
+        try {
+            const parsed = JSON.parse(rawV5);
+            Object.assign(state, parsed);
+            state.buildings = { ...DEFAULTS.buildings, ...(parsed.buildings || {}) };
+            state.buildingCosts = { ...DEFAULTS.buildingCosts, ...(parsed.buildingCosts || {}) };
+            state.buildingMults = { ...DEFAULTS.buildingMults, ...(parsed.buildingMults || {}) };
+            state.researchBought = { ...(parsed.researchBought || {}) };
+            validateState();
+            localStorage.removeItem(LEGACY_V5_KEY);
+            saveGame();
+            return;
+        } catch (_e) {
+            localStorage.removeItem(LEGACY_V5_KEY);
         }
     }
 
@@ -644,11 +855,12 @@ function renderCoreStats() {
 }
 
 function renderTdStats() {
-    safeSet(el.tdBaseHp, td.baseHp);
+    safeSet(el.tdBaseHp, `${td.baseHp}/${td.maxHp}`);
     safeSet(el.tdWave, td.wave);
     safeSet(el.tdTokens, td.tokens);
     safeSet(el.tdKills, td.kills);
-    safeSet(el.tdEnergy, fmt(td.energy));
+    safeSet(el.tdEnergy, `${fmt(td.energy)} | Best Wave ${fmt(state.tdBestWave)}`);
+    if (el.tdSpeedBtn) el.tdSpeedBtn.textContent = `Speed x${td.speedMult}`;
 }
 
 function renderSelectedTower() {
@@ -833,17 +1045,25 @@ function buyAllAffordableResearch() {
             } else if (research.target === 'clickAndCrit2') {
                 state.gpc += 8;
                 state.critChance = Math.min(0.95, state.critChance + 0.08);
+            } else if (research.target === 'clickAndCrit3') {
+                state.gpc += 22;
+                state.critChance = Math.min(0.95, state.critChance + 0.05);
             } else if (research.target === 'tdTokens') {
                 state.tdBonusTokens += research.amount;
             } else if (research.target === 'tdDamage') {
                 state.tdDamageBonus += research.amount;
             } else if (research.target === 'tdEnergy') {
                 state.tdEnergyBonus += research.amount;
+            } else if (research.target === 'tdStartEnergy') {
+                state.tdStartEnergy += research.amount;
             } else if (research.target === 'tdSpawnSlow') {
                 state.tdSpawnSlow += research.amount;
             } else if (research.target === 'combo') {
                 state.comboSoftCap += 0.5;
                 state.comboDecayDelay += 350;
+            } else if (research.target === 'combo2') {
+                state.comboSoftCap += 0.7;
+                state.comboDecayDelay += 500;
             } else {
                 state.buildingMults[research.target] *= research.mult;
             }
@@ -891,17 +1111,25 @@ function buyResearch(id) {
     } else if (research.target === 'clickAndCrit2') {
         state.gpc += 8;
         state.critChance = Math.min(0.95, state.critChance + 0.08);
+    } else if (research.target === 'clickAndCrit3') {
+        state.gpc += 22;
+        state.critChance = Math.min(0.95, state.critChance + 0.05);
     } else if (research.target === 'tdTokens') {
         state.tdBonusTokens += research.amount;
     } else if (research.target === 'tdDamage') {
         state.tdDamageBonus += research.amount;
     } else if (research.target === 'tdEnergy') {
         state.tdEnergyBonus += research.amount;
+    } else if (research.target === 'tdStartEnergy') {
+        state.tdStartEnergy += research.amount;
     } else if (research.target === 'tdSpawnSlow') {
         state.tdSpawnSlow += research.amount;
     } else if (research.target === 'combo') {
         state.comboSoftCap += 0.5;
         state.comboDecayDelay += 350;
+    } else if (research.target === 'combo2') {
+        state.comboSoftCap += 0.7;
+        state.comboDecayDelay += 500;
     } else {
         state.buildingMults[research.target] *= research.mult;
     }
@@ -978,6 +1206,7 @@ function performPrestige() {
     state.tdBonusTokens = 0;
     state.tdDamageBonus = 0;
     state.tdEnergyBonus = 0;
+    state.tdStartEnergy = 0;
     state.tdSpawnSlow = 0;
 
     state.researchBought = {};
@@ -1023,19 +1252,21 @@ function timedTick() {
 }
 
 function tdBaseHpForRun() {
-    return 20 + Math.floor(totalBuildings() / 90) + Math.floor(state.prestigeShards / 2);
+    return 20 + Math.floor(totalBuildings() / 80) + Math.floor(state.prestigeShards / 2);
 }
 
 function tdTokenStartForRun() {
-    return Math.max(3, Math.floor(totalBuildings() / 8) + state.tdBonusTokens + Math.floor(state.prestigeShards / 3));
+    return Math.max(4, Math.floor(totalBuildings() / 7) + state.tdBonusTokens + Math.floor(state.prestigeShards / 3));
 }
 
 function tdResetState() {
-    td.baseHp = tdBaseHpForRun();
+    td.maxHp = tdBaseHpForRun();
+    td.baseHp = td.maxHp;
     td.wave = 0;
     td.kills = 0;
     td.tokens = tdTokenStartForRun();
-    td.energy = 0;
+    td.energy = state.tdStartEnergy;
+    td.speedMult = 1;
 
     td.waveActive = false;
     td.enemiesToSpawn = 0;
@@ -1061,9 +1292,9 @@ function tdTowerAtCell(col, row) {
 
 function tdEnemyBaseStats(typeName) {
     const type = ENEMY_TYPES[typeName];
-    const waveScale = Math.pow(1.28, Math.max(0, td.wave - 1));
+    const waveScale = Math.pow(1.24, Math.max(0, td.wave - 1));
     const baseHp = 16 * waveScale * type.hpMult;
-    const baseSpeed = (30 + td.wave * 2.8) * type.speedMult;
+    const baseSpeed = (30 + td.wave * 2.6) * type.speedMult;
     return {
         hp: baseHp,
         speed: baseSpeed
@@ -1093,15 +1324,26 @@ function tdWavePool() {
     if (td.wave < 3) return ['scout'];
     if (td.wave < 6) return ['scout', 'brute'];
     if (td.wave < 10) return ['scout', 'brute', 'splitter'];
-    return ['scout', 'brute', 'splitter', 'shield'];
+    if (td.wave < 15) return ['scout', 'brute', 'splitter', 'shield'];
+    return ['scout', 'brute', 'splitter', 'shield', 'boss'];
 }
 
 function tdStartNextWave() {
     td.wave += 1;
+    state.tdBestWave = Math.max(state.tdBestWave, td.wave);
     td.waveActive = true;
-    td.enemiesToSpawn = 10 + td.wave * 4;
+    td.enemiesToSpawn = 12 + td.wave * 5;
     td.spawnClock = 0;
-    td.spawnDelay = Math.max(0.13, (0.82 - td.wave * 0.025) + Math.max(0, 0.14 - state.tdSpawnSlow));
+    td.spawnDelay = Math.max(0.1, (0.78 - td.wave * 0.022) + Math.max(0, 0.14 - state.tdSpawnSlow));
+
+    if (td.wave % 5 === 0) {
+        td.enemiesToSpawn += 3 + td.wave;
+        tdSpawnEnemy('boss');
+        td.baseHp = Math.min(td.maxHp, td.baseHp + 2);
+        td.energy += 10;
+    } else {
+        td.baseHp = Math.min(td.maxHp, td.baseHp + 1);
+    }
 
     td.tokens += td.wave % 3 === 0 ? 1 : 0;
     if (el.tdFeedback) {
@@ -1113,6 +1355,7 @@ function tdPickEnemyType() {
     const pool = tdWavePool();
     const roll = Math.random();
 
+    if (pool.includes('boss') && roll > 0.985) return 'boss';
     if (pool.includes('shield') && roll > 0.88) return 'shield';
     if (pool.includes('splitter') && roll > 0.75) return 'splitter';
     if (pool.includes('brute') && roll > 0.5) return 'brute';
@@ -1128,12 +1371,15 @@ function tdTowerStats(tower) {
     let splash = base.splash || 0;
     let slowAmount = base.slowAmount || 0;
     let slowTime = base.slowTime || 0;
+    let chain = base.chain || 0;
 
     for (let i = 0; i < tower.pathA; i += 1) {
         damage *= 1.35;
         range += 7;
         if (tower.type === 'cannon') splash += 6;
         if (tower.type === 'frost') slowTime += 0.2;
+        if (tower.type === 'tesla') chain += 1;
+        if (tower.type === 'missile') splash += 10;
     }
 
     for (let i = 0; i < tower.pathB; i += 1) {
@@ -1147,9 +1393,17 @@ function tdTowerStats(tower) {
             slowAmount = Math.min(0.72, slowAmount + 0.11);
             slowTime += 0.3;
         }
+        if (tower.type === 'tesla') {
+            fireRate *= 0.9;
+            damage *= 1.1;
+        }
+        if (tower.type === 'missile') {
+            range += 12;
+            damage *= 1.12;
+        }
     }
 
-    return { damage, fireRate, range, splash, slowAmount, slowTime };
+    return { damage, fireRate, range, splash, slowAmount, slowTime, chain };
 }
 
 function tdUpgradeCost(tower, path) {
@@ -1198,6 +1452,19 @@ function tdShotHit(shot) {
                 const enemyArmor = ENEMY_TYPES[enemy.type].armor || 0;
                 enemy.hp -= shot.damage * 0.55 * (1 - enemyArmor);
             }
+        });
+    }
+
+    if (shot.chain > 0) {
+        const nearby = td.enemies
+            .filter((enemy) => enemy.id !== primary.id)
+            .sort((a, b) => Math.hypot(a.x - primary.x, a.y - primary.y) - Math.hypot(b.x - primary.x, b.y - primary.y))
+            .slice(0, shot.chain);
+
+        nearby.forEach((enemy, idx) => {
+            const enemyArmor = ENEMY_TYPES[enemy.type].armor || 0;
+            const chainFalloff = 1 - Math.min(0.6, idx * 0.22);
+            enemy.hp -= shot.damage * 0.62 * chainFalloff * (1 - enemyArmor);
         });
     }
 
@@ -1261,16 +1528,17 @@ function tdMoveEnemy(enemy, delta) {
 
 function tdUpdate(delta) {
     if (!td.running) return;
+    const simDelta = delta * td.speedMult;
 
     if (!td.waveActive && td.enemies.length === 0) {
-        td.nextWaveClock -= delta;
+        td.nextWaveClock -= simDelta;
         if (td.nextWaveClock <= 0) {
             tdStartNextWave();
         }
     }
 
     if (td.waveActive) {
-        td.spawnClock += delta;
+        td.spawnClock += simDelta;
         if (td.enemiesToSpawn > 0 && td.spawnClock >= td.spawnDelay) {
             td.spawnClock = 0;
             tdSpawnEnemy(tdPickEnemyType());
@@ -1280,16 +1548,21 @@ function tdUpdate(delta) {
         if (td.enemiesToSpawn <= 0 && td.enemies.length === 0) {
             td.waveActive = false;
             td.nextWaveClock = 2.4;
-            const waveReward = Math.round(95 + td.wave * 22 + totalBuildings() * 1.4);
+            const waveReward = Math.round(125 + td.wave * 30 + totalBuildings() * 1.6);
             addGems(waveReward);
             if (td.wave % 4 === 0) td.tokens += 1;
+            if (td.wave % 5 === 0) td.tokens += 2;
+            if (td.wave >= td.victoryWave) {
+                tdWinRun();
+                return;
+            }
             if (el.tdFeedback) el.tdFeedback.textContent = `Wave ${td.wave} cleared. +${fmt(waveReward)} gems.`;
         }
     }
 
     td.towers.forEach((tower) => {
         const stats = tdTowerStats(tower);
-        tower.cooldown -= delta;
+        tower.cooldown -= simDelta;
         if (tower.cooldown > 0) return;
 
         const target = tdFindTarget(tower, stats);
@@ -1305,6 +1578,7 @@ function tdUpdate(delta) {
             splash: stats.splash,
             slowAmount: stats.slowAmount,
             slowTime: stats.slowTime,
+            chain: stats.chain,
             color: TOWER_TYPES[tower.type].color
         });
     });
@@ -1319,7 +1593,7 @@ function tdUpdate(delta) {
         const dx = target.x - shot.x;
         const dy = target.y - shot.y;
         const dist = Math.hypot(dx, dy) || 1;
-        const step = shot.speed * delta;
+        const step = shot.speed * simDelta;
 
         shot.x += (dx / dist) * step;
         shot.y += (dy / dist) * step;
@@ -1329,7 +1603,7 @@ function tdUpdate(delta) {
         }
     });
 
-    td.enemies.forEach((enemy) => tdMoveEnemy(enemy, delta));
+    td.enemies.forEach((enemy) => tdMoveEnemy(enemy, simDelta));
 
     for (let i = td.enemies.length - 1; i >= 0; i -= 1) {
         const enemy = td.enemies[i];
@@ -1410,6 +1684,27 @@ function tdDraw() {
         } else if (tower.type === 'cannon') {
             ctx.fillStyle = '#ffe4b0';
             ctx.fillRect(tower.x - 6, tower.y - 12, 12, 6);
+        } else if (tower.type === 'tesla') {
+            ctx.fillStyle = '#f1e7ff';
+            ctx.beginPath();
+            ctx.moveTo(tower.x, tower.y - 14);
+            ctx.lineTo(tower.x + 4, tower.y - 6);
+            ctx.lineTo(tower.x - 1, tower.y - 6);
+            ctx.lineTo(tower.x + 2, tower.y + 1);
+            ctx.lineTo(tower.x - 6, tower.y - 6);
+            ctx.lineTo(tower.x - 2, tower.y - 6);
+            ctx.closePath();
+            ctx.fill();
+        } else if (tower.type === 'missile') {
+            ctx.fillStyle = '#ffe2dc';
+            ctx.fillRect(tower.x - 3, tower.y - 14, 6, 10);
+            ctx.fillStyle = '#ff9c90';
+            ctx.beginPath();
+            ctx.moveTo(tower.x, tower.y - 18);
+            ctx.lineTo(tower.x + 4, tower.y - 12);
+            ctx.lineTo(tower.x - 4, tower.y - 12);
+            ctx.closePath();
+            ctx.fill();
         } else {
             ctx.fillStyle = '#d8e9ff';
             ctx.beginPath();
@@ -1466,12 +1761,27 @@ function tdStopRun(message) {
 
 function tdFinishRun() {
     state.tdBestKills = Math.max(state.tdBestKills, td.kills);
+    state.tdBestWave = Math.max(state.tdBestWave, td.wave);
 
     const reward = Math.round(td.kills * 16 + td.wave * 72 + totalBuildings() * 2.1);
     addGems(reward);
-    state.tdWins += td.wave > 0 ? 1 : 0;
 
     tdStopRun(`Defense failed at wave ${td.wave}. Reward: +${fmt(reward)} gems.`);
+    submitLeaderboardEntry('defense');
+    renderAll();
+    saveGame();
+}
+
+function tdWinRun() {
+    state.tdBestKills = Math.max(state.tdBestKills, td.kills);
+    state.tdBestWave = Math.max(state.tdBestWave, td.wave);
+    state.tdWins += 1;
+
+    const reward = Math.round(2500 + td.kills * 22 + td.wave * 210 + totalBuildings() * 3.8);
+    addGems(reward);
+
+    tdStopRun(`Victory! You cleared wave ${td.wave}. Reward: +${fmt(reward)} gems.`);
+    submitLeaderboardEntry('defense');
     renderAll();
     saveGame();
 }
@@ -1516,14 +1826,15 @@ function tdActivateOrbitalStrike() {
         return;
     }
 
-    if (td.energy < 25) {
-        if (el.tdFeedback) el.tdFeedback.textContent = 'Need 25 strike energy.';
+    const cost = 25;
+    if (td.energy < cost) {
+        if (el.tdFeedback) el.tdFeedback.textContent = `Need ${cost} strike energy.`;
         return;
     }
 
-    td.energy -= 25;
+    td.energy -= cost;
     td.enemies.forEach((enemy) => {
-        enemy.hp -= 38 * prestigeTdMultiplier();
+        enemy.hp -= (38 + td.wave * 1.2) * prestigeTdMultiplier();
     });
 
     if (el.tdFeedback) {
@@ -1532,6 +1843,32 @@ function tdActivateOrbitalStrike() {
 
     renderTdStats();
     tdDraw();
+}
+
+function tdCallNextWave() {
+    if (!td.running) {
+        if (el.tdFeedback) el.tdFeedback.textContent = 'Start defense first.';
+        return;
+    }
+
+    if (td.waveActive) {
+        if (el.tdFeedback) el.tdFeedback.textContent = 'Current wave still active.';
+        return;
+    }
+
+    td.nextWaveClock = 0;
+    td.energy += 6;
+    if (el.tdFeedback) el.tdFeedback.textContent = 'Next wave called early. +6 energy bonus.';
+    renderTdStats();
+}
+
+function tdToggleSpeed() {
+    if (td.speedMult === 1) td.speedMult = 2;
+    else if (td.speedMult === 2) td.speedMult = 3;
+    else td.speedMult = 1;
+
+    renderTdStats();
+    if (el.tdFeedback) el.tdFeedback.textContent = `Defense speed set to x${td.speedMult}.`;
 }
 
 function tdSelectTowerType(type) {
@@ -1619,11 +1956,11 @@ function tdUpgradeTower(path) {
         return;
     }
 
-    if (path === 'A' && tower.pathA >= 3) {
+    if (path === 'A' && tower.pathA >= 5) {
         if (el.tdFeedback) el.tdFeedback.textContent = 'Path A is maxed.';
         return;
     }
-    if (path === 'B' && tower.pathB >= 3) {
+    if (path === 'B' && tower.pathB >= 5) {
         if (el.tdFeedback) el.tdFeedback.textContent = 'Path B is maxed.';
         return;
     }
@@ -1712,6 +2049,8 @@ function bindEvents() {
 
     if (el.tdStartBtn) el.tdStartBtn.addEventListener('click', tdStart);
     if (el.tdResetBtn) el.tdResetBtn.addEventListener('click', tdResetGrid);
+    if (el.tdNextWaveBtn) el.tdNextWaveBtn.addEventListener('click', tdCallNextWave);
+    if (el.tdSpeedBtn) el.tdSpeedBtn.addEventListener('click', tdToggleSpeed);
     if (el.tdAbilityBtn) el.tdAbilityBtn.addEventListener('click', tdActivateOrbitalStrike);
     if (el.tdUpgradeA) el.tdUpgradeA.addEventListener('click', () => tdUpgradeTower('A'));
     if (el.tdUpgradeB) el.tdUpgradeB.addEventListener('click', () => tdUpgradeTower('B'));
@@ -1726,14 +2065,45 @@ function bindEvents() {
     }
 
     if (el.tdCanvas) el.tdCanvas.addEventListener('click', tdPlaceOrSelect);
+
+    if (el.lbNameInput) {
+        el.lbNameInput.addEventListener('change', () => {
+            state.playerName = normalizeCommanderName(el.lbNameInput.value);
+            el.lbNameInput.value = state.playerName;
+            saveGame();
+        });
+    }
+
+    if (el.lbSubmitBtn) {
+        el.lbSubmitBtn.addEventListener('click', () => {
+            state.playerName = normalizeCommanderName(el.lbNameInput ? el.lbNameInput.value : state.playerName);
+            if (el.lbNameInput) el.lbNameInput.value = state.playerName;
+            submitLeaderboardEntry('manual');
+            saveGame();
+        });
+    }
+
+    if (el.lbRefreshBtn) {
+        el.lbRefreshBtn.addEventListener('click', () => {
+            loadLeaderboard();
+            renderLeaderboard();
+            if (el.lbStatus) el.lbStatus.textContent = 'Leaderboard refreshed.';
+        });
+    }
 }
 
 function boot() {
     loadGame();
+    loadLeaderboard();
     bindEvents();
     tdResetState();
     tdDraw();
     renderAll();
+    renderLeaderboard();
+
+    if (el.lbNameInput) {
+        el.lbNameInput.value = normalizeCommanderName(state.playerName);
+    }
 
     setInterval(passiveIncomeTick, 200);
     setInterval(timedTick, 1000);
