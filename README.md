@@ -105,7 +105,7 @@ Entries:
 - 2026-03-16 | clicker.html/clicker.css/clicker.js | Polished Astrobakery Defense with scaling wave difficulty, enemy variety (scout/brute/splitter/shield), multiple tower types (laser/cannon/frost), branch upgrades (Path A/Path B), tower selling, and orbital strike ability; added a prestige reset loop with permanent shard bonuses (GPS/click/TD) and restart flow; massively expanded upgrade catalog to 62 total research upgrades with many additional global and building-specific boosts.
 - 2026-03-16 | clicker.html/clicker.css/clicker.js | Added bulk purchase systems: per-building Buy 1/10/100/All controls with simulated true cumulative costs, and a global "Buy All Affordable Upgrades" button for research; performed a balance pass to make tower-defense runs harder by increasing enemy scaling/spawn pressure and reducing token/reward inflation.
 - 2026-03-16 | index.html/styles.css/index.js | Added a new "My Achievements" homepage section with an easy local checklist editor: plus-button add flow, persistent localStorage entries, check/uncheck completion states, delete controls, and passcode-based edit lock so only unlocked users can modify achievements.
-- 2026-03-16 | index.html/styles.css/index.js | Polished and brightened the "My Achievements" section visuals (cleaner controls, stronger contrast, better empty state card) and updated the edit passcode to "1ydzpU1y!".
+- 2026-03-16 | index.html/styles.css/index.js | Polished and brightened the "My Achievements" section visuals (cleaner controls, stronger contrast, better empty state card) and updated the edit passcode.
 
 ## Next Suggested Improvements
 
