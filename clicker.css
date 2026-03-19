@@ -239,6 +239,34 @@ h3 {
     display: grid;
     gap: 0.55rem;
     margin-bottom: 0.3rem;
+    max-height: 330px;
+    overflow-y: auto;
+    border: 1px solid rgba(138, 214, 255, 0.22);
+    border-radius: 12px;
+    padding: 0.45rem;
+    background: rgba(6, 16, 32, 0.45);
+}
+
+.building-list::-webkit-scrollbar,
+.research-list::-webkit-scrollbar {
+    width: 10px;
+}
+
+.building-list::-webkit-scrollbar-track,
+.research-list::-webkit-scrollbar-track {
+    background: rgba(6, 16, 32, 0.7);
+    border-radius: 999px;
+}
+
+.building-list::-webkit-scrollbar-thumb,
+.research-list::-webkit-scrollbar-thumb {
+    background: rgba(92, 245, 255, 0.4);
+    border-radius: 999px;
+}
+
+.building-list::-webkit-scrollbar-thumb:hover,
+.research-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(92, 245, 255, 0.6);
 }
 
 .building,
@@ -530,6 +558,40 @@ h3 {
     flex-wrap: wrap;
 }
 
+.td-difficulty {
+    margin-top: 0.52rem;
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.td-difficulty-btn {
+    border: 1px solid rgba(138, 214, 255, 0.45);
+    border-radius: 10px;
+    background: rgba(23, 53, 88, 0.95);
+    color: var(--text);
+    cursor: pointer;
+    font-family: "Orbitron", sans-serif;
+    font-size: 0.74rem;
+    padding: 0.4rem 0.62rem;
+}
+
+.td-difficulty-btn:hover {
+    border-color: var(--accent);
+}
+
+.td-difficulty-btn.active {
+    border-color: rgba(255, 215, 90, 0.74);
+    background: rgba(88, 63, 23, 0.9);
+}
+
+.td-difficulty-btn[data-td-difficulty="hard"].active,
+.td-difficulty-btn[data-td-difficulty="veryhard"].active,
+.td-difficulty-btn[data-td-difficulty="insane"].active {
+    border-color: rgba(255, 140, 140, 0.85);
+    background: rgba(84, 29, 41, 0.9);
+}
+
 .td-upgrade-panel {
     margin-top: 0.55rem;
     border: 1px solid rgba(138, 214, 255, 0.24);
@@ -634,6 +696,11 @@ h3 {
     font-family: "Orbitron", sans-serif;
     font-size: 0.76rem;
     padding: 0.45rem 0.68rem;
+}
+
+#lbSubmitBtn.disabled-submit {
+    opacity: 0.55;
+    cursor: not-allowed;
 }
 
 #lbSubmitBtn:hover,

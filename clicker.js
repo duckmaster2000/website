@@ -85,6 +85,79 @@ const ENEMY_TYPES = {
     boss: { hpMult: 7.4, speedMult: 0.55, reward: 14, radius: 13, color: '#ffd16e', armor: 0.12 }
 };
 
+const TD_DIFFICULTIES = {
+    easy: {
+        label: 'Easy',
+        enemyHpMult: 0.9,
+        enemySpeedMult: 0.92,
+        spawnCountMult: 0.9,
+        spawnRateMult: 0.88,
+        playerHpMult: 1.2,
+        tokenMult: 1.18,
+        energyGainMult: 1.2,
+        baseLeakDamage: 1,
+        bossEvery: 6,
+        victoryWave: 16,
+        strikeCost: 20
+    },
+    medium: {
+        label: 'Medium',
+        enemyHpMult: 1.35,
+        enemySpeedMult: 1.08,
+        spawnCountMult: 1.2,
+        spawnRateMult: 1.12,
+        playerHpMult: 0.92,
+        tokenMult: 0.94,
+        energyGainMult: 0.95,
+        baseLeakDamage: 1,
+        bossEvery: 5,
+        victoryWave: 20,
+        strikeCost: 25
+    },
+    hard: {
+        label: 'Hard',
+        enemyHpMult: 1.9,
+        enemySpeedMult: 1.22,
+        spawnCountMult: 1.5,
+        spawnRateMult: 1.32,
+        playerHpMult: 0.82,
+        tokenMult: 0.85,
+        energyGainMult: 0.82,
+        baseLeakDamage: 2,
+        bossEvery: 4,
+        victoryWave: 24,
+        strikeCost: 29
+    },
+    veryhard: {
+        label: 'Very Hard',
+        enemyHpMult: 2.7,
+        enemySpeedMult: 1.38,
+        spawnCountMult: 1.95,
+        spawnRateMult: 1.55,
+        playerHpMult: 0.72,
+        tokenMult: 0.74,
+        energyGainMult: 0.72,
+        baseLeakDamage: 2,
+        bossEvery: 3,
+        victoryWave: 28,
+        strikeCost: 34
+    },
+    insane: {
+        label: 'Insane',
+        enemyHpMult: 3.6,
+        enemySpeedMult: 1.62,
+        spawnCountMult: 2.3,
+        spawnRateMult: 1.85,
+        playerHpMult: 0.62,
+        tokenMult: 0.64,
+        energyGainMult: 0.62,
+        baseLeakDamage: 3,
+        bossEvery: 3,
+        victoryWave: 32,
+        strikeCost: 40
+    }
+};
+
 function buildResearchData() {
     const list = [];
     const tiers = [
@@ -182,6 +255,7 @@ const el = {
     tdSellTower: document.getElementById('tdSellTower'),
     tdSelectedLabel: document.getElementById('tdSelectedLabel'),
     tdTowerTypes: document.getElementById('tdTowerTypes'),
+    tdDifficultyModes: document.getElementById('tdDifficultyModes'),
 
     tdCanvas: document.getElementById('tdCanvas'),
     tdBaseHp: document.getElementById('tdBaseHp'),
@@ -223,7 +297,9 @@ const DEFAULTS = {
     tdEnergyBonus: 0,
     tdStartEnergy: 0,
     tdSpawnSlow: 0,
+    tdDifficulty: 'medium',
     playerName: 'Pilot',
+    leaderboardSubmitted: false,
 
     prestigeShards: 0,
     prestigeRuns: 0,
@@ -279,6 +355,7 @@ const td = {
     energy: 0,
     speedMult: 1,
     victoryWave: 20,
+    difficultyKey: 'medium',
 
     waveActive: false,
     enemiesToSpawn: 0,
@@ -453,7 +530,20 @@ function addLeaderboardEntry(entry) {
     saveLeaderboard();
 }
 
+function refreshLeaderboardSubmitUi() {
+    if (!el.lbSubmitBtn) return;
+    el.lbSubmitBtn.disabled = state.leaderboardSubmitted;
+    el.lbSubmitBtn.classList.toggle('disabled-submit', state.leaderboardSubmitted);
+    el.lbSubmitBtn.textContent = state.leaderboardSubmitted ? 'Submitted' : 'Submit Score';
+}
+
 function submitLeaderboardEntry(mode = 'manual') {
+    if (state.leaderboardSubmitted) {
+        if (el.lbStatus) el.lbStatus.textContent = 'You already submitted your score. Only one submission is allowed.';
+        refreshLeaderboardSubmitUi();
+        return false;
+    }
+
     const name = normalizeCommanderName(state.playerName);
     const scores = leaderboardScorePack();
     const stamp = Date.now();
@@ -489,13 +579,17 @@ function submitLeaderboardEntry(mode = 'manual') {
     ];
 
     entries.forEach(addLeaderboardEntry);
+    state.leaderboardSubmitted = true;
+    refreshLeaderboardSubmitUi();
     renderLeaderboard();
 
     if (el.lbStatus) {
         el.lbStatus.textContent = mode === 'manual'
-            ? 'Score submitted to leaderboard.'
-            : 'Leaderboard auto-updated from your latest run.';
+            ? 'Score submitted. Further submissions are locked for this save.'
+            : 'Score submitted.';
     }
+
+    return true;
 }
 
 function renderLeaderboard() {
@@ -565,6 +659,8 @@ function validateState() {
     state.goldenChance = Math.min(Math.max(state.goldenChance, 0.01), 0.95);
     state.playerName = state.playerName.trim().slice(0, 16) || 'Pilot';
     state.tdBestWave = Math.max(state.tdBestWave, 0);
+    if (!TD_DIFFICULTIES[state.tdDifficulty]) state.tdDifficulty = 'medium';
+    if (typeof state.leaderboardSubmitted !== 'boolean') state.leaderboardSubmitted = false;
 
     state.researchCount = Object.keys(state.researchBought).length;
 
@@ -599,7 +695,9 @@ function saveGame() {
         tdEnergyBonus: state.tdEnergyBonus,
         tdStartEnergy: state.tdStartEnergy,
         tdSpawnSlow: state.tdSpawnSlow,
+        tdDifficulty: state.tdDifficulty,
         playerName: state.playerName,
+        leaderboardSubmitted: state.leaderboardSubmitted,
 
         prestigeShards: state.prestigeShards,
         prestigeRuns: state.prestigeRuns,
@@ -649,7 +747,9 @@ function applyV4LegacyMigration(v4) {
     state.tdBestKills = Number(v4.tdBestKills || 0);
     state.tdBestWave = Number(v4.tdBestWave || 0);
     state.tdStartEnergy = Number(v4.tdStartEnergy || 0);
+    state.tdDifficulty = String(v4.tdDifficulty || 'medium');
     state.playerName = String(v4.playerName || 'Pilot');
+    state.leaderboardSubmitted = Boolean(v4.leaderboardSubmitted);
 
     state.buildings = { ...DEFAULTS.buildings, ...(v4.buildings || {}) };
     state.buildingCosts = { ...DEFAULTS.buildingCosts, ...(v4.buildingCosts || {}) };
@@ -855,12 +955,14 @@ function renderCoreStats() {
 }
 
 function renderTdStats() {
+    const cfg = tdDifficultyConfig();
     safeSet(el.tdBaseHp, `${td.baseHp}/${td.maxHp}`);
     safeSet(el.tdWave, td.wave);
     safeSet(el.tdTokens, td.tokens);
     safeSet(el.tdKills, td.kills);
-    safeSet(el.tdEnergy, `${fmt(td.energy)} | Best Wave ${fmt(state.tdBestWave)}`);
+    safeSet(el.tdEnergy, `${fmt(td.energy)} | Best Wave ${fmt(state.tdBestWave)} | ${cfg.label}`);
     if (el.tdSpeedBtn) el.tdSpeedBtn.textContent = `Speed x${td.speedMult}`;
+    if (el.tdAbilityBtn) el.tdAbilityBtn.textContent = `Orbital Strike (${cfg.strikeCost})`;
 }
 
 function renderSelectedTower() {
@@ -1251,15 +1353,48 @@ function timedTick() {
     saveGame();
 }
 
+function tdDifficultyConfig() {
+    return TD_DIFFICULTIES[state.tdDifficulty] || TD_DIFFICULTIES.medium;
+}
+
+function tdApplyDifficultyButtons() {
+    if (!el.tdDifficultyModes) return;
+    el.tdDifficultyModes.querySelectorAll('[data-td-difficulty]').forEach((btn) => {
+        btn.classList.toggle('active', btn.dataset.tdDifficulty === state.tdDifficulty);
+    });
+}
+
+function tdSetDifficulty(key) {
+    if (!TD_DIFFICULTIES[key]) return;
+    if (td.running) {
+        if (el.tdFeedback) el.tdFeedback.textContent = 'Finish current run before changing difficulty.';
+        return;
+    }
+
+    state.tdDifficulty = key;
+    tdApplyDifficultyButtons();
+    tdResetState();
+    tdDraw();
+    saveGame();
+
+    const cfg = tdDifficultyConfig();
+    if (el.tdFeedback) el.tdFeedback.textContent = `Difficulty set to ${cfg.label}.`;
+}
+
 function tdBaseHpForRun() {
-    return 20 + Math.floor(totalBuildings() / 80) + Math.floor(state.prestigeShards / 2);
+    const cfg = tdDifficultyConfig();
+    const base = 20 + Math.floor(totalBuildings() / 80) + Math.floor(state.prestigeShards / 2);
+    return Math.max(6, Math.floor(base * cfg.playerHpMult));
 }
 
 function tdTokenStartForRun() {
-    return Math.max(4, Math.floor(totalBuildings() / 7) + state.tdBonusTokens + Math.floor(state.prestigeShards / 3));
+    const cfg = tdDifficultyConfig();
+    const base = Math.max(4, Math.floor(totalBuildings() / 7) + state.tdBonusTokens + Math.floor(state.prestigeShards / 3));
+    return Math.max(2, Math.floor(base * cfg.tokenMult));
 }
 
 function tdResetState() {
+    const cfg = tdDifficultyConfig();
     td.maxHp = tdBaseHpForRun();
     td.baseHp = td.maxHp;
     td.wave = 0;
@@ -1267,6 +1402,8 @@ function tdResetState() {
     td.tokens = tdTokenStartForRun();
     td.energy = state.tdStartEnergy;
     td.speedMult = 1;
+    td.victoryWave = cfg.victoryWave;
+    td.difficultyKey = state.tdDifficulty;
 
     td.waveActive = false;
     td.enemiesToSpawn = 0;
@@ -1291,10 +1428,11 @@ function tdTowerAtCell(col, row) {
 }
 
 function tdEnemyBaseStats(typeName) {
+    const cfg = tdDifficultyConfig();
     const type = ENEMY_TYPES[typeName];
     const waveScale = Math.pow(1.24, Math.max(0, td.wave - 1));
-    const baseHp = 16 * waveScale * type.hpMult;
-    const baseSpeed = (30 + td.wave * 2.6) * type.speedMult;
+    const baseHp = 16 * waveScale * type.hpMult * cfg.enemyHpMult;
+    const baseSpeed = (30 + td.wave * 2.6) * type.speedMult * cfg.enemySpeedMult;
     return {
         hp: baseHp,
         speed: baseSpeed
@@ -1329,20 +1467,20 @@ function tdWavePool() {
 }
 
 function tdStartNextWave() {
+    const cfg = tdDifficultyConfig();
     td.wave += 1;
     state.tdBestWave = Math.max(state.tdBestWave, td.wave);
     td.waveActive = true;
-    td.enemiesToSpawn = 12 + td.wave * 5;
+    td.enemiesToSpawn = Math.max(8, Math.round((12 + td.wave * 5) * cfg.spawnCountMult));
     td.spawnClock = 0;
-    td.spawnDelay = Math.max(0.1, (0.78 - td.wave * 0.022) + Math.max(0, 0.14 - state.tdSpawnSlow));
+    td.spawnDelay = Math.max(0.06, ((0.78 - td.wave * 0.022) + Math.max(0, 0.14 - state.tdSpawnSlow)) / cfg.spawnRateMult);
 
-    if (td.wave % 5 === 0) {
-        td.enemiesToSpawn += 3 + td.wave;
+    if (td.wave % cfg.bossEvery === 0) {
+        td.enemiesToSpawn += Math.round((3 + td.wave) * cfg.spawnCountMult * 0.55);
         tdSpawnEnemy('boss');
-        td.baseHp = Math.min(td.maxHp, td.baseHp + 2);
-        td.energy += 10;
+        td.energy += Math.round(6 * cfg.energyGainMult);
     } else {
-        td.baseHp = Math.min(td.maxHp, td.baseHp + 1);
+        td.baseHp = Math.min(td.maxHp, td.baseHp + (cfg.baseLeakDamage <= 1 ? 1 : 0));
     }
 
     td.tokens += td.wave % 3 === 0 ? 1 : 0;
@@ -1352,13 +1490,15 @@ function tdStartNextWave() {
 }
 
 function tdPickEnemyType() {
+    const cfg = tdDifficultyConfig();
     const pool = tdWavePool();
     const roll = Math.random();
 
-    if (pool.includes('boss') && roll > 0.985) return 'boss';
-    if (pool.includes('shield') && roll > 0.88) return 'shield';
-    if (pool.includes('splitter') && roll > 0.75) return 'splitter';
-    if (pool.includes('brute') && roll > 0.5) return 'brute';
+    const bossChance = cfg.label === 'Insane' ? 0.964 : cfg.label === 'Very Hard' ? 0.974 : cfg.label === 'Hard' ? 0.982 : 0.989;
+    if (pool.includes('boss') && roll > bossChance) return 'boss';
+    if (pool.includes('shield') && roll > 0.84) return 'shield';
+    if (pool.includes('splitter') && roll > 0.7) return 'splitter';
+    if (pool.includes('brute') && roll > 0.45) return 'brute';
     return 'scout';
 }
 
@@ -1472,10 +1612,11 @@ function tdShotHit(shot) {
 }
 
 function tdHandleEnemyDeath(enemy) {
+    const cfg = tdDifficultyConfig();
     const type = ENEMY_TYPES[enemy.type];
     td.kills += 1;
 
-    const energyGain = type.reward * (1 + state.tdEnergyBonus);
+    const energyGain = type.reward * (1 + state.tdEnergyBonus) * cfg.energyGainMult;
     td.energy += energyGain;
 
     if (type.split) {
@@ -1528,6 +1669,7 @@ function tdMoveEnemy(enemy, delta) {
 
 function tdUpdate(delta) {
     if (!td.running) return;
+    const cfg = tdDifficultyConfig();
     const simDelta = delta * td.speedMult;
 
     if (!td.waveActive && td.enemies.length === 0) {
@@ -1548,7 +1690,7 @@ function tdUpdate(delta) {
         if (td.enemiesToSpawn <= 0 && td.enemies.length === 0) {
             td.waveActive = false;
             td.nextWaveClock = 2.4;
-            const waveReward = Math.round(125 + td.wave * 30 + totalBuildings() * 1.6);
+            const waveReward = Math.round((125 + td.wave * 30 + totalBuildings() * 1.6) * (0.88 + cfg.spawnCountMult * 0.25));
             addGems(waveReward);
             if (td.wave % 4 === 0) td.tokens += 1;
             if (td.wave % 5 === 0) td.tokens += 2;
@@ -1615,7 +1757,7 @@ function tdUpdate(delta) {
         }
 
         if (enemy.pathIndex >= td.waypoints.length) {
-            td.baseHp -= 1;
+            td.baseHp -= cfg.baseLeakDamage;
             td.enemies.splice(i, 1);
         }
     }
@@ -1760,28 +1902,28 @@ function tdStopRun(message) {
 }
 
 function tdFinishRun() {
+    const cfg = tdDifficultyConfig();
     state.tdBestKills = Math.max(state.tdBestKills, td.kills);
     state.tdBestWave = Math.max(state.tdBestWave, td.wave);
 
-    const reward = Math.round(td.kills * 16 + td.wave * 72 + totalBuildings() * 2.1);
+    const reward = Math.round((td.kills * 16 + td.wave * 72 + totalBuildings() * 2.1) * (0.84 + cfg.spawnCountMult * 0.25));
     addGems(reward);
 
     tdStopRun(`Defense failed at wave ${td.wave}. Reward: +${fmt(reward)} gems.`);
-    submitLeaderboardEntry('defense');
     renderAll();
     saveGame();
 }
 
 function tdWinRun() {
+    const cfg = tdDifficultyConfig();
     state.tdBestKills = Math.max(state.tdBestKills, td.kills);
     state.tdBestWave = Math.max(state.tdBestWave, td.wave);
     state.tdWins += 1;
 
-    const reward = Math.round(2500 + td.kills * 22 + td.wave * 210 + totalBuildings() * 3.8);
+    const reward = Math.round((2500 + td.kills * 22 + td.wave * 210 + totalBuildings() * 3.8) * (0.88 + cfg.spawnCountMult * 0.35));
     addGems(reward);
 
     tdStopRun(`Victory! You cleared wave ${td.wave}. Reward: +${fmt(reward)} gems.`);
-    submitLeaderboardEntry('defense');
     renderAll();
     saveGame();
 }
@@ -1797,7 +1939,8 @@ function tdStart() {
     td.nextWaveClock = 0.8;
 
     if (el.tdFeedback) {
-        el.tdFeedback.textContent = 'Defense started. Build towers and survive escalating waves.';
+        const cfg = tdDifficultyConfig();
+        el.tdFeedback.textContent = `Defense started on ${cfg.label}. Survive to wave ${td.victoryWave}.`;
     }
 
     const frameMs = 50;
@@ -1821,12 +1964,13 @@ function tdResetGrid() {
 }
 
 function tdActivateOrbitalStrike() {
+    const cfg = tdDifficultyConfig();
     if (!td.running) {
         if (el.tdFeedback) el.tdFeedback.textContent = 'Start defense first.';
         return;
     }
 
-    const cost = 25;
+    const cost = cfg.strikeCost;
     if (td.energy < cost) {
         if (el.tdFeedback) el.tdFeedback.textContent = `Need ${cost} strike energy.`;
         return;
@@ -1846,6 +1990,7 @@ function tdActivateOrbitalStrike() {
 }
 
 function tdCallNextWave() {
+    const cfg = tdDifficultyConfig();
     if (!td.running) {
         if (el.tdFeedback) el.tdFeedback.textContent = 'Start defense first.';
         return;
@@ -1857,8 +2002,9 @@ function tdCallNextWave() {
     }
 
     td.nextWaveClock = 0;
-    td.energy += 6;
-    if (el.tdFeedback) el.tdFeedback.textContent = 'Next wave called early. +6 energy bonus.';
+    const rushEnergy = Math.max(2, Math.round(6 * cfg.energyGainMult));
+    td.energy += rushEnergy;
+    if (el.tdFeedback) el.tdFeedback.textContent = `Next wave called early. +${rushEnergy} energy bonus.`;
     renderTdStats();
 }
 
@@ -2064,6 +2210,14 @@ function bindEvents() {
         });
     }
 
+    if (el.tdDifficultyModes) {
+        el.tdDifficultyModes.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-td-difficulty]');
+            if (!button) return;
+            tdSetDifficulty(button.dataset.tdDifficulty);
+        });
+    }
+
     if (el.tdCanvas) el.tdCanvas.addEventListener('click', tdPlaceOrSelect);
 
     if (el.lbNameInput) {
@@ -2078,8 +2232,8 @@ function bindEvents() {
         el.lbSubmitBtn.addEventListener('click', () => {
             state.playerName = normalizeCommanderName(el.lbNameInput ? el.lbNameInput.value : state.playerName);
             if (el.lbNameInput) el.lbNameInput.value = state.playerName;
-            submitLeaderboardEntry('manual');
-            saveGame();
+            const didSubmit = submitLeaderboardEntry('manual');
+            if (didSubmit) saveGame();
         });
     }
 
@@ -2096,10 +2250,12 @@ function boot() {
     loadGame();
     loadLeaderboard();
     bindEvents();
+    tdApplyDifficultyButtons();
     tdResetState();
     tdDraw();
     renderAll();
     renderLeaderboard();
+    refreshLeaderboardSubmitUi();
 
     if (el.lbNameInput) {
         el.lbNameInput.value = normalizeCommanderName(state.playerName);
