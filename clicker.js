@@ -271,6 +271,8 @@ const TD_OBJECTIVE_POOL = [
 ];
 
 const TD_TARGET_MODES = ['first', 'strong', 'armor', 'last'];
+const TD_KILLS_PER_TOKEN = 14;
+const TD_WAVE_TOKEN_REWARD = 1;
 
 function buildResearchData() {
     const list = [];
@@ -2719,6 +2721,12 @@ function tdHandleEnemyDeath(enemy) {
     const cfg = tdDifficultyConfig();
     const type = ENEMY_TYPES[enemy.type];
     td.kills += 1;
+    if (td.kills % TD_KILLS_PER_TOKEN === 0) {
+        td.tokens += 1;
+        if (el.tdFeedback) {
+            el.tdFeedback.textContent = `Kill milestone reached: +1 token (${TD_KILLS_PER_TOKEN} kills).`;
+        }
+    }
 
     const energyGain = type.reward * (1 + state.tdEnergyBonus) * cfg.energyGainMult * td.currentMutator.energyMult;
     td.energy += energyGain;
@@ -2830,16 +2838,17 @@ function tdUpdate(delta) {
             td.nextWaveClock = 2.4;
             const waveReward = Math.round((125 + td.wave * 30 + totalBuildings() * 1.6) * (0.88 + cfg.spawnCountMult * 0.25) * td.currentMutator.rewardMult);
             addGems(waveReward);
+            td.tokens += TD_WAVE_TOKEN_REWARD;
             if (td.currentBossMode) {
                 const tokenGain = Math.max(1, Math.floor(td.currentBossMode.bossCount * 0.8));
                 td.tokens += tokenGain;
-                if (el.tdFeedback) el.tdFeedback.textContent = `Boss wave ${td.wave} cleared. +${tokenGain} token(s), +${fmt(waveReward)} gems.`;
+                if (el.tdFeedback) el.tdFeedback.textContent = `Boss wave ${td.wave} cleared. +${TD_WAVE_TOKEN_REWARD + tokenGain} token(s), +${fmt(waveReward)} gems.`;
             }
             if (td.wave >= td.victoryWave) {
                 tdWinRun();
                 return;
             }
-            if (!td.currentBossMode && el.tdFeedback) el.tdFeedback.textContent = `Wave ${td.wave} cleared. +${fmt(waveReward)} gems.`;
+            if (!td.currentBossMode && el.tdFeedback) el.tdFeedback.textContent = `Wave ${td.wave} cleared. +${TD_WAVE_TOKEN_REWARD} token, +${fmt(waveReward)} gems.`;
         }
 
         if (td.dpsTarget > 0) {
