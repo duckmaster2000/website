@@ -100,73 +100,73 @@ const ENEMY_TYPES = {
 const TD_DIFFICULTIES = {
     easy: {
         label: 'Easy',
-        enemyHpMult: 0.9,
-        enemySpeedMult: 0.92,
-        spawnCountMult: 0.9,
-        spawnRateMult: 0.88,
-        playerHpMult: 1.2,
-        tokenMult: 1.18,
-        energyGainMult: 1.2,
+        enemyHpMult: 1.08,
+        enemySpeedMult: 1.04,
+        spawnCountMult: 1.05,
+        spawnRateMult: 1.02,
+        playerHpMult: 1,
+        tokenMult: 1,
+        energyGainMult: 1.05,
         baseLeakDamage: 1,
-        bossEvery: 6,
-        victoryWave: 16,
-        strikeCost: 20
+        bossEvery: 5,
+        victoryWave: 18,
+        strikeCost: 24
     },
     medium: {
         label: 'Medium',
-        enemyHpMult: 1.35,
-        enemySpeedMult: 1.08,
-        spawnCountMult: 1.2,
-        spawnRateMult: 1.12,
-        playerHpMult: 0.92,
-        tokenMult: 0.94,
-        energyGainMult: 0.95,
-        baseLeakDamage: 1,
-        bossEvery: 5,
-        victoryWave: 20,
-        strikeCost: 25
-    },
-    hard: {
-        label: 'Hard',
-        enemyHpMult: 1.9,
-        enemySpeedMult: 1.22,
-        spawnCountMult: 1.5,
-        spawnRateMult: 1.32,
-        playerHpMult: 0.82,
-        tokenMult: 0.85,
-        energyGainMult: 0.82,
+        enemyHpMult: 1.65,
+        enemySpeedMult: 1.2,
+        spawnCountMult: 1.38,
+        spawnRateMult: 1.28,
+        playerHpMult: 1,
+        tokenMult: 1,
+        energyGainMult: 0.88,
         baseLeakDamage: 2,
         bossEvery: 4,
         victoryWave: 24,
-        strikeCost: 29
+        strikeCost: 30
     },
-    veryhard: {
-        label: 'Very Hard',
-        enemyHpMult: 2.7,
-        enemySpeedMult: 1.38,
-        spawnCountMult: 1.95,
-        spawnRateMult: 1.55,
-        playerHpMult: 0.72,
-        tokenMult: 0.74,
-        energyGainMult: 0.72,
+    hard: {
+        label: 'Hard',
+        enemyHpMult: 2.25,
+        enemySpeedMult: 1.34,
+        spawnCountMult: 1.78,
+        spawnRateMult: 1.46,
+        playerHpMult: 1,
+        tokenMult: 1,
+        energyGainMult: 0.76,
         baseLeakDamage: 2,
         bossEvery: 3,
         victoryWave: 28,
         strikeCost: 34
     },
-    insane: {
-        label: 'Insane',
-        enemyHpMult: 3.6,
-        enemySpeedMult: 1.62,
-        spawnCountMult: 2.3,
-        spawnRateMult: 1.85,
-        playerHpMult: 0.62,
-        tokenMult: 0.64,
-        energyGainMult: 0.62,
+    veryhard: {
+        label: 'Very Hard',
+        enemyHpMult: 3.15,
+        enemySpeedMult: 1.52,
+        spawnCountMult: 2.25,
+        spawnRateMult: 1.72,
+        playerHpMult: 1,
+        tokenMult: 1,
+        energyGainMult: 0.68,
         baseLeakDamage: 3,
         bossEvery: 3,
         victoryWave: 32,
-        strikeCost: 40
+        strikeCost: 38
+    },
+    insane: {
+        label: 'Insane',
+        enemyHpMult: 4.25,
+        enemySpeedMult: 1.8,
+        spawnCountMult: 2.65,
+        spawnRateMult: 2.05,
+        playerHpMult: 1,
+        tokenMult: 1,
+        energyGainMult: 0.56,
+        baseLeakDamage: 4,
+        bossEvery: 2,
+        victoryWave: 36,
+        strikeCost: 44
     }
 };
 
@@ -379,8 +379,10 @@ const td = {
         speedMult: 1,
         rewardMult: 1,
         energyMult: 1,
-        spawnMult: 1
+        spawnMult: 1,
+        leakBonus: 0
     },
+    currentBossMode: null,
 
     waveActive: false,
     enemiesToSpawn: 0,
@@ -394,10 +396,13 @@ const td = {
     towers: [],
     enemies: [],
     shots: [],
+    particles: [],
+    shockwaves: [],
 
     intervalId: null,
     secondId: null,
-    uidSeed: 1
+    uidSeed: 1,
+    frameClock: 0
 };
 
 const ACHIEVEMENTS = [
@@ -1441,15 +1446,30 @@ function tdSetDifficulty(key) {
 }
 
 function tdBaseHpForRun() {
-    const cfg = tdDifficultyConfig();
-    const base = 20 + Math.floor(totalBuildings() / 80) + Math.floor(state.prestigeShards / 2);
-    return Math.max(6, Math.floor(base * cfg.playerHpMult));
+    const fixedByDifficulty = {
+        easy: 22,
+        medium: 18,
+        hard: 15,
+        veryhard: 13,
+        insane: 11
+    };
+
+    return fixedByDifficulty[state.tdDifficulty] || 18;
 }
 
 function tdTokenStartForRun() {
-    const cfg = tdDifficultyConfig();
-    const base = Math.max(4, Math.floor(totalBuildings() / 7) + state.tdBonusTokens + Math.floor(state.prestigeShards / 3));
-    return Math.max(2, Math.floor(base * cfg.tokenMult));
+    const startByDifficulty = {
+        easy: 4,
+        medium: 3,
+        hard: 2,
+        veryhard: 2,
+        insane: 1
+    };
+
+    const base = startByDifficulty[state.tdDifficulty] || 3;
+    const researchBonus = Math.floor(state.tdBonusTokens * 0.34);
+    const prestigeBonus = Math.floor(state.prestigeShards / 18);
+    return Math.max(1, base + researchBonus + prestigeBonus);
 }
 
 function tdResetState() {
@@ -1469,8 +1489,10 @@ function tdResetState() {
         speedMult: 1,
         rewardMult: 1,
         energyMult: 1,
-        spawnMult: 1
+        spawnMult: 1,
+        leakBonus: 0
     };
+    td.currentBossMode = null;
 
     td.waveActive = false;
     td.enemiesToSpawn = 0;
@@ -1481,6 +1503,9 @@ function tdResetState() {
     td.towers = [];
     td.enemies = [];
     td.shots = [];
+    td.particles = [];
+    td.shockwaves = [];
+    td.frameClock = 0;
 
     renderTdStats();
     renderSelectedTower();
@@ -1541,15 +1566,16 @@ function tdRollMutator() {
             speedMult: 1,
             rewardMult: 1,
             energyMult: 1,
-            spawnMult: 1
+            spawnMult: 1,
+            leakBonus: 0
         };
     }
 
     const rolls = [
-        { label: 'Meteor Rush', hpMult: 0.92, speedMult: 1.22, rewardMult: 1.1, energyMult: 1.08, spawnMult: 1.08 },
-        { label: 'Iron Convoy', hpMult: 1.28, speedMult: 0.9, rewardMult: 1.16, energyMult: 1.05, spawnMult: 1.05 },
-        { label: 'Energy Storm', hpMult: 1.08, speedMult: 1.08, rewardMult: 1.08, energyMult: 1.26, spawnMult: 1.02 },
-        { label: 'Thin Atmosphere', hpMult: 0.86, speedMult: 1.14, rewardMult: 0.96, energyMult: 1.12, spawnMult: 0.95 }
+        { label: 'Meteor Rush', hpMult: 1.05, speedMult: 1.28, rewardMult: 1.15, energyMult: 1, spawnMult: 1.14, leakBonus: 0 },
+        { label: 'Iron Convoy', hpMult: 1.36, speedMult: 0.95, rewardMult: 1.2, energyMult: 1.02, spawnMult: 1.08, leakBonus: 1 },
+        { label: 'Energy Storm', hpMult: 1.18, speedMult: 1.12, rewardMult: 1.1, energyMult: 1.14, spawnMult: 1.05, leakBonus: 0 },
+        { label: 'Void Pressure', hpMult: 1.22, speedMult: 1.18, rewardMult: 1.12, energyMult: 0.92, spawnMult: 1.16, leakBonus: 1 }
     ];
 
     if (Math.random() < 0.34) {
@@ -1559,11 +1585,30 @@ function tdRollMutator() {
             speedMult: 1,
             rewardMult: 1,
             energyMult: 1,
-            spawnMult: 1
+            spawnMult: 1,
+            leakBonus: 0
         };
     }
 
     return rolls[Math.floor(Math.random() * rolls.length)];
+}
+
+function tdBossModeForWave() {
+    const cfg = tdDifficultyConfig();
+    if (td.wave % cfg.bossEvery !== 0) return null;
+
+    const cycle = Math.floor(td.wave / cfg.bossEvery);
+    const modes = [
+        { label: 'Juggernaut Protocol', hpMult: 1.7, speedMult: 1.06, spawnMult: 1.15, rewardMult: 1.28, leakBonus: 1, bossCount: 1 },
+        { label: 'Swarm Overlord', hpMult: 1.45, speedMult: 1.24, spawnMult: 1.34, rewardMult: 1.22, leakBonus: 1, bossCount: 2 },
+        { label: 'Siege Colossus', hpMult: 2, speedMult: 0.94, spawnMult: 1.08, rewardMult: 1.36, leakBonus: 2, bossCount: 1 }
+    ];
+
+    const mode = modes[(cycle - 1) % modes.length];
+    return {
+        ...mode,
+        bossCount: mode.bossCount + Math.floor(cycle / 4)
+    };
 }
 
 function tdStartNextWave() {
@@ -1571,22 +1616,36 @@ function tdStartNextWave() {
     td.wave += 1;
     state.tdBestWave = Math.max(state.tdBestWave, td.wave);
     td.currentMutator = tdRollMutator();
+    td.currentBossMode = tdBossModeForWave();
+
+    if (td.currentBossMode) {
+        td.currentMutator = {
+            label: `BOSS MODE: ${td.currentBossMode.label}`,
+            hpMult: td.currentMutator.hpMult * td.currentBossMode.hpMult,
+            speedMult: td.currentMutator.speedMult * td.currentBossMode.speedMult,
+            rewardMult: td.currentMutator.rewardMult * td.currentBossMode.rewardMult,
+            energyMult: td.currentMutator.energyMult,
+            spawnMult: td.currentMutator.spawnMult * td.currentBossMode.spawnMult,
+            leakBonus: td.currentMutator.leakBonus + td.currentBossMode.leakBonus
+        };
+    }
+
     td.waveActive = true;
     td.enemiesToSpawn = Math.max(8, Math.round((12 + td.wave * 5) * cfg.spawnCountMult * td.currentMutator.spawnMult));
     td.spawnClock = 0;
     td.spawnDelay = Math.max(0.06, ((0.78 - td.wave * 0.022) + Math.max(0, 0.14 - state.tdSpawnSlow)) / cfg.spawnRateMult);
 
-    if (td.wave % cfg.bossEvery === 0) {
-        td.enemiesToSpawn += Math.round((3 + td.wave) * cfg.spawnCountMult * 0.55);
-        tdSpawnEnemy('boss');
-        td.energy += Math.round(6 * cfg.energyGainMult * td.currentMutator.energyMult);
-    } else {
-        td.baseHp = Math.min(td.maxHp, td.baseHp + (cfg.baseLeakDamage <= 1 ? 1 : 0));
+    if (td.currentBossMode) {
+        td.enemiesToSpawn += Math.round((4 + td.wave) * cfg.spawnCountMult * 0.75);
+        for (let i = 0; i < td.currentBossMode.bossCount; i += 1) {
+            tdSpawnEnemy('boss');
+        }
+        td.energy += Math.round(5 * cfg.energyGainMult * td.currentMutator.energyMult);
     }
 
-    td.tokens += td.wave % 3 === 0 ? 1 : 0;
     if (el.tdFeedback) {
-        el.tdFeedback.textContent = `Wave ${td.wave} started. ${td.currentMutator.label} active. Incoming monsters: ${td.enemiesToSpawn}.`;
+        const bossLabel = td.currentBossMode ? ` Bosses: ${td.currentBossMode.bossCount}.` : '';
+        el.tdFeedback.textContent = `Wave ${td.wave} started. ${td.currentMutator.label} active. Incoming monsters: ${td.enemiesToSpawn}.${bossLabel}`;
     }
 }
 
@@ -1695,6 +1754,7 @@ function tdShotHit(shot) {
     const armor = ENEMY_TYPES[primary.type].armor || 0;
     let dealt = shot.damage * (1 - armor);
     primary.hp -= dealt;
+    tdEmitImpact(primary.x, primary.y, shot.color, shot.chain > 0 ? 8 : 5);
 
     if (shot.slowAmount > 0) {
         primary.slowFactor = Math.min(primary.slowFactor, 1 - shot.slowAmount);
@@ -1728,6 +1788,33 @@ function tdShotHit(shot) {
     return true;
 }
 
+function tdEmitImpact(x, y, color, count = 6) {
+    for (let i = 0; i < count; i += 1) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 34 + Math.random() * 130;
+        td.particles.push({
+            x,
+            y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            size: 1.4 + Math.random() * 2.3,
+            life: 0.22 + Math.random() * 0.25,
+            maxLife: 0.45,
+            color
+        });
+    }
+
+    td.shockwaves.push({
+        x,
+        y,
+        radius: 4,
+        growth: 95,
+        life: 0.18,
+        maxLife: 0.18,
+        color
+    });
+}
+
 function tdHandleEnemyDeath(enemy) {
     const cfg = tdDifficultyConfig();
     const type = ENEMY_TYPES[enemy.type];
@@ -1735,6 +1822,7 @@ function tdHandleEnemyDeath(enemy) {
 
     const energyGain = type.reward * (1 + state.tdEnergyBonus) * cfg.energyGainMult * td.currentMutator.energyMult;
     td.energy += energyGain;
+    tdEmitImpact(enemy.x, enemy.y, '#ffeeb3', enemy.type === 'boss' ? 16 : 9);
 
     if (type.split) {
         for (let i = 0; i < 2; i += 1) {
@@ -1788,6 +1876,7 @@ function tdUpdate(delta) {
     if (!td.running) return;
     const cfg = tdDifficultyConfig();
     const simDelta = delta * td.speedMult;
+    td.frameClock += simDelta;
 
     if (!td.waveActive && td.enemies.length === 0) {
         td.nextWaveClock -= simDelta;
@@ -1809,13 +1898,16 @@ function tdUpdate(delta) {
             td.nextWaveClock = 2.4;
             const waveReward = Math.round((125 + td.wave * 30 + totalBuildings() * 1.6) * (0.88 + cfg.spawnCountMult * 0.25) * td.currentMutator.rewardMult);
             addGems(waveReward);
-            if (td.wave % 4 === 0) td.tokens += 1;
-            if (td.wave % 5 === 0) td.tokens += 2;
+            if (td.currentBossMode) {
+                const tokenGain = Math.max(1, Math.floor(td.currentBossMode.bossCount * 0.8));
+                td.tokens += tokenGain;
+                if (el.tdFeedback) el.tdFeedback.textContent = `Boss wave ${td.wave} cleared. +${tokenGain} token(s), +${fmt(waveReward)} gems.`;
+            }
             if (td.wave >= td.victoryWave) {
                 tdWinRun();
                 return;
             }
-            if (el.tdFeedback) el.tdFeedback.textContent = `Wave ${td.wave} cleared. +${fmt(waveReward)} gems.`;
+            if (!td.currentBossMode && el.tdFeedback) el.tdFeedback.textContent = `Wave ${td.wave} cleared. +${fmt(waveReward)} gems.`;
         }
     }
 
@@ -1857,6 +1949,19 @@ function tdUpdate(delta) {
         shot.x += (dx / dist) * step;
         shot.y += (dy / dist) * step;
 
+        if (Math.random() > 0.45) {
+            td.particles.push({
+                x: shot.x,
+                y: shot.y,
+                vx: (Math.random() - 0.5) * 16,
+                vy: (Math.random() - 0.5) * 16,
+                size: 1.1,
+                life: 0.08,
+                maxLife: 0.1,
+                color: shot.color
+            });
+        }
+
         if (tdShotHit(shot)) {
             shot.dead = true;
         }
@@ -1874,9 +1979,28 @@ function tdUpdate(delta) {
         }
 
         if (enemy.pathIndex >= td.waypoints.length) {
-            td.baseHp -= cfg.baseLeakDamage;
+            const leakDamage = cfg.baseLeakDamage + (td.currentMutator.leakBonus || 0);
+            td.baseHp -= leakDamage;
+            tdEmitImpact(td.width - 14, enemy.y, '#ff8c8c', 10);
             td.enemies.splice(i, 1);
         }
+    }
+
+    for (let i = td.particles.length - 1; i >= 0; i -= 1) {
+        const p = td.particles[i];
+        p.life -= simDelta;
+        p.x += p.vx * simDelta;
+        p.y += p.vy * simDelta;
+        p.vx *= 0.92;
+        p.vy *= 0.92;
+        if (p.life <= 0) td.particles.splice(i, 1);
+    }
+
+    for (let i = td.shockwaves.length - 1; i >= 0; i -= 1) {
+        const ring = td.shockwaves[i];
+        ring.life -= simDelta;
+        ring.radius += ring.growth * simDelta;
+        if (ring.life <= 0) td.shockwaves.splice(i, 1);
     }
 
     td.shots = td.shots.filter((s) => !s.dead);
@@ -1898,8 +2022,16 @@ function tdDraw() {
 
     ctx.clearRect(0, 0, td.width, td.height);
 
-    ctx.fillStyle = '#0c203b';
+    const scanX = (td.frameClock * 75) % (td.width + 80) - 40;
+    const bg = ctx.createLinearGradient(0, 0, td.width, td.height);
+    bg.addColorStop(0, '#0b1a33');
+    bg.addColorStop(0.55, '#12284a');
+    bg.addColorStop(1, '#0b1a33');
+    ctx.fillStyle = bg;
     ctx.fillRect(0, 0, td.width, td.height);
+
+    ctx.fillStyle = 'rgba(132, 208, 255, 0.08)';
+    ctx.fillRect(scanX, 0, 38, td.height);
 
     for (let r = 0; r < td.rows; r += 1) {
         const y = r * td.cell;
@@ -2001,11 +2133,37 @@ function tdDraw() {
         ctx.fillRect(enemy.x - 12, enemy.y - enemy.radius - 7, 24 * hpRatio, 4);
     });
 
+    td.shockwaves.forEach((ring) => {
+        const alpha = Math.max(0, ring.life / ring.maxLife);
+        ctx.strokeStyle = `rgba(255, 236, 176, ${alpha * 0.65})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(ring.x, ring.y, ring.radius, 0, Math.PI * 2);
+        ctx.stroke();
+    });
+
+    td.particles.forEach((p) => {
+        const alpha = Math.max(0, p.life / p.maxLife);
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = alpha;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+    });
+
     td.shots.forEach((shot) => {
         ctx.fillStyle = shot.color;
         ctx.beginPath();
         ctx.arc(shot.x, shot.y, 3, 0, Math.PI * 2);
         ctx.fill();
+
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(shot.x, shot.y);
+        ctx.lineTo(shot.x - 6, shot.y - 2);
+        ctx.stroke();
     });
 }
 

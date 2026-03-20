@@ -30,6 +30,7 @@
 
             <div class="td-stats">
                 <span>Base HP: <strong id="tdBaseHp">20</strong></span>
+                <span>Lives: <strong id="tdLives">3</strong></span>
                 <span>Wave: <strong id="tdWave">0</strong></span>
                 <span>Tower Tokens: <strong id="tdTokens">0</strong></span>
                 <span>Monsters Defeated: <strong id="tdKills">0</strong></span>
@@ -42,6 +43,7 @@
                 <button id="tdNextWaveBtn" type="button">Call Next Wave</button>
                 <button id="tdSpeedBtn" type="button">Speed x1</button>
                 <button id="tdAbilityBtn" type="button">Orbital Strike (25)</button>
+                <button id="tdPermadeathBtn" type="button">Permadeath: OFF</button>
             </div>
 
             <div class="td-difficulty" id="tdDifficultyModes">
@@ -71,12 +73,13 @@
             </div>
 
             <canvas id="tdCanvas" width="560" height="220" aria-label="Tower defense arena"></canvas>
-            <p class="td-help">Relay Towers buff nearby allies. Read the mutator each wave and adapt your placement pathing.</p>
+            <p class="td-help">Relay Towers buff nearby allies. Boss Mode waves are brutal, base HP is fixed by difficulty, and tower tokens are rare so every placement matters.</p>
             <div class="terminal-feedback" id="tdMutator">Mutator: Stable Orbit</div>
             <div class="terminal-feedback" id="tdFeedback">Defense bay idle.</div>
         </section>
     </main>
 
+    <script src="anti-inspect.js"></script>
     <script src="clicker.js"></script>
 </body>
 </html>
