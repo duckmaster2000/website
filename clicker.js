@@ -1,9 +1,15 @@
 
-const SAVE_KEY = 'caleb_clicker_save_v6_space';
+const IS_TD_STANDALONE = Boolean(document.getElementById('tdCanvas')) && !document.querySelector('.gem-button');
+
+const SAVE_KEY = IS_TD_STANDALONE
+    ? 'caleb_td_standalone_save_v1'
+    : 'caleb_clicker_save_v6_space';
 const LEGACY_V5_KEY = 'caleb_clicker_save_v5_space';
 const LEGACY_V4_KEY = 'caleb_clicker_save_v4_space';
 const LEGACY_V3_KEY = 'caleb_clicker_save_v3';
-const LEADERBOARD_KEY = 'calyx_space_global_leaderboard_v1';
+const LEADERBOARD_KEY = IS_TD_STANDALONE
+    ? 'caleb_td_standalone_leaderboard_v1'
+    : 'calyx_space_global_leaderboard_v1';
 const LEADERBOARD_LIMIT = 30;
 
 const BUILDINGS = [
@@ -588,22 +594,27 @@ function safeSet(node, value) {
 }
 
 function totalBuildings() {
+    if (IS_TD_STANDALONE) return 0;
     return BUILDINGS.reduce((sum, b) => sum + state.buildings[b.id], 0);
 }
 
 function prestigeGpsMultiplier() {
+    if (IS_TD_STANDALONE) return 1;
     return 1 + state.prestigeShards * 0.12;
 }
 
 function prestigeTdMultiplier() {
+    if (IS_TD_STANDALONE) return 1;
     return 1 + state.prestigeShards * 0.08;
 }
 
 function prestigeClickMultiplier() {
+    if (IS_TD_STANDALONE) return 1;
     return 1 + state.prestigeShards * 0.04;
 }
 
 function prestigeGoldenBonus() {
+    if (IS_TD_STANDALONE) return 0;
     return Math.min(0.18, state.prestigeShards * 0.002);
 }
 
@@ -968,6 +979,11 @@ function loadGame() {
         } catch (_e) {
             localStorage.removeItem(SAVE_KEY);
         }
+    }
+
+    if (IS_TD_STANDALONE) {
+        validateState();
+        return;
     }
 
     const rawV5 = localStorage.getItem(LEGACY_V5_KEY);
@@ -1842,14 +1858,17 @@ function tdBaseHpForRun() {
 
 function tdTokenStartForRun() {
     const startByDifficulty = {
-        easy: 4,
-        medium: 3,
+        easy: 3,
+        medium: 2,
         hard: 2,
-        veryhard: 2,
+        veryhard: 1,
         insane: 1
     };
 
     const base = startByDifficulty[state.tdDifficulty] || 3;
+    if (IS_TD_STANDALONE) {
+        return base;
+    }
     const researchBonus = Math.floor(state.tdBonusTokens * 0.34);
     const prestigeBonus = Math.floor(state.prestigeShards / 18);
     return Math.max(1, base + researchBonus + prestigeBonus);
@@ -3800,6 +3819,19 @@ function bindEvents() {
 }
 
 function boot() {
+    if (IS_TD_STANDALONE) {
+        loadGame();
+        bindEvents();
+        tdApplyDifficultyButtons();
+        tdApplyModeButtons();
+        tdResetState();
+        tdDraw();
+        renderTdStats();
+        renderTdMeta();
+        renderSelectedTower();
+        return;
+    }
+
     loadGame();
     loadLeaderboard();
     bindEvents();
