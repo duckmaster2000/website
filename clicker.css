@@ -551,6 +551,22 @@ h3 {
     flex-wrap: wrap;
 }
 
+.td-launch-link {
+    text-decoration: none;
+    border: 1px solid rgba(138, 214, 255, 0.45);
+    border-radius: 10px;
+    background: rgba(23, 53, 88, 0.95);
+    color: var(--text);
+    cursor: pointer;
+    font-family: "Orbitron", sans-serif;
+    font-size: 0.78rem;
+    padding: 0.5rem 0.72rem;
+}
+
+.td-launch-link:hover {
+    border-color: var(--accent);
+}
+
 .td-tower-types {
     margin-top: 0.5rem;
     display: flex;

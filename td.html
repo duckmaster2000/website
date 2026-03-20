@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Astrobakery Defense Bay</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Press+Start+2P&family=Space+Grotesk:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="td.css">
+</head>
+<body>
+    <div class="bg-noise" aria-hidden="true"></div>
+    <main class="wrap">
+        <header class="hero panel">
+            <p class="eyebrow">DEFENSE COMMAND</p>
+            <h1>Astrobakery Defense Bay</h1>
+            <p>Build synergy-heavy tower layouts, read mutators each wave, and hold the station line.</p>
+            <div class="hero-links">
+                <a href="index.html">Home</a>
+                <a href="clicker.html">Back to Clicker Economy</a>
+            </div>
+        </header>
+
+        <section class="panel minigame">
+            <div class="minigame-head">
+                <h3>Live Operation</h3>
+                <p>Use your clicker progression for tokens, damage scaling, and long-run mastery.</p>
+            </div>
+
+            <div class="td-stats">
+                <span>Base HP: <strong id="tdBaseHp">20</strong></span>
+                <span>Wave: <strong id="tdWave">0</strong></span>
+                <span>Tower Tokens: <strong id="tdTokens">0</strong></span>
+                <span>Monsters Defeated: <strong id="tdKills">0</strong></span>
+                <span>Strike Energy: <strong id="tdEnergy">0</strong></span>
+            </div>
+
+            <div class="td-controls">
+                <button id="tdStartBtn" type="button">Start Defense</button>
+                <button id="tdResetBtn" type="button">Reset Grid</button>
+                <button id="tdNextWaveBtn" type="button">Call Next Wave</button>
+                <button id="tdSpeedBtn" type="button">Speed x1</button>
+                <button id="tdAbilityBtn" type="button">Orbital Strike (25)</button>
+            </div>
+
+            <div class="td-difficulty" id="tdDifficultyModes">
+                <button class="td-difficulty-btn" data-td-difficulty="easy" type="button">Easy</button>
+                <button class="td-difficulty-btn active" data-td-difficulty="medium" type="button">Medium</button>
+                <button class="td-difficulty-btn" data-td-difficulty="hard" type="button">Hard</button>
+                <button class="td-difficulty-btn" data-td-difficulty="veryhard" type="button">Very Hard</button>
+                <button class="td-difficulty-btn" data-td-difficulty="insane" type="button">Insane</button>
+            </div>
+
+            <div class="td-tower-types" id="tdTowerTypes">
+                <button class="td-type active" data-td-type="laser" type="button">Laser Tower</button>
+                <button class="td-type" data-td-type="cannon" type="button">Cannon Tower</button>
+                <button class="td-type" data-td-type="frost" type="button">Frost Tower</button>
+                <button class="td-type" data-td-type="tesla" type="button">Tesla Tower</button>
+                <button class="td-type" data-td-type="missile" type="button">Missile Tower</button>
+                <button class="td-type" data-td-type="relay" type="button">Relay Tower</button>
+            </div>
+
+            <div class="td-upgrade-panel">
+                <p id="tdSelectedLabel">Select a tower on the grid to upgrade it.</p>
+                <div class="td-upgrade-actions">
+                    <button id="tdUpgradeA" type="button">Path A Upgrade</button>
+                    <button id="tdUpgradeB" type="button">Path B Upgrade</button>
+                    <button id="tdSellTower" type="button">Sell Tower</button>
+                </div>
+            </div>
+
+            <canvas id="tdCanvas" width="560" height="220" aria-label="Tower defense arena"></canvas>
+            <p class="td-help">Relay Towers buff nearby allies. Read the mutator each wave and adapt your placement pathing.</p>
+            <div class="terminal-feedback" id="tdMutator">Mutator: Stable Orbit</div>
+            <div class="terminal-feedback" id="tdFeedback">Defense bay idle.</div>
+        </section>
+    </main>
+
+    <script src="clicker.js"></script>
+</body>
+</html>

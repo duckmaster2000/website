@@ -74,11 +74,23 @@ const TOWER_TYPES = {
         damage: 28,
         splash: 38,
         color: '#ff9c90'
+    },
+    relay: {
+        name: 'Relay Tower',
+        tokenCost: 3,
+        range: 98,
+        fireRate: 1.08,
+        damage: 3,
+        auraRadius: 88,
+        auraDamage: 0.12,
+        auraRate: 0.08,
+        color: '#9dff92'
     }
 };
 
 const ENEMY_TYPES = {
     scout: { hpMult: 0.85, speedMult: 1.45, reward: 1, radius: 7, color: '#ff8c74' },
+    runner: { hpMult: 0.62, speedMult: 1.95, reward: 1, radius: 6, color: '#ffd28a' },
     brute: { hpMult: 2.4, speedMult: 0.67, reward: 3, radius: 10, color: '#ff596d' },
     splitter: { hpMult: 1.2, speedMult: 1.05, reward: 2, radius: 8, color: '#d98eff', split: true },
     shield: { hpMult: 1.8, speedMult: 0.9, reward: 3, radius: 9, color: '#9eff90', armor: 0.24 },
@@ -220,6 +232,7 @@ const el = {
     comboValue: document.querySelector('.combo-value'),
     frenzyValue: document.querySelector('.frenzy-value'),
     tdWins: document.querySelector('.td-wins'),
+    tdWinsPreview: document.getElementById('tdWinsPreview'),
     prestigeShardsMini: document.querySelector('.prestige-shards'),
     prestigeMultMini: document.querySelector('.prestige-mult'),
     comboFill: document.querySelector('.combo-fill'),
@@ -263,7 +276,11 @@ const el = {
     tdTokens: document.getElementById('tdTokens'),
     tdKills: document.getElementById('tdKills'),
     tdEnergy: document.getElementById('tdEnergy'),
+    tdMutator: document.getElementById('tdMutator'),
     tdFeedback: document.getElementById('tdFeedback'),
+
+    tdBestWaveReadout: document.getElementById('tdBestWaveReadout'),
+    tdBestKillsReadout: document.getElementById('tdBestKillsReadout'),
 
     lbNameInput: document.getElementById('lbNameInput'),
     lbSubmitBtn: document.getElementById('lbSubmitBtn'),
@@ -356,6 +373,14 @@ const td = {
     speedMult: 1,
     victoryWave: 20,
     difficultyKey: 'medium',
+    currentMutator: {
+        label: 'Stable Orbit',
+        hpMult: 1,
+        speedMult: 1,
+        rewardMult: 1,
+        energyMult: 1,
+        spawnMult: 1
+    },
 
     waveActive: false,
     enemiesToSpawn: 0,
@@ -944,6 +969,9 @@ function renderCoreStats() {
     safeSet(el.comboValue, `x${fmtDec(state.comboMultiplier, 2)}`);
     safeSet(el.frenzyValue, state.frenzyTime > 0 ? `${Math.ceil(state.frenzyTime)}s` : 'OFF');
     safeSet(el.tdWins, fmt(state.tdWins));
+    safeSet(el.tdWinsPreview, fmt(state.tdWins));
+    safeSet(el.tdBestWaveReadout, fmt(state.tdBestWave));
+    safeSet(el.tdBestKillsReadout, fmt(state.tdBestKills));
 
     if (el.comboFill) {
         const width = Math.min((state.comboCount / 28) * 100, 100);
@@ -961,8 +989,34 @@ function renderTdStats() {
     safeSet(el.tdTokens, td.tokens);
     safeSet(el.tdKills, td.kills);
     safeSet(el.tdEnergy, `${fmt(td.energy)} | Best Wave ${fmt(state.tdBestWave)} | ${cfg.label}`);
+    safeSet(el.tdMutator, `Mutator: ${td.currentMutator.label}`);
     if (el.tdSpeedBtn) el.tdSpeedBtn.textContent = `Speed x${td.speedMult}`;
     if (el.tdAbilityBtn) el.tdAbilityBtn.textContent = `Orbital Strike (${cfg.strikeCost})`;
+}
+
+function tdRelayBoost(targetTower) {
+    let bonusDamage = 0;
+    let bonusRate = 0;
+
+    td.towers.forEach((tower) => {
+        if (tower.id === targetTower.id || tower.type !== 'relay') return;
+
+        const relayCfg = TOWER_TYPES.relay;
+        const auraRadius = relayCfg.auraRadius + tower.pathA * 10 + tower.pathB * 6;
+        const auraDamage = relayCfg.auraDamage + tower.pathA * 0.04;
+        const auraRate = relayCfg.auraRate + tower.pathB * 0.03;
+        const dist = Math.hypot(targetTower.x - tower.x, targetTower.y - tower.y);
+
+        if (dist <= auraRadius) {
+            bonusDamage += auraDamage;
+            bonusRate += auraRate;
+        }
+    });
+
+    return {
+        damage: Math.min(0.72, bonusDamage),
+        rate: Math.min(0.48, bonusRate)
+    };
 }
 
 function renderSelectedTower() {
@@ -977,7 +1031,12 @@ function renderSelectedTower() {
     const costA = tdUpgradeCost(tower, 'A');
     const costB = tdUpgradeCost(tower, 'B');
 
-    el.tdSelectedLabel.textContent = `${TOWER_TYPES[tower.type].name} | A:${tower.pathA} B:${tower.pathB} | Upgrade A:${costA} energy | Upgrade B:${costB} energy`;
+    const stats = tdTowerStats(tower);
+    const relayInfo = tower.type === 'relay'
+        ? ` | Aura +${Math.round((stats.auraDamage || 0) * 100)}% dmg, +${Math.round((stats.auraRate || 0) * 100)}% rate`
+        : '';
+
+    el.tdSelectedLabel.textContent = `${TOWER_TYPES[tower.type].name} | A:${tower.pathA} B:${tower.pathB}${relayInfo} | Upgrade A:${costA} energy | Upgrade B:${costB} energy`;
 }
 
 function renderAll() {
@@ -1404,6 +1463,14 @@ function tdResetState() {
     td.speedMult = 1;
     td.victoryWave = cfg.victoryWave;
     td.difficultyKey = state.tdDifficulty;
+    td.currentMutator = {
+        label: 'Stable Orbit',
+        hpMult: 1,
+        speedMult: 1,
+        rewardMult: 1,
+        energyMult: 1,
+        spawnMult: 1
+    };
 
     td.waveActive = false;
     td.enemiesToSpawn = 0;
@@ -1431,8 +1498,8 @@ function tdEnemyBaseStats(typeName) {
     const cfg = tdDifficultyConfig();
     const type = ENEMY_TYPES[typeName];
     const waveScale = Math.pow(1.24, Math.max(0, td.wave - 1));
-    const baseHp = 16 * waveScale * type.hpMult * cfg.enemyHpMult;
-    const baseSpeed = (30 + td.wave * 2.6) * type.speedMult * cfg.enemySpeedMult;
+    const baseHp = 16 * waveScale * type.hpMult * cfg.enemyHpMult * td.currentMutator.hpMult;
+    const baseSpeed = (30 + td.wave * 2.6) * type.speedMult * cfg.enemySpeedMult * td.currentMutator.speedMult;
     return {
         hp: baseHp,
         speed: baseSpeed
@@ -1459,33 +1526,67 @@ function tdSpawnEnemy(typeName) {
 }
 
 function tdWavePool() {
-    if (td.wave < 3) return ['scout'];
-    if (td.wave < 6) return ['scout', 'brute'];
-    if (td.wave < 10) return ['scout', 'brute', 'splitter'];
-    if (td.wave < 15) return ['scout', 'brute', 'splitter', 'shield'];
-    return ['scout', 'brute', 'splitter', 'shield', 'boss'];
+    if (td.wave < 3) return ['scout', 'runner'];
+    if (td.wave < 6) return ['scout', 'runner', 'brute'];
+    if (td.wave < 10) return ['scout', 'runner', 'brute', 'splitter'];
+    if (td.wave < 15) return ['scout', 'runner', 'brute', 'splitter', 'shield'];
+    return ['scout', 'runner', 'brute', 'splitter', 'shield', 'boss'];
+}
+
+function tdRollMutator() {
+    if (td.wave < 4) {
+        return {
+            label: 'Stable Orbit',
+            hpMult: 1,
+            speedMult: 1,
+            rewardMult: 1,
+            energyMult: 1,
+            spawnMult: 1
+        };
+    }
+
+    const rolls = [
+        { label: 'Meteor Rush', hpMult: 0.92, speedMult: 1.22, rewardMult: 1.1, energyMult: 1.08, spawnMult: 1.08 },
+        { label: 'Iron Convoy', hpMult: 1.28, speedMult: 0.9, rewardMult: 1.16, energyMult: 1.05, spawnMult: 1.05 },
+        { label: 'Energy Storm', hpMult: 1.08, speedMult: 1.08, rewardMult: 1.08, energyMult: 1.26, spawnMult: 1.02 },
+        { label: 'Thin Atmosphere', hpMult: 0.86, speedMult: 1.14, rewardMult: 0.96, energyMult: 1.12, spawnMult: 0.95 }
+    ];
+
+    if (Math.random() < 0.34) {
+        return {
+            label: 'Stable Orbit',
+            hpMult: 1,
+            speedMult: 1,
+            rewardMult: 1,
+            energyMult: 1,
+            spawnMult: 1
+        };
+    }
+
+    return rolls[Math.floor(Math.random() * rolls.length)];
 }
 
 function tdStartNextWave() {
     const cfg = tdDifficultyConfig();
     td.wave += 1;
     state.tdBestWave = Math.max(state.tdBestWave, td.wave);
+    td.currentMutator = tdRollMutator();
     td.waveActive = true;
-    td.enemiesToSpawn = Math.max(8, Math.round((12 + td.wave * 5) * cfg.spawnCountMult));
+    td.enemiesToSpawn = Math.max(8, Math.round((12 + td.wave * 5) * cfg.spawnCountMult * td.currentMutator.spawnMult));
     td.spawnClock = 0;
     td.spawnDelay = Math.max(0.06, ((0.78 - td.wave * 0.022) + Math.max(0, 0.14 - state.tdSpawnSlow)) / cfg.spawnRateMult);
 
     if (td.wave % cfg.bossEvery === 0) {
         td.enemiesToSpawn += Math.round((3 + td.wave) * cfg.spawnCountMult * 0.55);
         tdSpawnEnemy('boss');
-        td.energy += Math.round(6 * cfg.energyGainMult);
+        td.energy += Math.round(6 * cfg.energyGainMult * td.currentMutator.energyMult);
     } else {
         td.baseHp = Math.min(td.maxHp, td.baseHp + (cfg.baseLeakDamage <= 1 ? 1 : 0));
     }
 
     td.tokens += td.wave % 3 === 0 ? 1 : 0;
     if (el.tdFeedback) {
-        el.tdFeedback.textContent = `Wave ${td.wave} started. Incoming monsters: ${td.enemiesToSpawn}.`;
+        el.tdFeedback.textContent = `Wave ${td.wave} started. ${td.currentMutator.label} active. Incoming monsters: ${td.enemiesToSpawn}.`;
     }
 }
 
@@ -1499,6 +1600,7 @@ function tdPickEnemyType() {
     if (pool.includes('shield') && roll > 0.84) return 'shield';
     if (pool.includes('splitter') && roll > 0.7) return 'splitter';
     if (pool.includes('brute') && roll > 0.45) return 'brute';
+    if (pool.includes('runner') && roll > 0.24) return 'runner';
     return 'scout';
 }
 
@@ -1512,6 +1614,9 @@ function tdTowerStats(tower) {
     let slowAmount = base.slowAmount || 0;
     let slowTime = base.slowTime || 0;
     let chain = base.chain || 0;
+    let auraRadius = base.auraRadius || 0;
+    let auraDamage = base.auraDamage || 0;
+    let auraRate = base.auraRate || 0;
 
     for (let i = 0; i < tower.pathA; i += 1) {
         damage *= 1.35;
@@ -1520,6 +1625,10 @@ function tdTowerStats(tower) {
         if (tower.type === 'frost') slowTime += 0.2;
         if (tower.type === 'tesla') chain += 1;
         if (tower.type === 'missile') splash += 10;
+        if (tower.type === 'relay') {
+            auraRadius += 10;
+            auraDamage += 0.05;
+        }
     }
 
     for (let i = 0; i < tower.pathB; i += 1) {
@@ -1541,9 +1650,17 @@ function tdTowerStats(tower) {
             range += 12;
             damage *= 1.12;
         }
+        if (tower.type === 'relay') {
+            auraRate += 0.05;
+        }
     }
 
-    return { damage, fireRate, range, splash, slowAmount, slowTime, chain };
+    const relayBuff = tdRelayBoost(tower);
+    damage *= 1 + relayBuff.damage;
+    fireRate *= 1 - relayBuff.rate;
+    fireRate = Math.max(0.14, fireRate);
+
+    return { damage, fireRate, range, splash, slowAmount, slowTime, chain, auraRadius, auraDamage, auraRate };
 }
 
 function tdUpgradeCost(tower, path) {
@@ -1616,7 +1733,7 @@ function tdHandleEnemyDeath(enemy) {
     const type = ENEMY_TYPES[enemy.type];
     td.kills += 1;
 
-    const energyGain = type.reward * (1 + state.tdEnergyBonus) * cfg.energyGainMult;
+    const energyGain = type.reward * (1 + state.tdEnergyBonus) * cfg.energyGainMult * td.currentMutator.energyMult;
     td.energy += energyGain;
 
     if (type.split) {
@@ -1690,7 +1807,7 @@ function tdUpdate(delta) {
         if (td.enemiesToSpawn <= 0 && td.enemies.length === 0) {
             td.waveActive = false;
             td.nextWaveClock = 2.4;
-            const waveReward = Math.round((125 + td.wave * 30 + totalBuildings() * 1.6) * (0.88 + cfg.spawnCountMult * 0.25));
+            const waveReward = Math.round((125 + td.wave * 30 + totalBuildings() * 1.6) * (0.88 + cfg.spawnCountMult * 0.25) * td.currentMutator.rewardMult);
             addGems(waveReward);
             if (td.wave % 4 === 0) td.tokens += 1;
             if (td.wave % 5 === 0) td.tokens += 2;
@@ -1845,6 +1962,15 @@ function tdDraw() {
             ctx.moveTo(tower.x, tower.y - 18);
             ctx.lineTo(tower.x + 4, tower.y - 12);
             ctx.lineTo(tower.x - 4, tower.y - 12);
+            ctx.closePath();
+            ctx.fill();
+        } else if (tower.type === 'relay') {
+            ctx.fillStyle = '#d6ffbe';
+            ctx.beginPath();
+            ctx.moveTo(tower.x, tower.y - 13);
+            ctx.lineTo(tower.x + 8, tower.y);
+            ctx.lineTo(tower.x, tower.y + 13);
+            ctx.lineTo(tower.x - 8, tower.y);
             ctx.closePath();
             ctx.fill();
         } else {
