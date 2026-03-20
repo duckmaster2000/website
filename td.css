@@ -123,6 +123,7 @@ h3 {
 
 .td-controls,
 .td-difficulty,
+.td-mode-row,
 .td-tower-types,
 .td-upgrade-panel {
     margin-top: 0.55rem;
@@ -166,9 +167,18 @@ button:active {
     box-shadow: 0 0 14px rgba(255, 110, 110, 0.25);
 }
 
+#tdRangeBtn {
+    border-color: rgba(143, 211, 255, 0.7);
+}
+
 .td-difficulty-btn.active {
     border-color: rgba(255, 217, 157, 0.82);
     background: rgba(74, 56, 28, 0.9);
+}
+
+.td-mode-btn.active {
+    border-color: rgba(255, 203, 132, 0.9);
+    background: rgba(76, 55, 28, 0.92);
 }
 
 .td-upgrade-panel {
@@ -182,6 +192,96 @@ button:active {
     margin: 0 0 0.4rem;
     font-size: 0.82rem;
     color: #d2e8fb;
+}
+
+.panel-lite {
+    margin-top: 0.6rem;
+    border: 1px solid rgba(153, 224, 255, 0.24);
+    border-radius: 11px;
+    padding: 0.55rem;
+    background: rgba(9, 17, 29, 0.68);
+}
+
+.td-meta p {
+    margin: 0;
+    color: #d8ebfb;
+    font-size: 0.82rem;
+}
+
+.td-meta-modes {
+    margin-top: 0.45rem;
+    display: flex;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+}
+
+.td-meta-modes button {
+    font-size: 0.72rem;
+}
+
+.td-objective-list {
+    margin-top: 0.45rem;
+    display: grid;
+    gap: 0.3rem;
+}
+
+.td-objective-item {
+    border: 1px solid rgba(153, 224, 255, 0.22);
+    border-radius: 8px;
+    padding: 0.34rem 0.45rem;
+    background: rgba(11, 20, 34, 0.6);
+    color: #cde3f9;
+    font-size: 0.74rem;
+}
+
+.td-objective-item.done {
+    border-color: rgba(157, 255, 146, 0.6);
+    color: #d8ffd2;
+}
+
+.td-active-controls {
+    margin-top: 0.45rem;
+    display: flex;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+}
+
+.td-wave-panel p,
+.td-enemy-panel p {
+    margin: 0;
+    color: #d8ebfb;
+    font-size: 0.82rem;
+}
+
+.td-incoming-list {
+    margin-top: 0.45rem;
+    display: grid;
+    gap: 0.32rem;
+}
+
+.td-incoming-row {
+    border: 1px solid rgba(153, 224, 255, 0.22);
+    border-radius: 8px;
+    padding: 0.35rem 0.45rem;
+    background: rgba(11, 20, 34, 0.6);
+    font-size: 0.75rem;
+    color: #cbe0f4;
+}
+
+.td-enemy-legend {
+    margin-top: 0.45rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.34rem;
+}
+
+.td-enemy-legend button {
+    font-size: 0.69rem;
+    padding: 0.32rem 0.5rem;
+}
+
+#tdEnemyTooltip {
+    min-height: 1.4em;
 }
 
 #tdCanvas {
@@ -212,6 +312,14 @@ button:active {
     color: var(--accent2);
     font-weight: 600;
     animation: mutator-pulse 1.8s ease-in-out infinite;
+}
+
+#tdMapLabel {
+    color: #b9ffe4;
+}
+
+#tdWaveIntel {
+    color: #b8dcff;
 }
 
 @keyframes panel-rise {

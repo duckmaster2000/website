@@ -1,3 +1,4 @@
+
 const SAVE_KEY = 'caleb_clicker_save_v6_space';
 const LEGACY_V5_KEY = 'caleb_clicker_save_v5_space';
 const LEGACY_V4_KEY = 'caleb_clicker_save_v4_space';
@@ -36,6 +37,9 @@ const TOWER_TYPES = {
         range: 120,
         fireRate: 0.36,
         damage: 6,
+        canHitAir: true,
+        burnDps: 0,
+        burnTime: 0,
         color: '#5cf5ff'
     },
     cannon: {
@@ -45,6 +49,8 @@ const TOWER_TYPES = {
         fireRate: 0.8,
         damage: 17,
         splash: 26,
+        stunChance: 0,
+        stunTime: 0,
         color: '#ffbc66'
     },
     frost: {
@@ -64,6 +70,9 @@ const TOWER_TYPES = {
         fireRate: 0.62,
         damage: 9,
         chain: 2,
+        canHitAir: true,
+        armorShred: 0.08,
+        armorShredTime: 2.3,
         color: '#c6b4ff'
     },
     missile: {
@@ -73,6 +82,8 @@ const TOWER_TYPES = {
         fireRate: 1.15,
         damage: 28,
         splash: 38,
+        canHitAir: true,
+        antiAirBonus: 0.35,
         color: '#ff9c90'
     },
     relay: {
@@ -85,13 +96,26 @@ const TOWER_TYPES = {
         auraDamage: 0.12,
         auraRate: 0.08,
         color: '#9dff92'
+    },
+    investment: {
+        name: 'Venture Tower',
+        tokenCost: 1,
+        range: 0,
+        fireRate: 2.6,
+        damage: 0,
+        ventureEnergy: 2,
+        ventureGems: 36,
+        ventureTokenChance: 0.03,
+        color: '#ffe28e'
     }
 };
 
 const ENEMY_TYPES = {
     scout: { hpMult: 0.85, speedMult: 1.45, reward: 1, radius: 7, color: '#ff8c74' },
     runner: { hpMult: 0.62, speedMult: 1.95, reward: 1, radius: 6, color: '#ffd28a' },
+    flyer: { hpMult: 0.95, speedMult: 1.32, reward: 2, radius: 8, color: '#8fd3ff', airborne: true },
     brute: { hpMult: 2.4, speedMult: 0.67, reward: 3, radius: 10, color: '#ff596d' },
+    bulwark: { hpMult: 3.2, speedMult: 0.58, reward: 5, radius: 11, color: '#b8ffb2', armor: 0.42 },
     splitter: { hpMult: 1.2, speedMult: 1.05, reward: 2, radius: 8, color: '#d98eff', split: true },
     shield: { hpMult: 1.8, speedMult: 0.9, reward: 3, radius: 9, color: '#9eff90', armor: 0.24 },
     boss: { hpMult: 7.4, speedMult: 0.55, reward: 14, radius: 13, color: '#ffd16e', armor: 0.12 }
@@ -169,6 +193,78 @@ const TD_DIFFICULTIES = {
         strikeCost: 44
     }
 };
+
+const TD_MAP_LAYOUTS = {
+    serpent: {
+        name: 'Serpent Corridor',
+        routes: [
+            [
+                { x: -18, y: 52.5 },
+                { x: 525, y: 52.5 },
+                { x: 525, y: 87.5 },
+                { x: 35, y: 87.5 },
+                { x: 35, y: 122.5 },
+                { x: 525, y: 122.5 },
+                { x: 525, y: 157.5 },
+                { x: 580, y: 157.5 }
+            ]
+        ]
+    },
+    canyon: {
+        name: 'Twin Canyon',
+        routes: [
+            [
+                { x: -18, y: 35 },
+                { x: 210, y: 35 },
+                { x: 210, y: 105 },
+                { x: 420, y: 105 },
+                { x: 420, y: 157.5 },
+                { x: 580, y: 157.5 }
+            ],
+            [
+                { x: -18, y: 175 },
+                { x: 175, y: 175 },
+                { x: 175, y: 122.5 },
+                { x: 385, y: 122.5 },
+                { x: 385, y: 70 },
+                { x: 580, y: 70 }
+            ]
+        ]
+    },
+    choke: {
+        name: 'Iron Chokepoint',
+        routes: [
+            [
+                { x: -18, y: 35 },
+                { x: 140, y: 35 },
+                { x: 140, y: 105 },
+                { x: 280, y: 105 },
+                { x: 280, y: 175 },
+                { x: 420, y: 175 },
+                { x: 420, y: 105 },
+                { x: 560, y: 105 },
+                { x: 580, y: 105 }
+            ]
+        ]
+    }
+};
+
+const TD_MODES = {
+    classic: { label: 'Classic', endless: false, mutatorRush: false, maze: false, baseLives: 3, trapCost: 18, dashCost: 32, victoryBonusWave: 0, forcedMutator: false },
+    endless: { label: 'Endless', endless: true, mutatorRush: false, maze: false, baseLives: 2, trapCost: 20, dashCost: 34, victoryBonusWave: 0, forcedMutator: false },
+    mutator: { label: 'Mutator Rush', endless: false, mutatorRush: true, maze: false, baseLives: 3, trapCost: 19, dashCost: 33, victoryBonusWave: 3, forcedMutator: true },
+    maze: { label: 'Maze Mode', endless: false, mutatorRush: false, maze: true, baseLives: 4, trapCost: 16, dashCost: 30, victoryBonusWave: 2, forcedMutator: false }
+};
+
+const TD_OBJECTIVE_POOL = [
+    { id: 'no_tesla', label: 'Win without Tesla Towers.' },
+    { id: 'no_orbital', label: 'Win without Orbital Strike.' },
+    { id: 'trap_kills', label: 'Get 12 trap kills in a run.' },
+    { id: 'economy_push', label: 'Build 2 Venture Towers.' },
+    { id: 'high_hp', label: 'Finish with at least 60% base HP.' }
+];
+
+const TD_TARGET_MODES = ['first', 'strong', 'armor', 'last'];
 
 function buildResearchData() {
     const list = [];
@@ -263,12 +359,15 @@ const el = {
     tdAbilityBtn: document.getElementById('tdAbilityBtn'),
     tdNextWaveBtn: document.getElementById('tdNextWaveBtn'),
     tdSpeedBtn: document.getElementById('tdSpeedBtn'),
+    tdRangeBtn: document.getElementById('tdRangeBtn'),
     tdUpgradeA: document.getElementById('tdUpgradeA'),
     tdUpgradeB: document.getElementById('tdUpgradeB'),
+    tdTargetBtn: document.getElementById('tdTargetBtn'),
     tdSellTower: document.getElementById('tdSellTower'),
     tdSelectedLabel: document.getElementById('tdSelectedLabel'),
     tdTowerTypes: document.getElementById('tdTowerTypes'),
     tdDifficultyModes: document.getElementById('tdDifficultyModes'),
+    tdModeRow: document.getElementById('tdModeRow'),
 
     tdCanvas: document.getElementById('tdCanvas'),
     tdBaseHp: document.getElementById('tdBaseHp'),
@@ -277,7 +376,21 @@ const el = {
     tdKills: document.getElementById('tdKills'),
     tdEnergy: document.getElementById('tdEnergy'),
     tdMutator: document.getElementById('tdMutator'),
+    tdMapLabel: document.getElementById('tdMapLabel'),
+    tdWaveIntel: document.getElementById('tdWaveIntel'),
+    tdIncomingList: document.getElementById('tdIncomingList'),
+    tdEnemyLegend: document.getElementById('tdEnemyLegend'),
+    tdEnemyTooltip: document.getElementById('tdEnemyTooltip'),
+    tdObjectiveList: document.getElementById('tdObjectiveList'),
+    tdTrapBtn: document.getElementById('tdTrapBtn'),
+    tdDashBtn: document.getElementById('tdDashBtn'),
+    tdActiveHint: document.getElementById('tdActiveHint'),
     tdFeedback: document.getElementById('tdFeedback'),
+    tdMetaModes: document.getElementById('tdMetaModes'),
+    tdMetaPoints: document.getElementById('tdMetaPoints'),
+    tdMetaStatus: document.getElementById('tdMetaStatus'),
+    tdLives: document.getElementById('tdLives'),
+    tdPermadeathBtn: document.getElementById('tdPermadeathBtn'),
 
     tdBestWaveReadout: document.getElementById('tdBestWaveReadout'),
     tdBestKillsReadout: document.getElementById('tdBestKillsReadout'),
@@ -315,6 +428,16 @@ const DEFAULTS = {
     tdStartEnergy: 0,
     tdSpawnSlow: 0,
     tdDifficulty: 'medium',
+    tdMode: 'classic',
+    tdPermadeath: false,
+    tdBestEndlessWave: 0,
+    tdMetaPoints: 0,
+    tdMetaSpent: 0,
+    tdMetaTree: {
+        control: 0,
+        burst: 0,
+        economy: 0
+    },
     playerName: 'Pilot',
     leaderboardSubmitted: false,
 
@@ -353,19 +476,17 @@ const td = {
     cols: 16,
     rows: 6,
 
-    waypoints: [
-        { x: -18, y: 52.5 },
-        { x: 525, y: 52.5 },
-        { x: 525, y: 87.5 },
-        { x: 35, y: 87.5 },
-        { x: 35, y: 122.5 },
-        { x: 525, y: 122.5 },
-        { x: 525, y: 157.5 },
-        { x: 580, y: 157.5 }
-    ],
+    mapKey: 'serpent',
+    mapName: 'Serpent Corridor',
+    modeKey: 'classic',
+    routes: [],
+    pathCells: new Set(),
+    mazeStart: { col: 0, row: 2 },
+    mazeEnd: { col: 15, row: 3 },
 
     baseHp: 20,
     maxHp: 20,
+    lives: 3,
     wave: 0,
     kills: 0,
     tokens: 0,
@@ -389,6 +510,12 @@ const td = {
     spawnDelay: 0.8,
     spawnClock: 0,
     nextWaveClock: 0,
+    damageThisSecond: 0,
+    damageSecondClock: 0,
+    dpsNow: 0,
+    dpsTarget: 0,
+    dpsPressureTimer: 0,
+    dpsPressure: 0,
 
     selectedTowerType: 'laser',
     selectedTowerId: null,
@@ -396,6 +523,15 @@ const td = {
     towers: [],
     enemies: [],
     shots: [],
+    traps: [],
+    objectives: [],
+    objectiveState: {
+        teslaPlaced: false,
+        orbitalUsed: false,
+        trapKills: 0,
+        venturePlaced: 0
+    },
+    activeAbility: null,
     particles: [],
     shockwaves: [],
 
@@ -403,6 +539,12 @@ const td = {
     secondId: null,
     uidSeed: 1,
     frameClock: 0
+    ,showRanges: true,
+    hoverCell: null,
+    shakeTime: 0,
+    shakePower: 0,
+    audioCtx: null,
+    lastShotSound: 0
 };
 
 const ACHIEVEMENTS = [
@@ -689,8 +831,20 @@ function validateState() {
     state.goldenChance = Math.min(Math.max(state.goldenChance, 0.01), 0.95);
     state.playerName = state.playerName.trim().slice(0, 16) || 'Pilot';
     state.tdBestWave = Math.max(state.tdBestWave, 0);
+    state.tdBestEndlessWave = Math.max(0, Number(state.tdBestEndlessWave || 0));
     if (!TD_DIFFICULTIES[state.tdDifficulty]) state.tdDifficulty = 'medium';
+    if (!TD_MODES[state.tdMode]) state.tdMode = 'classic';
+    if (typeof state.tdPermadeath !== 'boolean') state.tdPermadeath = false;
     if (typeof state.leaderboardSubmitted !== 'boolean') state.leaderboardSubmitted = false;
+
+    if (!state.tdMetaTree || typeof state.tdMetaTree !== 'object') {
+        state.tdMetaTree = { control: 0, burst: 0, economy: 0 };
+    }
+    state.tdMetaTree.control = Math.max(0, Math.min(3, Number(state.tdMetaTree.control || 0)));
+    state.tdMetaTree.burst = Math.max(0, Math.min(3, Number(state.tdMetaTree.burst || 0)));
+    state.tdMetaTree.economy = Math.max(0, Math.min(3, Number(state.tdMetaTree.economy || 0)));
+    state.tdMetaSpent = Math.max(0, Number(state.tdMetaSpent || 0));
+    state.tdMetaPoints = Math.max(0, Number(state.tdMetaPoints || 0));
 
     state.researchCount = Object.keys(state.researchBought).length;
 
@@ -726,6 +880,12 @@ function saveGame() {
         tdStartEnergy: state.tdStartEnergy,
         tdSpawnSlow: state.tdSpawnSlow,
         tdDifficulty: state.tdDifficulty,
+        tdMode: state.tdMode,
+        tdPermadeath: state.tdPermadeath,
+        tdBestEndlessWave: state.tdBestEndlessWave,
+        tdMetaPoints: state.tdMetaPoints,
+        tdMetaSpent: state.tdMetaSpent,
+        tdMetaTree: state.tdMetaTree,
         playerName: state.playerName,
         leaderboardSubmitted: state.leaderboardSubmitted,
 
@@ -778,6 +938,12 @@ function applyV4LegacyMigration(v4) {
     state.tdBestWave = Number(v4.tdBestWave || 0);
     state.tdStartEnergy = Number(v4.tdStartEnergy || 0);
     state.tdDifficulty = String(v4.tdDifficulty || 'medium');
+    state.tdMode = String(v4.tdMode || 'classic');
+    state.tdPermadeath = Boolean(v4.tdPermadeath);
+    state.tdBestEndlessWave = Number(v4.tdBestEndlessWave || 0);
+    state.tdMetaPoints = Number(v4.tdMetaPoints || 0);
+    state.tdMetaSpent = Number(v4.tdMetaSpent || 0);
+    state.tdMetaTree = { control: 0, burst: 0, economy: 0, ...(v4.tdMetaTree || {}) };
     state.playerName = String(v4.playerName || 'Pilot');
     state.leaderboardSubmitted = Boolean(v4.leaderboardSubmitted);
 
@@ -989,14 +1155,213 @@ function renderCoreStats() {
 
 function renderTdStats() {
     const cfg = tdDifficultyConfig();
+    const mode = tdModeConfig();
     safeSet(el.tdBaseHp, `${td.baseHp}/${td.maxHp}`);
     safeSet(el.tdWave, td.wave);
     safeSet(el.tdTokens, td.tokens);
     safeSet(el.tdKills, td.kills);
-    safeSet(el.tdEnergy, `${fmt(td.energy)} | Best Wave ${fmt(state.tdBestWave)} | ${cfg.label}`);
+    const bestTag = mode.endless
+        ? `Endless Best ${fmt(state.tdBestEndlessWave)}`
+        : `Best Wave ${fmt(state.tdBestWave)}`;
+    safeSet(el.tdEnergy, `${fmt(td.energy)} | ${bestTag} | ${mode.label} | ${cfg.label}`);
     safeSet(el.tdMutator, `Mutator: ${td.currentMutator.label}`);
+    safeSet(el.tdMapLabel, `Map: ${td.mapName}`);
+    safeSet(el.tdWaveIntel, tdWaveIntel());
+    safeSet(el.tdLives, td.lives);
+    renderTdObjectives();
+    renderTdIncomingPanel();
+    if (el.tdRangeBtn) {
+        el.tdRangeBtn.textContent = `Ranges: ${td.showRanges ? 'ON' : 'OFF'}`;
+    }
     if (el.tdSpeedBtn) el.tdSpeedBtn.textContent = `Speed x${td.speedMult}`;
     if (el.tdAbilityBtn) el.tdAbilityBtn.textContent = `Orbital Strike (${cfg.strikeCost})`;
+    if (el.tdTrapBtn) el.tdTrapBtn.textContent = `Place Mine Trap (${mode.trapCost})`;
+    if (el.tdDashBtn) el.tdDashBtn.textContent = `Pilot Dash (${mode.dashCost})`;
+    if (el.tdPermadeathBtn) el.tdPermadeathBtn.textContent = `Permadeath: ${state.tdPermadeath ? 'ON' : 'OFF'}`;
+    if (el.tdActiveHint) {
+        if (td.activeAbility === 'trap') el.tdActiveHint.textContent = 'Trap armed: click a cell to place a mine.';
+        else if (td.activeAbility === 'dash') el.tdActiveHint.textContent = 'Dash armed: click near enemies to burst them.';
+        else el.tdActiveHint.textContent = 'Click the battlefield after choosing an active ability target.';
+    }
+    renderTdTypeButtons();
+}
+
+function tdPlacementTokenCost(typeKey) {
+    const base = (TOWER_TYPES[typeKey] && TOWER_TYPES[typeKey].tokenCost) || 1;
+    const densityTax = Math.floor(td.towers.length / 4);
+    const modeTax = state.tdMode === 'maze' ? 1 : 0;
+    return Math.max(1, base + densityTax + modeTax);
+}
+
+function renderTdTypeButtons() {
+    if (!el.tdTowerTypes) return;
+    el.tdTowerTypes.querySelectorAll('.td-type').forEach((btn) => {
+        const typeKey = btn.dataset.tdType;
+        const type = TOWER_TYPES[typeKey];
+        if (!type) return;
+        btn.textContent = `${type.name} (${tdPlacementTokenCost(typeKey)} tok)`;
+    });
+}
+
+function tdPoolForWave(waveNum) {
+    if (waveNum < 3) return ['scout', 'runner'];
+    if (waveNum < 6) return ['scout', 'runner', 'brute', 'flyer'];
+    if (waveNum < 10) return ['scout', 'runner', 'brute', 'splitter', 'flyer'];
+    if (waveNum < 15) return ['scout', 'runner', 'brute', 'splitter', 'shield', 'flyer', 'bulwark'];
+    return ['scout', 'runner', 'brute', 'splitter', 'shield', 'flyer', 'bulwark', 'boss'];
+}
+
+function tdIncomingWaveLabel(waveNum) {
+    const pool = tdPoolForWave(waveNum);
+    const tags = [];
+    if (pool.includes('runner')) tags.push('Fast');
+    if (pool.includes('flyer')) tags.push('Air');
+    if (pool.includes('bulwark')) tags.push('Armor');
+    if (pool.includes('splitter')) tags.push('Split');
+    const cfg = tdDifficultyConfig();
+    if (waveNum % cfg.bossEvery === 0) tags.push('Boss');
+    return tags.join(' | ') || 'Scouts';
+}
+
+function renderTdIncomingPanel() {
+    if (!el.tdIncomingList) return;
+
+    const rows = [];
+    for (let i = 1; i <= 3; i += 1) {
+        const waveNum = td.wave + i;
+        rows.push(`<div class="td-incoming-row">Wave ${waveNum}: ${tdIncomingWaveLabel(waveNum)}</div>`);
+    }
+    el.tdIncomingList.innerHTML = rows.join('');
+}
+
+function tdEnemyVulnerabilityText(type) {
+    const map = {
+        scout: 'Scout: low HP. Weak to high fire rate and chain towers.',
+        runner: 'Runner: very fast. Counter with Frost slows and fast Laser tracking.',
+        flyer: 'Flyer: airborne. Needs Missile, Tesla, or Laser (anti-air capable).',
+        bulwark: 'Bulwark: heavy armor. Strip armor with Tesla, then burst with Cannon/Missile.',
+        shield: 'Shield: armored with sustain pressure. Use shred + AoE layering.',
+        boss: 'Boss: high HP/armor + mechanics. Prepare stuns, armor shred, and reserve orbital strike.'
+    };
+
+    return map[type] || 'No intel available.';
+}
+
+function tdInitAudio() {
+    if (td.audioCtx) return td.audioCtx;
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return null;
+    td.audioCtx = new Ctx();
+    return td.audioCtx;
+}
+
+function tdSfx(kind) {
+    const ctx = tdInitAudio();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    if (kind === 'shot') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(420, now);
+        osc.frequency.exponentialRampToValueAtTime(290, now + 0.04);
+        gain.gain.setValueAtTime(0.03, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
+        osc.start(now);
+        osc.stop(now + 0.05);
+        return;
+    }
+
+    if (kind === 'kill') {
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(170, now);
+        osc.frequency.exponentialRampToValueAtTime(120, now + 0.08);
+        gain.gain.setValueAtTime(0.045, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.09);
+        osc.start(now);
+        osc.stop(now + 0.09);
+        return;
+    }
+
+    if (kind === 'victory') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(380, now);
+        osc.frequency.exponentialRampToValueAtTime(640, now + 0.16);
+        gain.gain.setValueAtTime(0.06, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
+        osc.start(now);
+        osc.stop(now + 0.2);
+    }
+}
+
+function tdTriggerShake(power, duration) {
+    td.shakePower = Math.max(td.shakePower, power);
+    td.shakeTime = Math.max(td.shakeTime, duration);
+}
+
+function tdMetaLevel(key) {
+    return Number((state.tdMetaTree && state.tdMetaTree[key]) || 0);
+}
+
+function tdMetaCost(key) {
+    return tdMetaLevel(key) + 1;
+}
+
+function renderTdMeta() {
+    safeSet(el.tdMetaPoints, state.tdMetaPoints);
+
+    if (!el.tdMetaModes) return;
+
+    const labels = {
+        control: 'Control Lab',
+        burst: 'Siege Lab',
+        economy: 'Venture Lab'
+    };
+
+    el.tdMetaModes.querySelectorAll('[data-td-tech]').forEach((btn) => {
+        const key = btn.dataset.tdTech;
+        const lvl = tdMetaLevel(key);
+        const maxed = lvl >= 3;
+        const cost = tdMetaCost(key);
+
+        btn.disabled = maxed || state.tdMetaPoints < cost;
+        btn.textContent = maxed
+            ? `${labels[key]} Lv${lvl} (MAX)`
+            : `${labels[key]} Lv${lvl} -> ${lvl + 1} (${cost} pts)`;
+    });
+
+    if (el.tdMetaStatus) {
+        el.tdMetaStatus.textContent = 'Control boosts slows/DoT, Siege boosts burst/armor break, Venture boosts economy tower output.';
+    }
+}
+
+function tdUnlockMeta(key) {
+    if (!state.tdMetaTree || !(key in state.tdMetaTree)) return;
+
+    const lvl = tdMetaLevel(key);
+    if (lvl >= 3) {
+        if (el.tdFeedback) el.tdFeedback.textContent = 'That lab path is already maxed.';
+        return;
+    }
+
+    const cost = tdMetaCost(key);
+    if (state.tdMetaPoints < cost) {
+        if (el.tdFeedback) el.tdFeedback.textContent = `Need ${cost} meta point(s).`;
+        return;
+    }
+
+    state.tdMetaPoints -= cost;
+    state.tdMetaSpent += cost;
+    state.tdMetaTree[key] = lvl + 1;
+    renderTdMeta();
+    renderSelectedTower();
+    saveGame();
+
+    if (el.tdFeedback) el.tdFeedback.textContent = `${key} lab upgraded to level ${state.tdMetaTree[key]}.`;
 }
 
 function tdRelayBoost(targetTower) {
@@ -1030,18 +1395,35 @@ function renderSelectedTower() {
     const tower = td.towers.find((t) => t.id === td.selectedTowerId);
     if (!tower) {
         el.tdSelectedLabel.textContent = 'Select a tower on the grid to upgrade it.';
+        if (el.tdTargetBtn) el.tdTargetBtn.textContent = 'Target Priority: n/a';
         return;
     }
 
     const costA = tdUpgradeCost(tower, 'A');
     const costB = tdUpgradeCost(tower, 'B');
+    const targetMode = tower.targetMode || 'first';
+    const targetLabel = targetMode.charAt(0).toUpperCase() + targetMode.slice(1);
 
     const stats = tdTowerStats(tower);
     const relayInfo = tower.type === 'relay'
         ? ` | Aura +${Math.round((stats.auraDamage || 0) * 100)}% dmg, +${Math.round((stats.auraRate || 0) * 100)}% rate`
         : '';
+    const roleInfo = tower.type === 'laser'
+        ? ' | Role: DoT + bonus vs slowed'
+        : tower.type === 'tesla'
+            ? ' | Role: Chain + armor shred'
+            : tower.type === 'cannon'
+                ? ' | Role: AoE + stun chance'
+                : tower.type === 'missile'
+                    ? ' | Role: Anti-air burst'
+                    : tower.type === 'frost'
+                        ? ' | Role: Crowd control + setup'
+                        : tower.type === 'investment'
+                            ? ' | Role: Risk-reward economy output'
+                            : ' | Role: Team support';
 
-    el.tdSelectedLabel.textContent = `${TOWER_TYPES[tower.type].name} | A:${tower.pathA} B:${tower.pathB}${relayInfo} | Upgrade A:${costA} energy | Upgrade B:${costB} energy`;
+    el.tdSelectedLabel.textContent = `${TOWER_TYPES[tower.type].name} | A:${tower.pathA} B:${tower.pathB}${relayInfo}${roleInfo} | Target:${targetLabel} | Upgrade A:${costA} energy | Upgrade B:${costB} energy`;
+    if (el.tdTargetBtn) el.tdTargetBtn.textContent = `Target Priority: ${targetLabel}`;
 }
 
 function renderAll() {
@@ -1051,6 +1433,7 @@ function renderAll() {
     renderResearch();
     renderAchievements();
     renderTdStats();
+    renderTdMeta();
     renderSelectedTower();
 }
 
@@ -1472,16 +1855,262 @@ function tdTokenStartForRun() {
     return Math.max(1, base + researchBonus + prestigeBonus);
 }
 
+function tdPathCellKey(col, row) {
+    return `${col},${row}`;
+}
+
+function tdBuildPathCells(routes) {
+    const cells = new Set();
+
+    routes.forEach((route) => {
+        for (let i = 1; i < route.length; i += 1) {
+            const from = route[i - 1];
+            const to = route[i];
+            const dx = to.x - from.x;
+            const dy = to.y - from.y;
+            const steps = Math.max(Math.abs(Math.round(dx / 4)), Math.abs(Math.round(dy / 4)), 1);
+
+            for (let s = 0; s <= steps; s += 1) {
+                const t = s / steps;
+                const x = from.x + dx * t;
+                const y = from.y + dy * t;
+                const col = Math.floor(x / td.cell);
+                const row = Math.floor(y / td.cell);
+                if (col >= 0 && col < td.cols && row >= 0 && row < td.rows) {
+                    cells.add(tdPathCellKey(col, row));
+                }
+            }
+        }
+    });
+
+    return cells;
+}
+
+function tdChooseLayoutKey() {
+    const keys = Object.keys(TD_MAP_LAYOUTS);
+    const cycleIndex = (state.tdWins + state.prestigeRuns) % keys.length;
+
+    // Mostly predictable rotation, with occasional anomaly map.
+    if (Math.random() < 0.18) {
+        return keys[Math.floor(Math.random() * keys.length)];
+    }
+
+    return keys[cycleIndex];
+}
+
+function tdApplyMapLayout(mapKey) {
+    const layout = TD_MAP_LAYOUTS[mapKey] || TD_MAP_LAYOUTS.serpent;
+    td.mapKey = mapKey;
+    td.mapName = layout.name;
+    td.routes = layout.routes.map((route) => route.map((pt) => ({ ...pt })));
+    td.pathCells = tdBuildPathCells(td.routes);
+}
+
+function tdWaveIntel() {
+    const nextWave = td.wave + 1;
+    const pool = tdWavePool();
+    const anchors = [];
+
+    if (pool.includes('runner')) anchors.push('fast runners');
+    if (pool.includes('flyer')) anchors.push('air units');
+    if (pool.includes('bulwark')) anchors.push('heavy armor');
+    if (pool.includes('splitter')) anchors.push('splitters');
+
+    const cfg = tdDifficultyConfig();
+    const bossSoon = nextWave % cfg.bossEvery === 0;
+    const surprise = Math.random() < 0.18 ? 'Unknown anomaly!' : 'Stable prediction';
+    const label = anchors.length > 0 ? anchors.slice(0, 2).join(' + ') : 'scout pressure';
+    const dpsText = td.dpsTarget > 0
+        ? ` | DPS ${fmtDec(td.dpsNow, 0)}/${fmtDec(td.dpsTarget, 0)}`
+        : '';
+    const pressure = td.dpsPressure > 0.45 ? ' | Pressure rising' : '';
+
+    return `Next Wave ${nextWave}: ${label}${bossSoon ? ' | Boss incoming' : ''} | ${surprise}${dpsText}${pressure}`;
+}
+
+function tdModeConfig() {
+    return TD_MODES[state.tdMode] || TD_MODES.classic;
+}
+
+function tdApplyModeButtons() {
+    if (!el.tdModeRow) return;
+    el.tdModeRow.querySelectorAll('[data-td-mode]').forEach((btn) => {
+        btn.classList.toggle('active', btn.dataset.tdMode === state.tdMode);
+    });
+}
+
+function tdSetMode(modeKey) {
+    if (!TD_MODES[modeKey]) return;
+    if (td.running) {
+        if (el.tdFeedback) el.tdFeedback.textContent = 'Finish current run before changing mode.';
+        return;
+    }
+
+    state.tdMode = modeKey;
+    tdApplyModeButtons();
+    tdResetState();
+    tdDraw();
+    saveGame();
+
+    if (el.tdFeedback) el.tdFeedback.textContent = `Mode set to ${TD_MODES[modeKey].label}.`;
+}
+
+function tdTogglePermadeath() {
+    if (td.running) {
+        if (el.tdFeedback) el.tdFeedback.textContent = 'Cannot toggle permadeath mid-run.';
+        return;
+    }
+
+    state.tdPermadeath = !state.tdPermadeath;
+    tdResetState();
+    tdDraw();
+    renderTdStats();
+    saveGame();
+    if (el.tdFeedback) el.tdFeedback.textContent = `Permadeath ${state.tdPermadeath ? 'enabled' : 'disabled'}.`;
+}
+
+function tdPickObjectives() {
+    const pool = [...TD_OBJECTIVE_POOL];
+    const picks = [];
+
+    while (pool.length > 0 && picks.length < 2) {
+        const idx = Math.floor(Math.random() * pool.length);
+        picks.push({ ...pool.splice(idx, 1)[0], done: false });
+    }
+
+    return picks;
+}
+
+function tdObjectiveDone(id) {
+    if (id === 'no_tesla') return !td.objectiveState.teslaPlaced;
+    if (id === 'no_orbital') return !td.objectiveState.orbitalUsed;
+    if (id === 'trap_kills') return td.objectiveState.trapKills >= 12;
+    if (id === 'economy_push') return td.objectiveState.venturePlaced >= 2;
+    if (id === 'high_hp') return td.baseHp >= Math.ceil(td.maxHp * 0.6);
+    return false;
+}
+
+function renderTdObjectives() {
+    if (!el.tdObjectiveList) return;
+    if (!td.objectives || td.objectives.length <= 0) {
+        el.tdObjectiveList.innerHTML = '<div class="td-objective-item">Objectives load at run start.</div>';
+        return;
+    }
+
+    el.tdObjectiveList.innerHTML = td.objectives.map((obj) => {
+        const done = tdObjectiveDone(obj.id);
+        return `<div class="td-objective-item ${done ? 'done' : ''}">${done ? 'DONE - ' : ''}${obj.label}</div>`;
+    }).join('');
+}
+
+function tdBlockedCells(extraBlock = null, ignoreTowerId = null) {
+    const blocked = new Set();
+    td.towers.forEach((tower) => {
+        if (ignoreTowerId && tower.id === ignoreTowerId) return;
+        blocked.add(tdPathCellKey(tower.col, tower.row));
+    });
+    if (extraBlock) blocked.add(tdPathCellKey(extraBlock.col, extraBlock.row));
+    return blocked;
+}
+
+function tdGridPathBfs(blocked) {
+    const start = td.mazeStart;
+    const end = td.mazeEnd;
+    const queue = [{ col: start.col, row: start.row }];
+    const seen = new Set([tdPathCellKey(start.col, start.row)]);
+    const prev = new Map();
+    const dirs = [
+        { dc: 1, dr: 0 },
+        { dc: -1, dr: 0 },
+        { dc: 0, dr: 1 },
+        { dc: 0, dr: -1 }
+    ];
+
+    while (queue.length > 0) {
+        const cur = queue.shift();
+        if (cur.col === end.col && cur.row === end.row) {
+            const path = [];
+            let k = tdPathCellKey(cur.col, cur.row);
+            while (k) {
+                const [c, r] = k.split(',').map(Number);
+                path.push({ col: c, row: r });
+                k = prev.get(k);
+            }
+            return path.reverse();
+        }
+
+        dirs.forEach((d) => {
+            const nc = cur.col + d.dc;
+            const nr = cur.row + d.dr;
+            if (nc < 0 || nr < 0 || nc >= td.cols || nr >= td.rows) return;
+            const nk = tdPathCellKey(nc, nr);
+            if (seen.has(nk) || blocked.has(nk)) return;
+            seen.add(nk);
+            prev.set(nk, tdPathCellKey(cur.col, cur.row));
+            queue.push({ col: nc, row: nr });
+        });
+    }
+
+    return null;
+}
+
+function tdRouteFromGridPath(path) {
+    if (!path || path.length <= 0) return [];
+    const route = [{ x: -18, y: path[0].row * td.cell + td.cell / 2 }];
+    path.forEach((node) => {
+        route.push({
+            x: node.col * td.cell + td.cell / 2,
+            y: node.row * td.cell + td.cell / 2
+        });
+    });
+    route.push({ x: td.width + 20, y: path[path.length - 1].row * td.cell + td.cell / 2 });
+    return route;
+}
+
+function tdRebuildMazeRoute(extraBlock = null, ignoreTowerId = null) {
+    const blocked = tdBlockedCells(extraBlock, ignoreTowerId);
+    blocked.delete(tdPathCellKey(td.mazeStart.col, td.mazeStart.row));
+    blocked.delete(tdPathCellKey(td.mazeEnd.col, td.mazeEnd.row));
+    const path = tdGridPathBfs(blocked);
+    if (!path) return false;
+
+    td.routes = [tdRouteFromGridPath(path)];
+    td.pathCells = tdBuildPathCells(td.routes);
+    td.mapName = 'Maze Labyrinth';
+    td.mapKey = 'maze';
+
+    const activeRoute = td.routes[0];
+    td.enemies.forEach((enemy) => {
+        enemy.route = activeRoute;
+        let bestIdx = 1;
+        let bestDist = Infinity;
+        for (let i = 1; i < activeRoute.length; i += 1) {
+            const node = activeRoute[i];
+            const d = Math.hypot(node.x - enemy.x, node.y - enemy.y);
+            if (d < bestDist) {
+                bestDist = d;
+                bestIdx = i;
+            }
+        }
+        enemy.pathIndex = bestIdx;
+    });
+
+    return true;
+}
+
 function tdResetState() {
     const cfg = tdDifficultyConfig();
+    const mode = tdModeConfig();
     td.maxHp = tdBaseHpForRun();
     td.baseHp = td.maxHp;
+    td.lives = state.tdPermadeath ? 1 : mode.baseLives;
+    td.modeKey = state.tdMode;
     td.wave = 0;
     td.kills = 0;
     td.tokens = tdTokenStartForRun();
     td.energy = state.tdStartEnergy;
     td.speedMult = 1;
-    td.victoryWave = cfg.victoryWave;
+    td.victoryWave = mode.endless ? 999999 : cfg.victoryWave + (mode.victoryBonusWave || 0);
     td.difficultyKey = state.tdDifficulty;
     td.currentMutator = {
         label: 'Stable Orbit',
@@ -1498,21 +2127,45 @@ function tdResetState() {
     td.enemiesToSpawn = 0;
     td.spawnClock = 0;
     td.nextWaveClock = 0;
+    td.damageThisSecond = 0;
+    td.damageSecondClock = 0;
+    td.dpsNow = 0;
+    td.dpsTarget = 0;
+    td.dpsPressureTimer = 0;
+    td.dpsPressure = 0;
 
     td.selectedTowerId = null;
     td.towers = [];
     td.enemies = [];
     td.shots = [];
+    td.traps = [];
+    td.objectives = tdPickObjectives();
+    td.objectiveState = {
+        teslaPlaced: false,
+        orbitalUsed: false,
+        trapKills: 0,
+        venturePlaced: 0
+    };
+    td.activeAbility = null;
     td.particles = [];
     td.shockwaves = [];
     td.frameClock = 0;
+    if (mode.maze) {
+        td.mazeStart = { col: 0, row: 2 };
+        td.mazeEnd = { col: td.cols - 1, row: 3 };
+        tdRebuildMazeRoute();
+    } else {
+        tdApplyMapLayout(tdChooseLayoutKey());
+    }
 
     renderTdStats();
     renderSelectedTower();
+    tdApplyModeButtons();
 }
 
-function tdIsOnPath(row) {
-    return row >= 1 && row <= 4;
+function tdIsOnPath(row, col) {
+    if (!Number.isInteger(col)) return false;
+    return td.pathCells.has(tdPathCellKey(col, row));
 }
 
 function tdTowerAtCell(col, row) {
@@ -1535,27 +2188,36 @@ function tdSpawnEnemy(typeName) {
     const type = ENEMY_TYPES[typeName];
     const stats = tdEnemyBaseStats(typeName);
 
+    const routeIndex = td.routes.length > 1
+        ? (td.currentBossMode ? 0 : Math.floor(Math.random() * td.routes.length))
+        : 0;
+    const route = td.routes[routeIndex] || td.routes[0] || [];
+    if (route.length <= 1) return;
+
     td.enemies.push({
         id: td.uidSeed++,
         type: typeName,
-        x: td.waypoints[0].x,
-        y: td.waypoints[0].y,
+        x: route[0].x,
+        y: route[0].y,
+        route,
         pathIndex: 1,
         hp: stats.hp,
         maxHp: stats.hp,
         speed: stats.speed,
+        airborne: Boolean(type.airborne),
         slowFactor: 1,
         slowTimer: 0,
+        dotDps: 0,
+        dotTimer: 0,
+        armorShred: 0,
+        armorShredTimer: 0,
+        stunTimer: 0,
         radius: type.radius
     });
 }
 
 function tdWavePool() {
-    if (td.wave < 3) return ['scout', 'runner'];
-    if (td.wave < 6) return ['scout', 'runner', 'brute'];
-    if (td.wave < 10) return ['scout', 'runner', 'brute', 'splitter'];
-    if (td.wave < 15) return ['scout', 'runner', 'brute', 'splitter', 'shield'];
-    return ['scout', 'runner', 'brute', 'splitter', 'shield', 'boss'];
+    return tdPoolForWave(td.wave);
 }
 
 function tdRollMutator() {
@@ -1613,9 +2275,22 @@ function tdBossModeForWave() {
 
 function tdStartNextWave() {
     const cfg = tdDifficultyConfig();
+    const mode = tdModeConfig();
     td.wave += 1;
     state.tdBestWave = Math.max(state.tdBestWave, td.wave);
+    if (mode.endless) state.tdBestEndlessWave = Math.max(state.tdBestEndlessWave, td.wave);
     td.currentMutator = tdRollMutator();
+    if (mode.forcedMutator) {
+        td.currentMutator = {
+            label: `MODE: ${mode.label}`,
+            hpMult: 1.14,
+            speedMult: 1.12,
+            rewardMult: 1.2,
+            energyMult: 1,
+            spawnMult: 1.18,
+            leakBonus: 1
+        };
+    }
     td.currentBossMode = tdBossModeForWave();
 
     if (td.currentBossMode) {
@@ -1631,7 +2306,8 @@ function tdStartNextWave() {
     }
 
     td.waveActive = true;
-    td.enemiesToSpawn = Math.max(8, Math.round((12 + td.wave * 5) * cfg.spawnCountMult * td.currentMutator.spawnMult));
+    const endlessSpawn = mode.endless ? (1 + td.wave * 0.012) : 1;
+    td.enemiesToSpawn = Math.max(8, Math.round((12 + td.wave * 5) * cfg.spawnCountMult * td.currentMutator.spawnMult * endlessSpawn));
     td.spawnClock = 0;
     td.spawnDelay = Math.max(0.06, ((0.78 - td.wave * 0.022) + Math.max(0, 0.14 - state.tdSpawnSlow)) / cfg.spawnRateMult);
 
@@ -1643,9 +2319,34 @@ function tdStartNextWave() {
         td.energy += Math.round(5 * cfg.energyGainMult * td.currentMutator.energyMult);
     }
 
+    const towerLevels = td.towers.reduce((sum, tower) => sum + tower.pathA + tower.pathB, 0);
+    const upkeep = Math.round(td.towers.length * 0.75 + towerLevels * 0.25);
+    if (upkeep > 0) {
+        const hadEnough = td.energy >= upkeep;
+        td.energy = Math.max(0, td.energy - upkeep);
+        if (!hadEnough) {
+            td.currentMutator.speedMult *= 1.08;
+        }
+    }
+
+    const pool = tdWavePool();
+    const avgHp = pool.length > 0
+        ? pool.reduce((sum, key) => sum + tdEnemyBaseStats(key).hp, 0) / pool.length
+        : tdEnemyBaseStats('scout').hp;
+    const bossBudget = td.currentBossMode ? tdEnemyBaseStats('boss').hp * td.currentBossMode.bossCount : 0;
+    const hpBudget = avgHp * td.enemiesToSpawn + bossBudget;
+    const estDuration = Math.max(10, td.enemiesToSpawn * td.spawnDelay * 1.05 + 4);
+    td.dpsTarget = hpBudget / estDuration;
+    td.damageThisSecond = 0;
+    td.damageSecondClock = 0;
+    td.dpsNow = 0;
+    td.dpsPressureTimer = 0;
+    td.dpsPressure = 0;
+
     if (el.tdFeedback) {
         const bossLabel = td.currentBossMode ? ` Bosses: ${td.currentBossMode.bossCount}.` : '';
-        el.tdFeedback.textContent = `Wave ${td.wave} started. ${td.currentMutator.label} active. Incoming monsters: ${td.enemiesToSpawn}.${bossLabel}`;
+        const upkeepMsg = upkeep > 0 ? ` Upkeep: -${upkeep} energy.` : '';
+        el.tdFeedback.textContent = `Wave ${td.wave} started on ${td.mapName}. ${td.currentMutator.label} active. Incoming monsters: ${td.enemiesToSpawn}.${bossLabel}${upkeepMsg}`;
     }
 }
 
@@ -1656,6 +2357,8 @@ function tdPickEnemyType() {
 
     const bossChance = cfg.label === 'Insane' ? 0.964 : cfg.label === 'Very Hard' ? 0.974 : cfg.label === 'Hard' ? 0.982 : 0.989;
     if (pool.includes('boss') && roll > bossChance) return 'boss';
+    if (pool.includes('bulwark') && roll > 0.88) return 'bulwark';
+    if (pool.includes('flyer') && roll > 0.76) return 'flyer';
     if (pool.includes('shield') && roll > 0.84) return 'shield';
     if (pool.includes('splitter') && roll > 0.7) return 'splitter';
     if (pool.includes('brute') && roll > 0.45) return 'brute';
@@ -1673,6 +2376,17 @@ function tdTowerStats(tower) {
     let slowAmount = base.slowAmount || 0;
     let slowTime = base.slowTime || 0;
     let chain = base.chain || 0;
+    let canHitAir = Boolean(base.canHitAir);
+    let burnDps = base.burnDps || 0;
+    let burnTime = base.burnTime || 0;
+    let armorShred = base.armorShred || 0;
+    let armorShredTime = base.armorShredTime || 0;
+    let stunChance = base.stunChance || 0;
+    let stunTime = base.stunTime || 0;
+    let antiAirBonus = base.antiAirBonus || 0;
+    let ventureEnergy = base.ventureEnergy || 0;
+    let ventureGems = base.ventureGems || 0;
+    let ventureTokenChance = base.ventureTokenChance || 0;
     let auraRadius = base.auraRadius || 0;
     let auraDamage = base.auraDamage || 0;
     let auraRate = base.auraRate || 0;
@@ -1684,6 +2398,14 @@ function tdTowerStats(tower) {
         if (tower.type === 'frost') slowTime += 0.2;
         if (tower.type === 'tesla') chain += 1;
         if (tower.type === 'missile') splash += 10;
+        if (tower.type === 'laser') {
+            burnDps += 1.8;
+            burnTime += 0.55;
+        }
+        if (tower.type === 'tesla') {
+            armorShred += 0.05;
+            armorShredTime += 0.35;
+        }
         if (tower.type === 'relay') {
             auraRadius += 10;
             auraDamage += 0.05;
@@ -1696,6 +2418,8 @@ function tdTowerStats(tower) {
         if (tower.type === 'cannon') {
             fireRate *= 0.88;
             splash += 8;
+            stunChance = Math.min(0.52, stunChance + 0.11);
+            stunTime += 0.22;
         }
         if (tower.type === 'frost') {
             slowAmount = Math.min(0.72, slowAmount + 0.11);
@@ -1708,6 +2432,7 @@ function tdTowerStats(tower) {
         if (tower.type === 'missile') {
             range += 12;
             damage *= 1.12;
+            antiAirBonus += 0.08;
         }
         if (tower.type === 'relay') {
             auraRate += 0.05;
@@ -1715,11 +2440,79 @@ function tdTowerStats(tower) {
     }
 
     const relayBuff = tdRelayBoost(tower);
+    const controlLv = tdMetaLevel('control');
+    const burstLv = tdMetaLevel('burst');
+    const economyLv = tdMetaLevel('economy');
+
+    if (controlLv > 0) {
+        if (tower.type === 'frost') {
+            slowAmount = Math.min(0.82, slowAmount + controlLv * 0.04);
+            slowTime += controlLv * 0.22;
+        }
+        if (tower.type === 'laser') {
+            burnDps += controlLv * 0.9;
+            burnTime += controlLv * 0.28;
+        }
+    }
+
+    if (burstLv > 0) {
+        if (tower.type === 'cannon') damage *= 1 + burstLv * 0.08;
+        if (tower.type === 'tesla') armorShred = Math.min(0.6, armorShred + burstLv * 0.04);
+        if (tower.type === 'missile') antiAirBonus += burstLv * 0.12;
+    }
+
+    if (economyLv > 0 && tower.type === 'investment') {
+        ventureEnergy += economyLv * 0.9;
+        ventureGems += 24 * economyLv;
+        ventureTokenChance += 0.016 * economyLv;
+        fireRate = Math.max(1.45, fireRate - economyLv * 0.2);
+    }
+
+    if (tower.type === 'laser' && tower.pathA >= 3) {
+        chain += 1;
+        burnDps += 1.8;
+    }
+    if (tower.type === 'cannon' && tower.pathB >= 3) {
+        stunChance = Math.min(0.74, stunChance + 0.2);
+        stunTime += 0.35;
+        splash += 12;
+    }
+    if (tower.type === 'frost' && tower.pathA >= 3) {
+        stunChance = Math.min(0.5, stunChance + 0.16);
+        stunTime += 0.45;
+    }
+    if (tower.type === 'missile' && tower.pathA >= 3) {
+        splash += 20;
+        chain += 1;
+    }
+
     damage *= 1 + relayBuff.damage;
     fireRate *= 1 - relayBuff.rate;
     fireRate = Math.max(0.14, fireRate);
 
-    return { damage, fireRate, range, splash, slowAmount, slowTime, chain, auraRadius, auraDamage, auraRate };
+    return {
+        damage,
+        fireRate,
+        range,
+        splash,
+        slowAmount,
+        slowTime,
+        chain,
+        canHitAir,
+        burnDps,
+        burnTime,
+        armorShred,
+        armorShredTime,
+        stunChance,
+        stunTime,
+        antiAirBonus,
+        ventureEnergy,
+        ventureGems,
+        ventureTokenChance,
+        auraRadius,
+        auraDamage,
+        auraRate
+    };
 }
 
 function tdUpgradeCost(tower, path) {
@@ -1728,16 +2521,70 @@ function tdUpgradeCost(tower, path) {
     return Math.round(base + tower.pathB * 7 + tower.pathA * 3);
 }
 
+function tdEnemyProgress(enemy) {
+    const route = enemy.route || td.routes[0] || [];
+    if (!route.length) return 0;
+    const idx = Math.max(0, Math.min(route.length - 1, enemy.pathIndex || 0));
+    const target = route[idx] || route[route.length - 1];
+    const toNext = Math.hypot(target.x - enemy.x, target.y - enemy.y);
+    return idx + Math.max(0, 1 - toNext / td.cell);
+}
+
+function tdRegisterDamage(amount) {
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    td.damageThisSecond += amount;
+}
+
+function tdCycleTargetMode() {
+    const tower = td.towers.find((t) => t.id === td.selectedTowerId);
+    if (!tower) {
+        if (el.tdFeedback) el.tdFeedback.textContent = 'Select a tower first.';
+        return;
+    }
+
+    const current = TD_TARGET_MODES.includes(tower.targetMode) ? tower.targetMode : 'first';
+    const idx = TD_TARGET_MODES.indexOf(current);
+    tower.targetMode = TD_TARGET_MODES[(idx + 1) % TD_TARGET_MODES.length];
+    renderSelectedTower();
+    if (el.tdFeedback) el.tdFeedback.textContent = `${TOWER_TYPES[tower.type].name} targeting set to ${tower.targetMode}.`;
+}
+
 function tdFindTarget(tower, stats) {
+    if (tower.type === 'investment') return null;
+
     let best = null;
-    let bestDist = Infinity;
+    let bestScore = Number.NEGATIVE_INFINITY;
+    const mode = TD_TARGET_MODES.includes(tower.targetMode) ? tower.targetMode : 'first';
 
     td.enemies.forEach((enemy) => {
+        if (enemy.airborne && !stats.canHitAir) return;
+
         const dx = enemy.x - tower.x;
         const dy = enemy.y - tower.y;
         const dist = Math.hypot(dx, dy);
-        if (dist <= stats.range && dist < bestDist) {
-            bestDist = dist;
+        if (dist > stats.range) return;
+
+        const armor = Math.max(0, (ENEMY_TYPES[enemy.type].armor || 0) - (enemy.armorShred || 0));
+        const progress = tdEnemyProgress(enemy);
+        let score = 0;
+
+        if (mode === 'strong') {
+            score = enemy.hp;
+        } else if (mode === 'armor') {
+            score = armor * 500 + enemy.hp * 0.1;
+        } else if (mode === 'last') {
+            score = -progress * 100 - enemy.hp * 0.02;
+        } else {
+            score = progress * 100 + enemy.hp * 0.02;
+        }
+
+        if (tower.type === 'missile' && enemy.airborne) score += 18;
+        if (tower.type === 'tesla' && armor > 0.2) score += 14;
+        if (tower.type === 'cannon' && (enemy.armorShred || 0) > 0) score += 10;
+        score -= dist * 0.01;
+
+        if (score > bestScore) {
+            bestScore = score;
             best = enemy;
         }
     });
@@ -1751,14 +2598,39 @@ function tdShotHit(shot) {
 
     if (Math.hypot(primary.x - shot.x, primary.y - shot.y) > primary.radius + 4) return false;
 
-    const armor = ENEMY_TYPES[primary.type].armor || 0;
-    let dealt = shot.damage * (1 - armor);
+    const armorBase = ENEMY_TYPES[primary.type].armor || 0;
+    const effectiveArmor = Math.max(0, armorBase - (primary.armorShred || 0));
+    let dealt = shot.damage * (1 - effectiveArmor);
+
+    if (shot.towerType === 'laser' && primary.slowTimer > 0) dealt *= 1.35;
+    if (shot.towerType === 'missile' && (primary.armorShred || 0) > 0) dealt *= 1.3;
+    if (primary.airborne) dealt *= 1 + (shot.antiAirBonus || 0);
+
     primary.hp -= dealt;
+    tdRegisterDamage(dealt);
     tdEmitImpact(primary.x, primary.y, shot.color, shot.chain > 0 ? 8 : 5);
 
     if (shot.slowAmount > 0) {
         primary.slowFactor = Math.min(primary.slowFactor, 1 - shot.slowAmount);
         primary.slowTimer = Math.max(primary.slowTimer, shot.slowTime);
+
+        if ((primary.dotTimer || 0) > 0) {
+            primary.stunTimer = Math.max(primary.stunTimer || 0, 0.28);
+        }
+    }
+
+    if (shot.burnDps > 0) {
+        primary.dotDps = Math.max(primary.dotDps || 0, shot.burnDps);
+        primary.dotTimer = Math.max(primary.dotTimer || 0, shot.burnTime || 0);
+    }
+
+    if (shot.armorShred > 0) {
+        primary.armorShred = Math.min(0.7, (primary.armorShred || 0) + shot.armorShred);
+        primary.armorShredTimer = Math.max(primary.armorShredTimer || 0, shot.armorShredTime || 0);
+    }
+
+    if (shot.stunChance > 0 && Math.random() < shot.stunChance) {
+        primary.stunTimer = Math.max(primary.stunTimer || 0, shot.stunTime || 0);
     }
 
     if (shot.splash > 0) {
@@ -1766,8 +2638,11 @@ function tdShotHit(shot) {
             if (enemy.id === primary.id) return;
             const d = Math.hypot(enemy.x - primary.x, enemy.y - primary.y);
             if (d <= shot.splash) {
-                const enemyArmor = ENEMY_TYPES[enemy.type].armor || 0;
-                enemy.hp -= shot.damage * 0.55 * (1 - enemyArmor);
+                const enemyArmor = Math.max(0, (ENEMY_TYPES[enemy.type].armor || 0) - (enemy.armorShred || 0));
+                let splashDamage = shot.damage * 0.55 * (1 - enemyArmor);
+                if (shot.towerType === 'cannon' && (enemy.armorShred || 0) > 0) splashDamage *= 1.25;
+                enemy.hp -= splashDamage;
+                tdRegisterDamage(splashDamage);
             }
         });
     }
@@ -1779,9 +2654,15 @@ function tdShotHit(shot) {
             .slice(0, shot.chain);
 
         nearby.forEach((enemy, idx) => {
-            const enemyArmor = ENEMY_TYPES[enemy.type].armor || 0;
+            const enemyArmor = Math.max(0, (ENEMY_TYPES[enemy.type].armor || 0) - (enemy.armorShred || 0));
             const chainFalloff = 1 - Math.min(0.6, idx * 0.22);
-            enemy.hp -= shot.damage * 0.62 * chainFalloff * (1 - enemyArmor);
+            const chainDamage = shot.damage * 0.62 * chainFalloff * (1 - enemyArmor);
+            enemy.hp -= chainDamage;
+            tdRegisterDamage(chainDamage);
+            if (shot.armorShred > 0) {
+                enemy.armorShred = Math.min(0.6, (enemy.armorShred || 0) + shot.armorShred * 0.55);
+                enemy.armorShredTimer = Math.max(enemy.armorShredTimer || 0, (shot.armorShredTime || 0) * 0.8);
+            }
         });
     }
 
@@ -1822,7 +2703,12 @@ function tdHandleEnemyDeath(enemy) {
 
     const energyGain = type.reward * (1 + state.tdEnergyBonus) * cfg.energyGainMult * td.currentMutator.energyMult;
     td.energy += energyGain;
+    if (enemy.killSource === 'trap') {
+        td.objectiveState.trapKills += 1;
+    }
     tdEmitImpact(enemy.x, enemy.y, '#ffeeb3', enemy.type === 'boss' ? 16 : 9);
+    if (enemy.type === 'boss') tdTriggerShake(7, 0.22);
+    tdSfx('kill');
 
     if (type.split) {
         for (let i = 0; i < 2; i += 1) {
@@ -1836,8 +2722,14 @@ function tdHandleEnemyDeath(enemy) {
                 hp: tinyHp,
                 maxHp: tinyHp,
                 speed: enemy.speed * 1.3,
+                airborne: false,
                 slowFactor: 1,
                 slowTimer: 0,
+                dotDps: 0,
+                dotTimer: 0,
+                armorShred: 0,
+                armorShredTimer: 0,
+                stunTimer: 0,
                 radius: 5
             });
         }
@@ -1845,14 +2737,21 @@ function tdHandleEnemyDeath(enemy) {
 }
 
 function tdMoveEnemy(enemy, delta) {
-    if (enemy.pathIndex >= td.waypoints.length) return;
+    const route = enemy.route || td.routes[0] || [];
+    if (enemy.pathIndex >= route.length) return;
 
-    const target = td.waypoints[enemy.pathIndex];
+    if ((enemy.stunTimer || 0) > 0) {
+        enemy.stunTimer -= delta;
+        return;
+    }
+
+    const target = route[enemy.pathIndex];
     const dx = target.x - enemy.x;
     const dy = target.y - enemy.y;
     const dist = Math.hypot(dx, dy) || 1;
 
-    const speed = enemy.speed * enemy.slowFactor;
+    const pressureMult = 1 + td.dpsPressure * 0.32;
+    const speed = enemy.speed * enemy.slowFactor * pressureMult;
     const step = speed * delta;
 
     if (step >= dist) {
@@ -1870,6 +2769,10 @@ function tdMoveEnemy(enemy, delta) {
             enemy.slowFactor = 1;
         }
     }
+
+    if ((enemy.airborne || false) && enemy.pathIndex < route.length) {
+        enemy.y += Math.sin(td.frameClock * 6 + enemy.id * 0.35) * 0.55;
+    }
 }
 
 function tdUpdate(delta) {
@@ -1877,6 +2780,16 @@ function tdUpdate(delta) {
     const cfg = tdDifficultyConfig();
     const simDelta = delta * td.speedMult;
     td.frameClock += simDelta;
+    td.damageSecondClock += simDelta;
+    if (td.shakeTime > 0) {
+        td.shakeTime = Math.max(0, td.shakeTime - simDelta);
+    }
+
+    if (td.damageSecondClock >= 1) {
+        td.dpsNow = td.damageThisSecond / td.damageSecondClock;
+        td.damageThisSecond = 0;
+        td.damageSecondClock = 0;
+    }
 
     if (!td.waveActive && td.enemies.length === 0) {
         td.nextWaveClock -= simDelta;
@@ -1909,12 +2822,37 @@ function tdUpdate(delta) {
             }
             if (!td.currentBossMode && el.tdFeedback) el.tdFeedback.textContent = `Wave ${td.wave} cleared. +${fmt(waveReward)} gems.`;
         }
+
+        if (td.dpsTarget > 0) {
+            const ratio = td.dpsNow / td.dpsTarget;
+            if (ratio < 0.85) {
+                td.dpsPressureTimer += simDelta;
+            } else {
+                td.dpsPressureTimer = Math.max(0, td.dpsPressureTimer - simDelta * 1.6);
+            }
+            td.dpsPressure = Math.max(0, Math.min(1, (td.dpsPressureTimer - 2) / 6));
+        } else {
+            td.dpsPressure = 0;
+            td.dpsPressureTimer = 0;
+        }
     }
 
     td.towers.forEach((tower) => {
         const stats = tdTowerStats(tower);
         tower.cooldown -= simDelta;
         if (tower.cooldown > 0) return;
+
+        if (tower.type === 'investment') {
+            tower.cooldown = stats.fireRate;
+            td.energy += stats.ventureEnergy;
+            addGems(stats.ventureGems);
+            if (Math.random() < stats.ventureTokenChance) {
+                td.tokens += 1;
+                if (el.tdFeedback) el.tdFeedback.textContent = 'Venture Tower payout: +1 token.';
+            }
+            tdEmitImpact(tower.x, tower.y, '#ffe28e', 5);
+            return;
+        }
 
         const target = tdFindTarget(tower, stats);
         if (!target) return;
@@ -1930,8 +2868,21 @@ function tdUpdate(delta) {
             slowAmount: stats.slowAmount,
             slowTime: stats.slowTime,
             chain: stats.chain,
+            burnDps: stats.burnDps,
+            burnTime: stats.burnTime,
+            armorShred: stats.armorShred,
+            armorShredTime: stats.armorShredTime,
+            stunChance: stats.stunChance,
+            stunTime: stats.stunTime,
+            antiAirBonus: stats.antiAirBonus,
+            towerType: tower.type,
             color: TOWER_TYPES[tower.type].color
         });
+
+        if (Date.now() - td.lastShotSound > 45) {
+            tdSfx('shot');
+            td.lastShotSound = Date.now();
+        }
     });
 
     td.shots.forEach((shot) => {
@@ -1967,7 +2918,54 @@ function tdUpdate(delta) {
         }
     });
 
-    td.enemies.forEach((enemy) => tdMoveEnemy(enemy, simDelta));
+    for (let i = td.traps.length - 1; i >= 0; i -= 1) {
+        const trap = td.traps[i];
+        trap.life -= simDelta;
+        let triggered = false;
+
+        td.enemies.forEach((enemy) => {
+            if (triggered) return;
+            const d = Math.hypot(enemy.x - trap.x, enemy.y - trap.y);
+            if (d <= trap.radius) {
+                enemy.hp -= trap.damage;
+                tdRegisterDamage(trap.damage);
+                enemy.killSource = 'trap';
+                triggered = true;
+            }
+        });
+
+        if (triggered) {
+            tdEmitImpact(trap.x, trap.y, '#ffe6a3', 14);
+            tdTriggerShake(4, 0.12);
+            td.traps.splice(i, 1);
+            continue;
+        }
+
+        if (trap.life <= 0) {
+            td.traps.splice(i, 1);
+        }
+    }
+
+    td.enemies.forEach((enemy) => {
+        if ((enemy.dotTimer || 0) > 0) {
+            enemy.dotTimer -= simDelta;
+            const dotTick = (enemy.dotDps || 0) * simDelta;
+            enemy.hp -= dotTick;
+            tdRegisterDamage(dotTick);
+            if (enemy.dotTimer <= 0) {
+                enemy.dotDps = 0;
+            }
+        }
+
+        if ((enemy.armorShredTimer || 0) > 0) {
+            enemy.armorShredTimer -= simDelta;
+            if (enemy.armorShredTimer <= 0) {
+                enemy.armorShred = 0;
+            }
+        }
+
+        tdMoveEnemy(enemy, simDelta);
+    });
 
     for (let i = td.enemies.length - 1; i >= 0; i -= 1) {
         const enemy = td.enemies[i];
@@ -1978,7 +2976,8 @@ function tdUpdate(delta) {
             continue;
         }
 
-        if (enemy.pathIndex >= td.waypoints.length) {
+        const route = enemy.route || td.routes[0] || [];
+        if (enemy.pathIndex >= route.length) {
             const leakDamage = cfg.baseLeakDamage + (td.currentMutator.leakBonus || 0);
             td.baseHp -= leakDamage;
             tdEmitImpact(td.width - 14, enemy.y, '#ff8c8c', 10);
@@ -2006,8 +3005,19 @@ function tdUpdate(delta) {
     td.shots = td.shots.filter((s) => !s.dead);
 
     if (td.baseHp <= 0) {
-        tdFinishRun();
-        return;
+        td.lives -= 1;
+        if (td.lives > 0) {
+            td.baseHp = td.maxHp;
+            td.enemies = [];
+            td.waveActive = false;
+            td.enemiesToSpawn = 0;
+            td.nextWaveClock = 1.2;
+            if (el.tdFeedback) el.tdFeedback.textContent = `Core breached. Life lost (${td.lives} left).`;
+            tdTriggerShake(9, 0.2);
+        } else {
+            tdFinishRun();
+            return;
+        }
     }
 
     renderTdStats();
@@ -2019,6 +3029,14 @@ function tdDraw() {
     if (!el.tdCanvas) return;
     const ctx = el.tdCanvas.getContext('2d');
     if (!ctx) return;
+
+    ctx.save();
+    if (td.shakeTime > 0) {
+        const mag = td.shakePower * (td.shakeTime / Math.max(0.001, td.shakeTime + 0.12));
+        const ox = (Math.random() - 0.5) * mag;
+        const oy = (Math.random() - 0.5) * mag;
+        ctx.translate(ox, oy);
+    }
 
     ctx.clearRect(0, 0, td.width, td.height);
 
@@ -2035,9 +3053,11 @@ function tdDraw() {
 
     for (let r = 0; r < td.rows; r += 1) {
         const y = r * td.cell;
-        if (tdIsOnPath(r)) {
-            ctx.fillStyle = 'rgba(255, 153, 119, 0.12)';
-            ctx.fillRect(0, y, td.width, td.cell);
+        for (let c = 0; c < td.cols; c += 1) {
+            if (tdIsOnPath(r, c)) {
+                ctx.fillStyle = 'rgba(255, 153, 119, 0.12)';
+                ctx.fillRect(c * td.cell, y, td.cell, td.cell);
+            }
         }
         ctx.strokeStyle = 'rgba(180, 220, 255, 0.14)';
         ctx.strokeRect(0, y, td.width, td.cell);
@@ -2052,19 +3072,23 @@ function tdDraw() {
         ctx.stroke();
     }
 
-    ctx.strokeStyle = 'rgba(255, 200, 140, 0.35)';
-    ctx.lineWidth = 5;
-    ctx.beginPath();
-    ctx.moveTo(td.waypoints[0].x, td.waypoints[0].y);
-    for (let i = 1; i < td.waypoints.length; i += 1) {
-        ctx.lineTo(td.waypoints[i].x, td.waypoints[i].y);
-    }
-    ctx.stroke();
+    td.routes.forEach((route, idx) => {
+        if (!route || route.length <= 1) return;
+        ctx.strokeStyle = idx === 0 ? 'rgba(255, 200, 140, 0.4)' : 'rgba(255, 165, 125, 0.28)';
+        ctx.lineWidth = idx === 0 ? 5 : 4;
+        ctx.beginPath();
+        ctx.moveTo(route[0].x, route[0].y);
+        for (let i = 1; i < route.length; i += 1) {
+            ctx.lineTo(route[i].x, route[i].y);
+        }
+        ctx.stroke();
+    });
     ctx.lineWidth = 1;
 
     td.towers.forEach((tower) => {
         const color = TOWER_TYPES[tower.type].color;
         const selected = tower.id === td.selectedTowerId;
+        const hovered = td.hoverCell && tower.col === td.hoverCell.col && tower.row === td.hoverCell.row;
 
         ctx.fillStyle = color;
         ctx.fillRect(tower.x - 9, tower.y - 9, 18, 18);
@@ -2116,7 +3140,44 @@ function tdDraw() {
             ctx.strokeStyle = '#ffffff';
             ctx.strokeRect(tower.x - 12, tower.y - 12, 24, 24);
         }
+
+        if (td.showRanges && (selected || hovered)) {
+            const stats = tdTowerStats(tower);
+            if (stats.range > 0) {
+                ctx.strokeStyle = selected ? 'rgba(156, 248, 255, 0.7)' : 'rgba(156, 248, 255, 0.38)';
+                ctx.lineWidth = 1.2;
+                ctx.beginPath();
+                ctx.arc(tower.x, tower.y, stats.range, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.lineWidth = 1;
+            }
+        }
     });
+
+    td.traps.forEach((trap) => {
+        ctx.fillStyle = 'rgba(255, 230, 143, 0.85)';
+        ctx.beginPath();
+        ctx.arc(trap.x, trap.y, 4.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 230, 143, 0.26)';
+        ctx.beginPath();
+        ctx.arc(trap.x, trap.y, trap.radius, 0, Math.PI * 2);
+        ctx.stroke();
+    });
+
+    if (td.showRanges && td.hoverCell) {
+        const tType = TOWER_TYPES[td.selectedTowerType];
+        const ghostX = td.hoverCell.col * td.cell + td.cell / 2;
+        const ghostY = td.hoverCell.row * td.cell + td.cell / 2;
+        if (tType && tType.range > 0 && !tdTowerAtCell(td.hoverCell.col, td.hoverCell.row)) {
+            ctx.strokeStyle = tdIsOnPath(td.hoverCell.row, td.hoverCell.col)
+                ? 'rgba(255, 140, 140, 0.55)'
+                : 'rgba(120, 255, 210, 0.42)';
+            ctx.beginPath();
+            ctx.arc(ghostX, ghostY, tType.range, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+    }
 
     td.enemies.forEach((enemy) => {
         const eType = ENEMY_TYPES[enemy.type] || ENEMY_TYPES.scout;
@@ -2125,6 +3186,22 @@ function tdDraw() {
         ctx.beginPath();
         ctx.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
         ctx.fill();
+
+        if (enemy.airborne) {
+            ctx.strokeStyle = 'rgba(143, 211, 255, 0.72)';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(enemy.x, enemy.y, enemy.radius + 3, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+
+        if ((enemy.dotTimer || 0) > 0) {
+            ctx.strokeStyle = 'rgba(255, 148, 102, 0.85)';
+            ctx.lineWidth = 1.4;
+            ctx.beginPath();
+            ctx.arc(enemy.x, enemy.y, enemy.radius + 1, 0, Math.PI * 2);
+            ctx.stroke();
+        }
 
         const hpRatio = Math.max(0, enemy.hp / enemy.maxHp);
         ctx.fillStyle = '#210d16';
@@ -2165,6 +3242,8 @@ function tdDraw() {
         ctx.lineTo(shot.x - 6, shot.y - 2);
         ctx.stroke();
     });
+
+    ctx.restore();
 }
 
 function tdStopRun(message) {
@@ -2185,30 +3264,55 @@ function tdStopRun(message) {
     tdDraw();
 }
 
+function tdObjectiveCompletionCount() {
+    if (!td.objectives || td.objectives.length <= 0) return 0;
+    return td.objectives.reduce((sum, obj) => sum + (tdObjectiveDone(obj.id) ? 1 : 0), 0);
+}
+
 function tdFinishRun() {
     const cfg = tdDifficultyConfig();
+    const mode = tdModeConfig();
     state.tdBestKills = Math.max(state.tdBestKills, td.kills);
     state.tdBestWave = Math.max(state.tdBestWave, td.wave);
+    if (mode.endless) state.tdBestEndlessWave = Math.max(state.tdBestEndlessWave, td.wave);
+
+    const objectiveDone = tdObjectiveCompletionCount();
+    const objectiveGemBonus = objectiveDone * 900;
+    const objectiveMetaBonus = objectiveDone;
 
     const reward = Math.round((td.kills * 16 + td.wave * 72 + totalBuildings() * 2.1) * (0.84 + cfg.spawnCountMult * 0.25));
-    addGems(reward);
+    const metaGain = Math.max(1, Math.floor(td.wave / 10) + Math.floor(td.kills / 160)) + objectiveMetaBonus;
+    addGems(reward + objectiveGemBonus);
+    state.tdMetaPoints += metaGain;
 
-    tdStopRun(`Defense failed at wave ${td.wave}. Reward: +${fmt(reward)} gems.`);
+    tdStopRun(`Defense failed at wave ${td.wave}. Reward: +${fmt(reward + objectiveGemBonus)} gems, +${metaGain} meta point(s). Objectives: ${objectiveDone}/${td.objectives.length}.`);
     renderAll();
+    renderTdMeta();
     saveGame();
 }
 
 function tdWinRun() {
     const cfg = tdDifficultyConfig();
+    const mode = tdModeConfig();
     state.tdBestKills = Math.max(state.tdBestKills, td.kills);
     state.tdBestWave = Math.max(state.tdBestWave, td.wave);
+    if (mode.endless) state.tdBestEndlessWave = Math.max(state.tdBestEndlessWave, td.wave);
     state.tdWins += 1;
 
-    const reward = Math.round((2500 + td.kills * 22 + td.wave * 210 + totalBuildings() * 3.8) * (0.88 + cfg.spawnCountMult * 0.35));
-    addGems(reward);
+    const objectiveDone = tdObjectiveCompletionCount();
+    const objectiveGemBonus = objectiveDone * 1400;
+    const objectiveMetaBonus = objectiveDone;
 
-    tdStopRun(`Victory! You cleared wave ${td.wave}. Reward: +${fmt(reward)} gems.`);
+    const reward = Math.round((2500 + td.kills * 22 + td.wave * 210 + totalBuildings() * 3.8) * (0.88 + cfg.spawnCountMult * 0.35));
+    const metaGain = Math.max(2, 2 + Math.floor(td.wave / 8) + Math.floor(td.kills / 140)) + objectiveMetaBonus;
+    addGems(reward + objectiveGemBonus);
+    state.tdMetaPoints += metaGain;
+    tdTriggerShake(11, 0.35);
+    tdSfx('victory');
+
+    tdStopRun(`Victory! You cleared wave ${td.wave}. Reward: +${fmt(reward + objectiveGemBonus)} gems, +${metaGain} meta point(s). Objectives: ${objectiveDone}/${td.objectives.length}.`);
     renderAll();
+    renderTdMeta();
     saveGame();
 }
 
@@ -2224,7 +3328,9 @@ function tdStart() {
 
     if (el.tdFeedback) {
         const cfg = tdDifficultyConfig();
-        el.tdFeedback.textContent = `Defense started on ${cfg.label}. Survive to wave ${td.victoryWave}.`;
+        const mode = tdModeConfig();
+        const winText = mode.endless ? 'Push your highest endless wave.' : `Survive to wave ${td.victoryWave}.`;
+        el.tdFeedback.textContent = `Defense started on ${cfg.label} (${mode.label}). ${winText}`;
     }
 
     const frameMs = 50;
@@ -2261,14 +3367,86 @@ function tdActivateOrbitalStrike() {
     }
 
     td.energy -= cost;
+    td.objectiveState.orbitalUsed = true;
     td.enemies.forEach((enemy) => {
-        enemy.hp -= (38 + td.wave * 1.2) * prestigeTdMultiplier();
+        const strikeDamage = (38 + td.wave * 1.2) * prestigeTdMultiplier();
+        enemy.hp -= strikeDamage;
+        tdRegisterDamage(strikeDamage);
     });
 
     if (el.tdFeedback) {
         el.tdFeedback.textContent = 'Orbital strike deployed!';
     }
 
+    renderTdStats();
+    tdDraw();
+}
+
+function tdArmAbility(kind) {
+    if (!td.running) {
+        if (el.tdFeedback) el.tdFeedback.textContent = 'Start defense first.';
+        return;
+    }
+
+    td.activeAbility = kind;
+    renderTdStats();
+}
+
+function tdUseActiveAbility(col, row) {
+    const mode = tdModeConfig();
+    const x = col * td.cell + td.cell / 2;
+    const y = row * td.cell + td.cell / 2;
+
+    if (td.activeAbility === 'trap') {
+        if (td.energy < mode.trapCost) {
+            if (el.tdFeedback) el.tdFeedback.textContent = `Need ${mode.trapCost} energy for trap.`;
+            td.activeAbility = null;
+            renderTdStats();
+            return;
+        }
+        if (tdTowerAtCell(col, row)) {
+            if (el.tdFeedback) el.tdFeedback.textContent = 'Cannot place trap on tower cell.';
+            td.activeAbility = null;
+            renderTdStats();
+            return;
+        }
+
+        td.energy -= mode.trapCost;
+        td.traps.push({
+            id: td.uidSeed++,
+            col,
+            row,
+            x,
+            y,
+            radius: 24,
+            damage: (120 + td.wave * 4) * prestigeTdMultiplier(),
+            life: 32
+        });
+        if (el.tdFeedback) el.tdFeedback.textContent = 'Mine trap deployed.';
+    } else if (td.activeAbility === 'dash') {
+        if (td.energy < mode.dashCost) {
+            if (el.tdFeedback) el.tdFeedback.textContent = `Need ${mode.dashCost} energy for dash.`;
+            td.activeAbility = null;
+            renderTdStats();
+            return;
+        }
+
+        td.energy -= mode.dashCost;
+        td.enemies.forEach((enemy) => {
+            const d = Math.hypot(enemy.x - x, enemy.y - y);
+            if (d <= 72) {
+                const dashDamage = (75 + td.wave * 2.1) * prestigeTdMultiplier();
+                enemy.hp -= dashDamage;
+                tdRegisterDamage(dashDamage);
+                enemy.stunTimer = Math.max(enemy.stunTimer || 0, 0.45);
+            }
+        });
+        tdEmitImpact(x, y, '#9df2ff', 18);
+        tdTriggerShake(5, 0.14);
+        if (el.tdFeedback) el.tdFeedback.textContent = 'Pilot dash strike executed.';
+    }
+
+    td.activeAbility = null;
     renderTdStats();
     tdDraw();
 }
@@ -2301,6 +3479,36 @@ function tdToggleSpeed() {
     if (el.tdFeedback) el.tdFeedback.textContent = `Defense speed set to x${td.speedMult}.`;
 }
 
+function tdToggleRanges() {
+    td.showRanges = !td.showRanges;
+    renderTdStats();
+    tdDraw();
+}
+
+function tdHandleCanvasMove(evt) {
+    if (!el.tdCanvas) return;
+    const rect = el.tdCanvas.getBoundingClientRect();
+    const scaleX = td.width / rect.width;
+    const scaleY = td.height / rect.height;
+    const x = (evt.clientX - rect.left) * scaleX;
+    const y = (evt.clientY - rect.top) * scaleY;
+    const col = Math.floor(x / td.cell);
+    const row = Math.floor(y / td.cell);
+
+    if (col < 0 || col >= td.cols || row < 0 || row >= td.rows) {
+        td.hoverCell = null;
+    } else {
+        td.hoverCell = { col, row };
+    }
+
+    tdDraw();
+}
+
+function tdHandleCanvasLeave() {
+    td.hoverCell = null;
+    tdDraw();
+}
+
 function tdSelectTowerType(type) {
     if (!TOWER_TYPES[type]) return;
     td.selectedTowerType = type;
@@ -2326,6 +3534,11 @@ function tdPlaceOrSelect(evt) {
 
     if (col < 0 || col >= td.cols || row < 0 || row >= td.rows) return;
 
+    if (td.activeAbility) {
+        tdUseActiveAbility(col, row);
+        return;
+    }
+
     const existing = tdTowerAtCell(col, row);
     if (existing) {
         td.selectedTowerId = existing.id;
@@ -2334,20 +3547,20 @@ function tdPlaceOrSelect(evt) {
         return;
     }
 
-    if (tdIsOnPath(row)) {
-        if (el.tdFeedback) el.tdFeedback.textContent = 'Cannot place tower on monster path rows.';
+    if (tdIsOnPath(row, col) && td.modeKey !== 'maze') {
+        if (el.tdFeedback) el.tdFeedback.textContent = 'Cannot place tower on active path tiles.';
         return;
     }
 
     const tType = TOWER_TYPES[td.selectedTowerType];
     if (!tType) return;
 
-    if (td.tokens < tType.tokenCost) {
-        if (el.tdFeedback) el.tdFeedback.textContent = `Need ${tType.tokenCost} tokens for ${tType.name}.`;
+    const tokenCost = tdPlacementTokenCost(td.selectedTowerType);
+
+    if (td.tokens < tokenCost) {
+        if (el.tdFeedback) el.tdFeedback.textContent = `Need ${tokenCost} tokens for ${tType.name}.`;
         return;
     }
-
-    td.tokens -= tType.tokenCost;
 
     const newTower = {
         id: td.uidSeed++,
@@ -2359,11 +3572,27 @@ function tdPlaceOrSelect(evt) {
         pathA: 0,
         pathB: 0,
         cooldown: 0,
-        spentEnergy: 0
+        spentEnergy: 0,
+        targetMode: td.selectedTowerType === 'tesla'
+            ? 'armor'
+            : td.selectedTowerType === 'cannon'
+                ? 'strong'
+                : td.selectedTowerType === 'frost'
+                    ? 'first'
+                    : 'first'
     };
+
+    if (td.modeKey === 'maze' && !tdRebuildMazeRoute({ col, row })) {
+        if (el.tdFeedback) el.tdFeedback.textContent = 'Placement blocks all routes to exit.';
+        return;
+    }
+
+    td.tokens -= tokenCost;
 
     td.towers.push(newTower);
     td.selectedTowerId = newTower.id;
+    if (newTower.type === 'tesla') td.objectiveState.teslaPlaced = true;
+    if (newTower.type === 'investment') td.objectiveState.venturePlaced += 1;
 
     if (el.tdFeedback) {
         el.tdFeedback.textContent = `${tType.name} placed.`;
@@ -2433,6 +3662,10 @@ function tdSellSelectedTower() {
     td.towers.splice(idx, 1);
     td.selectedTowerId = null;
 
+    if (td.modeKey === 'maze') {
+        tdRebuildMazeRoute(null, tower.id);
+    }
+
     if (el.tdFeedback) {
         el.tdFeedback.textContent = `Tower sold. +${tokenRefund} token(s), +${energyRefund} energy.`;
     }
@@ -2481,9 +3714,11 @@ function bindEvents() {
     if (el.tdResetBtn) el.tdResetBtn.addEventListener('click', tdResetGrid);
     if (el.tdNextWaveBtn) el.tdNextWaveBtn.addEventListener('click', tdCallNextWave);
     if (el.tdSpeedBtn) el.tdSpeedBtn.addEventListener('click', tdToggleSpeed);
+    if (el.tdRangeBtn) el.tdRangeBtn.addEventListener('click', tdToggleRanges);
     if (el.tdAbilityBtn) el.tdAbilityBtn.addEventListener('click', tdActivateOrbitalStrike);
     if (el.tdUpgradeA) el.tdUpgradeA.addEventListener('click', () => tdUpgradeTower('A'));
     if (el.tdUpgradeB) el.tdUpgradeB.addEventListener('click', () => tdUpgradeTower('B'));
+    if (el.tdTargetBtn) el.tdTargetBtn.addEventListener('click', tdCycleTargetMode);
     if (el.tdSellTower) el.tdSellTower.addEventListener('click', tdSellSelectedTower);
 
     if (el.tdTowerTypes) {
@@ -2491,6 +3726,14 @@ function bindEvents() {
             const button = event.target.closest('[data-td-type]');
             if (!button) return;
             tdSelectTowerType(button.dataset.tdType);
+        });
+    }
+
+    if (el.tdMetaModes) {
+        el.tdMetaModes.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-td-tech]');
+            if (!button) return;
+            tdUnlockMeta(button.dataset.tdTech);
         });
     }
 
@@ -2502,7 +3745,33 @@ function bindEvents() {
         });
     }
 
-    if (el.tdCanvas) el.tdCanvas.addEventListener('click', tdPlaceOrSelect);
+    if (el.tdModeRow) {
+        el.tdModeRow.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-td-mode]');
+            if (!button) return;
+            tdSetMode(button.dataset.tdMode);
+        });
+    }
+
+    if (el.tdTrapBtn) el.tdTrapBtn.addEventListener('click', () => tdArmAbility('trap'));
+    if (el.tdDashBtn) el.tdDashBtn.addEventListener('click', () => tdArmAbility('dash'));
+    if (el.tdPermadeathBtn) el.tdPermadeathBtn.addEventListener('click', tdTogglePermadeath);
+
+    if (el.tdCanvas) {
+        el.tdCanvas.addEventListener('click', tdPlaceOrSelect);
+        el.tdCanvas.addEventListener('mousemove', tdHandleCanvasMove);
+        el.tdCanvas.addEventListener('mouseleave', tdHandleCanvasLeave);
+    }
+
+    if (el.tdEnemyLegend) {
+        const showTip = (event) => {
+            const btn = event.target.closest('[data-td-enemy]');
+            if (!btn) return;
+            safeSet(el.tdEnemyTooltip, tdEnemyVulnerabilityText(btn.dataset.tdEnemy));
+        };
+        el.tdEnemyLegend.addEventListener('mouseover', showTip);
+        el.tdEnemyLegend.addEventListener('click', showTip);
+    }
 
     if (el.lbNameInput) {
         el.lbNameInput.addEventListener('change', () => {
@@ -2538,6 +3807,7 @@ function boot() {
     tdResetState();
     tdDraw();
     renderAll();
+    renderTdMeta();
     renderLeaderboard();
     refreshLeaderboardSubmitUi();
 
