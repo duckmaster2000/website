@@ -3490,9 +3490,9 @@ function tdCallNextWave() {
 }
 
 function tdToggleSpeed() {
-    if (td.speedMult === 1) td.speedMult = 2;
-    else if (td.speedMult === 2) td.speedMult = 3;
-    else td.speedMult = 1;
+    const speedSteps = [1, 2, 3, 5, 10, 20, 50, 100];
+    const idx = speedSteps.indexOf(td.speedMult);
+    td.speedMult = speedSteps[(idx + 1) % speedSteps.length];
 
     renderTdStats();
     if (el.tdFeedback) el.tdFeedback.textContent = `Defense speed set to x${td.speedMult}.`;
