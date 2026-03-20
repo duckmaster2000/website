@@ -1174,14 +1174,19 @@ function renderCoreStats() {
 function renderTdStats() {
     const cfg = tdDifficultyConfig();
     const mode = tdModeConfig();
+    const tokenSafe = Number.isFinite(td.tokens) ? Math.max(0, Math.floor(td.tokens)) : 0;
+    const energySafe = Number.isFinite(td.energy) ? Math.max(0, td.energy) : 0;
+    const killsSafe = Number.isFinite(td.kills) ? Math.max(0, Math.floor(td.kills)) : 0;
+    const nextTokenIn = TD_KILLS_PER_TOKEN - (killsSafe % TD_KILLS_PER_TOKEN || TD_KILLS_PER_TOKEN);
+
     safeSet(el.tdBaseHp, `${td.baseHp}/${td.maxHp}`);
     safeSet(el.tdWave, td.wave);
-    safeSet(el.tdTokens, td.tokens);
+    safeSet(el.tdTokens, `${tokenSafe} (next +1 in ${nextTokenIn})`);
     safeSet(el.tdKills, td.kills);
     const bestTag = mode.endless
         ? `Endless Best ${fmt(state.tdBestEndlessWave)}`
         : `Best Wave ${fmt(state.tdBestWave)}`;
-    safeSet(el.tdEnergy, `${fmt(td.energy)} | ${bestTag} | ${mode.label} | ${cfg.label}`);
+    safeSet(el.tdEnergy, `${fmtDec(energySafe, 1)} | ${bestTag} | ${mode.label} | ${cfg.label}`);
     safeSet(el.tdMutator, `Mutator: ${td.currentMutator.label}`);
     safeSet(el.tdMapLabel, `Map: ${td.mapName}`);
     safeSet(el.tdWaveIntel, tdWaveIntel());
