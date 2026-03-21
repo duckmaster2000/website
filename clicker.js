@@ -3146,8 +3146,20 @@ function tdDraw() {
         const hovered = td.hoverCell && tower.col === td.hoverCell.col && tower.row === td.hoverCell.row;
         const bob = Math.sin(td.frameClock * 4 + tower.id * 0.37) * 1.1;
         const spin = td.frameClock * 2.2 + tower.id * 0.3;
+        const recoil = Math.min(1, tower.flash || 0) * 2.4;
+        const nearest = td.enemies.reduce((best, enemy) => {
+            const d = Math.hypot(enemy.x - tower.x, enemy.y - tower.y);
+            if (!best || d < best.dist) return { enemy, dist: d };
+            return best;
+        }, null);
+        const aimAngle = nearest ? Math.atan2(nearest.enemy.y - tower.y, nearest.enemy.x - tower.x) : -Math.PI / 2;
 
         // Platform and energy ring
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.26)';
+        ctx.beginPath();
+        ctx.ellipse(tower.x, tower.y + 11.5, 10.2, 3.8, 0, 0, Math.PI * 2);
+        ctx.fill();
+
         ctx.fillStyle = 'rgba(8, 16, 28, 0.84)';
         ctx.beginPath();
         ctx.arc(tower.x, tower.y, 11, 0, Math.PI * 2);
@@ -3171,20 +3183,37 @@ function tdDraw() {
         ctx.arc(tower.x, tower.y + bob * 0.25, 7.8, 0, Math.PI * 2);
         ctx.fill();
 
+        const metallic = ctx.createLinearGradient(tower.x - 8, tower.y - 8, tower.x + 8, tower.y + 8);
+        metallic.addColorStop(0, 'rgba(255, 255, 255, 0.3)');
+        metallic.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        ctx.fillStyle = metallic;
+        ctx.beginPath();
+        ctx.arc(tower.x - 1.2, tower.y - 1.2 + bob * 0.15, 5.5, 0, Math.PI * 2);
+        ctx.fill();
+
         if (tower.type === 'laser') {
             const pulse = 1 + Math.sin(td.frameClock * 12 + tower.id) * 0.12;
+            ctx.save();
+            ctx.translate(tower.x, tower.y + bob * 0.4);
+            ctx.rotate(aimAngle);
             ctx.fillStyle = '#d8fcff';
-            ctx.fillRect(tower.x - 2 * pulse, tower.y - 13 + bob, 4 * pulse, 9);
-            ctx.strokeStyle = 'rgba(188, 251, 255, 0.85)';
-            ctx.beginPath();
-            ctx.moveTo(tower.x, tower.y - 14 + bob);
-            ctx.lineTo(tower.x + Math.cos(spin) * 8, tower.y - 18 + bob);
-            ctx.stroke();
+            ctx.fillRect(-2.2 * pulse, -3.5, 9.8 - recoil, 7);
+            ctx.fillStyle = 'rgba(188, 251, 255, 0.7)';
+            ctx.fillRect(5.2 - recoil, -1.25, 4.8, 2.5);
+            ctx.restore();
         } else if (tower.type === 'cannon') {
+            ctx.save();
+            ctx.translate(tower.x, tower.y + bob * 0.35);
+            ctx.rotate(aimAngle);
             ctx.fillStyle = '#ffe4b0';
-            ctx.fillRect(tower.x - 6, tower.y - 12 + bob, 12, 6);
+            ctx.fillRect(-4.8, -4, 11 - recoil, 8);
             ctx.fillStyle = '#ffd08c';
-            ctx.fillRect(tower.x - 2, tower.y - 16 + bob, 4, 5);
+            ctx.fillRect(5.5 - recoil, -2.2, 5.2, 4.4);
+            ctx.restore();
+            ctx.fillStyle = 'rgba(255, 228, 176, 0.55)';
+            ctx.beginPath();
+            ctx.arc(tower.x, tower.y + bob * 0.2, 3.2, 0, Math.PI * 2);
+            ctx.fill();
         } else if (tower.type === 'tesla') {
             ctx.fillStyle = '#f1e7ff';
             ctx.beginPath();
@@ -3201,17 +3230,23 @@ function tdDraw() {
             ctx.arc(tower.x, tower.y + bob * 0.4, 10 + Math.sin(td.frameClock * 8 + tower.id) * 1.5, 0, Math.PI * 2);
             ctx.stroke();
         } else if (tower.type === 'missile') {
+            ctx.save();
+            ctx.translate(tower.x, tower.y + bob * 0.45);
+            ctx.rotate(aimAngle);
             ctx.fillStyle = '#ffe2dc';
-            ctx.fillRect(tower.x - 3, tower.y - 14 + bob, 6, 10);
+            ctx.fillRect(-4, -2.8, 10.8 - recoil, 5.6);
             ctx.fillStyle = '#ff9c90';
             ctx.beginPath();
-            ctx.moveTo(tower.x, tower.y - 19 + bob);
-            ctx.lineTo(tower.x + 4, tower.y - 12 + bob);
-            ctx.lineTo(tower.x - 4, tower.y - 12 + bob);
+            ctx.moveTo(7.8 - recoil, 0);
+            ctx.lineTo(2.4, 3.2);
+            ctx.lineTo(2.4, -3.2);
             ctx.closePath();
             ctx.fill();
+            ctx.restore();
             ctx.fillStyle = 'rgba(255, 208, 170, 0.7)';
-            ctx.fillRect(tower.x - 1.3, tower.y - 9 + bob, 2.6, 5);
+            ctx.beginPath();
+            ctx.arc(tower.x - Math.cos(aimAngle) * 2.8, tower.y - Math.sin(aimAngle) * 2.8 + bob * 0.45, 1.7, 0, Math.PI * 2);
+            ctx.fill();
         } else if (tower.type === 'relay') {
             ctx.fillStyle = '#d6ffbe';
             ctx.beginPath();
@@ -3228,6 +3263,15 @@ function tdDraw() {
             ctx.lineTo(tower.x + Math.cos(spin + 4.18) * 8, tower.y + Math.sin(spin + 4.18) * 8);
             ctx.closePath();
             ctx.stroke();
+            for (let orb = 0; orb < 3; orb += 1) {
+                const t = spin + orb * (Math.PI * 2 / 3);
+                const ox = tower.x + Math.cos(t) * 11.5;
+                const oy = tower.y + Math.sin(t) * 11.5;
+                ctx.fillStyle = 'rgba(214, 255, 190, 0.7)';
+                ctx.beginPath();
+                ctx.arc(ox, oy, 1.8, 0, Math.PI * 2);
+                ctx.fill();
+            }
         } else if (tower.type === 'investment') {
             ctx.fillStyle = '#fff0be';
             ctx.beginPath();
@@ -3237,6 +3281,11 @@ function tdDraw() {
             ctx.strokeRect(tower.x - 7, tower.y - 7 + bob, 14, 14);
             ctx.fillStyle = 'rgba(255, 226, 142, 0.7)';
             ctx.fillRect(tower.x - 0.8, tower.y - 11 + bob, 1.6, 8);
+            const blink = 0.4 + 0.6 * Math.max(0, Math.sin(td.frameClock * 6 + tower.id));
+            ctx.fillStyle = `rgba(255, 232, 150, ${0.35 * blink})`;
+            ctx.beginPath();
+            ctx.arc(tower.x, tower.y + bob * 0.2, 9.8, 0, Math.PI * 2);
+            ctx.fill();
         } else {
             ctx.fillStyle = '#d8e9ff';
             ctx.beginPath();
