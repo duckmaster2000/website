@@ -47,89 +47,95 @@
                 <button id="tdRangeBtn" type="button">Ranges: ON</button>
             </div>
 
-            <div class="td-wave-panel panel-lite">
-                <p><strong>Incoming Wave Panel</strong></p>
-                <div class="td-incoming-list" id="tdIncomingList"></div>
-            </div>
+            <div class="td-layout">
+                <div class="td-battle-zone">
+                    <div class="td-tower-types" id="tdTowerTypes">
+                        <button class="td-type active" data-td-type="laser" type="button">Laser Tower</button>
+                        <button class="td-type" data-td-type="cannon" type="button">Cannon Tower</button>
+                        <button class="td-type" data-td-type="frost" type="button">Frost Tower</button>
+                        <button class="td-type" data-td-type="tesla" type="button">Tesla Tower</button>
+                        <button class="td-type" data-td-type="missile" type="button">Missile Tower</button>
+                        <button class="td-type" data-td-type="relay" type="button">Relay Tower</button>
+                        <button class="td-type" data-td-type="investment" type="button">Venture Tower</button>
+                    </div>
 
-            <div class="td-enemy-panel panel-lite">
-                <p><strong>Enemy Vulnerability Intel</strong></p>
-                <div class="td-enemy-legend" id="tdEnemyLegend">
-                    <button data-td-enemy="scout" type="button">Scout</button>
-                    <button data-td-enemy="runner" type="button">Runner</button>
-                    <button data-td-enemy="flyer" type="button">Flyer</button>
-                    <button data-td-enemy="bulwark" type="button">Bulwark</button>
-                    <button data-td-enemy="shield" type="button">Shield</button>
-                    <button data-td-enemy="boss" type="button">Boss</button>
+                    <div class="td-active panel-lite">
+                        <p><strong>Active Participation</strong></p>
+                        <div class="td-active-controls">
+                            <button id="tdTrapBtn" type="button">Place Mine Trap (18)</button>
+                            <button id="tdDashBtn" type="button">Pilot Dash (32)</button>
+                        </div>
+                        <div class="terminal-feedback" id="tdActiveHint">Click the battlefield after choosing an active ability target.</div>
+                    </div>
+
+                    <div class="td-upgrade-panel">
+                        <p id="tdSelectedLabel">Select a tower on the grid to upgrade it.</p>
+                        <div class="td-upgrade-actions">
+                            <button id="tdUpgradeA" type="button">Path A Upgrade</button>
+                            <button id="tdUpgradeB" type="button">Path B Upgrade</button>
+                            <button id="tdTargetBtn" type="button">Target Priority: n/a</button>
+                            <button id="tdSellTower" type="button">Sell Tower</button>
+                        </div>
+                    </div>
+
+                    <canvas id="tdCanvas" width="560" height="220" aria-label="Tower defense arena"></canvas>
+                    <p class="td-help">Build combos: Frost sets up Laser bonus damage, Tesla strips armor for Cannon/Missile burst, and Missile is your anti-air answer for flying waves.</p>
+                    <div class="terminal-feedback" id="tdMapLabel">Map: Serpent Corridor</div>
+                    <div class="terminal-feedback" id="tdWaveIntel">Next Wave 1: scout pressure | Stable prediction</div>
+                    <div class="terminal-feedback" id="tdMutator">Mutator: Stable Orbit</div>
+                    <div class="terminal-feedback" id="tdFeedback">Defense bay idle.</div>
                 </div>
-                <div class="terminal-feedback" id="tdEnemyTooltip">Hover an enemy chip to see weaknesses and recommended counters.</div>
-            </div>
 
-            <div class="td-difficulty" id="tdDifficultyModes">
-                <button class="td-difficulty-btn" data-td-difficulty="easy" type="button">Easy</button>
-                <button class="td-difficulty-btn active" data-td-difficulty="medium" type="button">Medium</button>
-                <button class="td-difficulty-btn" data-td-difficulty="hard" type="button">Hard</button>
-                <button class="td-difficulty-btn" data-td-difficulty="veryhard" type="button">Very Hard</button>
-                <button class="td-difficulty-btn" data-td-difficulty="insane" type="button">Insane</button>
-            </div>
+                <aside class="td-support-zone">
+                    <div class="td-difficulty" id="tdDifficultyModes">
+                        <button class="td-difficulty-btn" data-td-difficulty="easy" type="button">Easy</button>
+                        <button class="td-difficulty-btn active" data-td-difficulty="medium" type="button">Medium</button>
+                        <button class="td-difficulty-btn" data-td-difficulty="hard" type="button">Hard</button>
+                        <button class="td-difficulty-btn" data-td-difficulty="veryhard" type="button">Very Hard</button>
+                        <button class="td-difficulty-btn" data-td-difficulty="insane" type="button">Insane</button>
+                    </div>
 
-            <div class="td-mode-row" id="tdModeRow">
-                <button class="td-mode-btn active" data-td-mode="classic" type="button">Classic</button>
-                <button class="td-mode-btn" data-td-mode="endless" type="button">Endless</button>
-                <button class="td-mode-btn" data-td-mode="mutator" type="button">Mutator Rush</button>
-                <button class="td-mode-btn" data-td-mode="maze" type="button">Maze Mode</button>
-            </div>
+                    <div class="td-mode-row" id="tdModeRow">
+                        <button class="td-mode-btn active" data-td-mode="classic" type="button">Classic</button>
+                        <button class="td-mode-btn" data-td-mode="endless" type="button">Endless</button>
+                        <button class="td-mode-btn" data-td-mode="mutator" type="button">Mutator Rush</button>
+                        <button class="td-mode-btn" data-td-mode="maze" type="button">Maze Mode</button>
+                    </div>
 
-            <div class="td-tower-types" id="tdTowerTypes">
-                <button class="td-type active" data-td-type="laser" type="button">Laser Tower</button>
-                <button class="td-type" data-td-type="cannon" type="button">Cannon Tower</button>
-                <button class="td-type" data-td-type="frost" type="button">Frost Tower</button>
-                <button class="td-type" data-td-type="tesla" type="button">Tesla Tower</button>
-                <button class="td-type" data-td-type="missile" type="button">Missile Tower</button>
-                <button class="td-type" data-td-type="relay" type="button">Relay Tower</button>
-                <button class="td-type" data-td-type="investment" type="button">Venture Tower</button>
-            </div>
+                    <div class="td-wave-panel panel-lite">
+                        <p><strong>Incoming Wave Panel</strong></p>
+                        <div class="td-incoming-list" id="tdIncomingList"></div>
+                    </div>
 
-            <div class="td-meta panel-lite">
-                <p><strong>Research Lab</strong> | Meta Points: <strong id="tdMetaPoints">0</strong></p>
-                <div class="td-meta-modes" id="tdMetaModes">
-                    <button data-td-tech="control" type="button">Control Lab Lv0 -> 1 (1 pts)</button>
-                    <button data-td-tech="burst" type="button">Siege Lab Lv0 -> 1 (1 pts)</button>
-                    <button data-td-tech="economy" type="button">Venture Lab Lv0 -> 1 (1 pts)</button>
-                </div>
-                <div class="terminal-feedback" id="tdMetaStatus">Complete runs to earn persistent meta points.</div>
-            </div>
+                    <div class="td-enemy-panel panel-lite">
+                        <p><strong>Enemy Vulnerability Intel</strong></p>
+                        <div class="td-enemy-legend" id="tdEnemyLegend">
+                            <button data-td-enemy="scout" type="button">Scout</button>
+                            <button data-td-enemy="runner" type="button">Runner</button>
+                            <button data-td-enemy="flyer" type="button">Flyer</button>
+                            <button data-td-enemy="bulwark" type="button">Bulwark</button>
+                            <button data-td-enemy="shield" type="button">Shield</button>
+                            <button data-td-enemy="boss" type="button">Boss</button>
+                        </div>
+                        <div class="terminal-feedback" id="tdEnemyTooltip">Hover an enemy chip to see weaknesses and recommended counters.</div>
+                    </div>
 
-            <div class="td-objectives panel-lite">
-                <p><strong>Bonus Objectives</strong></p>
-                <div class="td-objective-list" id="tdObjectiveList"></div>
-            </div>
+                    <div class="td-objectives panel-lite">
+                        <p><strong>Bonus Objectives</strong></p>
+                        <div class="td-objective-list" id="tdObjectiveList"></div>
+                    </div>
 
-            <div class="td-active panel-lite">
-                <p><strong>Active Participation</strong></p>
-                <div class="td-active-controls">
-                    <button id="tdTrapBtn" type="button">Place Mine Trap (18)</button>
-                    <button id="tdDashBtn" type="button">Pilot Dash (32)</button>
-                </div>
-                <div class="terminal-feedback" id="tdActiveHint">Click the battlefield after choosing an active ability target.</div>
-            </div>
-
-            <div class="td-upgrade-panel">
-                <p id="tdSelectedLabel">Select a tower on the grid to upgrade it.</p>
-                <div class="td-upgrade-actions">
-                    <button id="tdUpgradeA" type="button">Path A Upgrade</button>
-                    <button id="tdUpgradeB" type="button">Path B Upgrade</button>
-                    <button id="tdTargetBtn" type="button">Target Priority: n/a</button>
-                    <button id="tdSellTower" type="button">Sell Tower</button>
+                    <div class="td-meta panel-lite">
+                        <p><strong>Research Lab</strong> | Meta Points: <strong id="tdMetaPoints">0</strong></p>
+                        <div class="td-meta-modes" id="tdMetaModes">
+                            <button data-td-tech="control" type="button">Control Lab Lv0 -> 1 (1 pts)</button>
+                            <button data-td-tech="burst" type="button">Siege Lab Lv0 -> 1 (1 pts)</button>
+                            <button data-td-tech="economy" type="button">Venture Lab Lv0 -> 1 (1 pts)</button>
+                        </div>
+                        <div class="terminal-feedback" id="tdMetaStatus">Complete runs to earn persistent meta points.</div>
+                    </div>
                 </div>
             </div>
-
-            <canvas id="tdCanvas" width="560" height="220" aria-label="Tower defense arena"></canvas>
-            <p class="td-help">Build combos: Frost sets up Laser bonus damage, Tesla strips armor for Cannon/Missile burst, and Missile is your anti-air answer for flying waves.</p>
-            <div class="terminal-feedback" id="tdMapLabel">Map: Serpent Corridor</div>
-            <div class="terminal-feedback" id="tdWaveIntel">Next Wave 1: scout pressure | Stable prediction</div>
-            <div class="terminal-feedback" id="tdMutator">Mutator: Stable Orbit</div>
-            <div class="terminal-feedback" id="tdFeedback">Defense bay idle.</div>
         </section>
     </main>
 

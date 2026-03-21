@@ -546,9 +546,11 @@ const td = {
     intervalId: null,
     secondId: null,
     uidSeed: 1,
-    frameClock: 0
-    ,showRanges: true,
+    frameClock: 0,
+    showRanges: true,
     hoverCell: null,
+    cursorX: null,
+    cursorY: null,
     shakeTime: 0,
     shakePower: 0,
     audioCtx: null,
@@ -2872,11 +2874,13 @@ function tdUpdate(delta) {
 
     td.towers.forEach((tower) => {
         const stats = tdTowerStats(tower);
+        tower.flash = Math.max(0, (tower.flash || 0) - simDelta * 5.2);
         tower.cooldown -= simDelta;
         if (tower.cooldown > 0) return;
 
         if (tower.type === 'investment') {
             tower.cooldown = stats.fireRate;
+            tower.flash = 0.6;
             td.energy += stats.ventureEnergy;
             addGems(stats.ventureGems);
             if (Math.random() < stats.ventureTokenChance) {
@@ -2891,6 +2895,7 @@ function tdUpdate(delta) {
         if (!target) return;
 
         tower.cooldown = stats.fireRate;
+        tower.flash = 1;
         td.shots.push({
             x: tower.x,
             y: tower.y,
@@ -3084,6 +3089,14 @@ function tdDraw() {
     ctx.fillStyle = 'rgba(132, 208, 255, 0.08)';
     ctx.fillRect(scanX, 0, 38, td.height);
 
+    if (Number.isFinite(td.cursorX) && Number.isFinite(td.cursorY)) {
+        const spotlight = ctx.createRadialGradient(td.cursorX, td.cursorY, 12, td.cursorX, td.cursorY, 95);
+        spotlight.addColorStop(0, 'rgba(149, 255, 216, 0.14)');
+        spotlight.addColorStop(1, 'rgba(149, 255, 216, 0)');
+        ctx.fillStyle = spotlight;
+        ctx.fillRect(0, 0, td.width, td.height);
+    }
+
     for (let r = 0; r < td.rows; r += 1) {
         const y = r * td.cell;
         for (let c = 0; c < td.cols; c += 1) {
@@ -3115,6 +3128,15 @@ function tdDraw() {
             ctx.lineTo(route[i].x, route[i].y);
         }
         ctx.stroke();
+
+        if (idx === 0) {
+            const pulseIdx = Math.floor((td.frameClock * 3.1) % (route.length - 1)) + 1;
+            const p = route[pulseIdx];
+            ctx.fillStyle = 'rgba(255, 216, 162, 0.7)';
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 3.2, 0, Math.PI * 2);
+            ctx.fill();
+        }
     });
     ctx.lineWidth = 1;
 
@@ -3122,56 +3144,120 @@ function tdDraw() {
         const color = TOWER_TYPES[tower.type].color;
         const selected = tower.id === td.selectedTowerId;
         const hovered = td.hoverCell && tower.col === td.hoverCell.col && tower.row === td.hoverCell.row;
+        const bob = Math.sin(td.frameClock * 4 + tower.id * 0.37) * 1.1;
+        const spin = td.frameClock * 2.2 + tower.id * 0.3;
+
+        // Platform and energy ring
+        ctx.fillStyle = 'rgba(8, 16, 28, 0.84)';
+        ctx.beginPath();
+        ctx.arc(tower.x, tower.y, 11, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = hovered ? 'rgba(153, 244, 255, 0.7)' : 'rgba(153, 224, 255, 0.28)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(tower.x, tower.y, 11.5, 0, Math.PI * 2);
+        ctx.stroke();
+
+        const coreGlow = ctx.createRadialGradient(tower.x, tower.y, 2, tower.x, tower.y, 15);
+        coreGlow.addColorStop(0, 'rgba(255, 255, 255, 0.42)');
+        coreGlow.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        ctx.fillStyle = coreGlow;
+        ctx.beginPath();
+        ctx.arc(tower.x, tower.y, 15, 0, Math.PI * 2);
+        ctx.fill();
 
         ctx.fillStyle = color;
-        ctx.fillRect(tower.x - 9, tower.y - 9, 18, 18);
+        ctx.beginPath();
+        ctx.arc(tower.x, tower.y + bob * 0.25, 7.8, 0, Math.PI * 2);
+        ctx.fill();
 
         if (tower.type === 'laser') {
+            const pulse = 1 + Math.sin(td.frameClock * 12 + tower.id) * 0.12;
             ctx.fillStyle = '#d8fcff';
-            ctx.fillRect(tower.x - 2, tower.y - 13, 4, 8);
+            ctx.fillRect(tower.x - 2 * pulse, tower.y - 13 + bob, 4 * pulse, 9);
+            ctx.strokeStyle = 'rgba(188, 251, 255, 0.85)';
+            ctx.beginPath();
+            ctx.moveTo(tower.x, tower.y - 14 + bob);
+            ctx.lineTo(tower.x + Math.cos(spin) * 8, tower.y - 18 + bob);
+            ctx.stroke();
         } else if (tower.type === 'cannon') {
             ctx.fillStyle = '#ffe4b0';
-            ctx.fillRect(tower.x - 6, tower.y - 12, 12, 6);
+            ctx.fillRect(tower.x - 6, tower.y - 12 + bob, 12, 6);
+            ctx.fillStyle = '#ffd08c';
+            ctx.fillRect(tower.x - 2, tower.y - 16 + bob, 4, 5);
         } else if (tower.type === 'tesla') {
             ctx.fillStyle = '#f1e7ff';
             ctx.beginPath();
-            ctx.moveTo(tower.x, tower.y - 14);
-            ctx.lineTo(tower.x + 4, tower.y - 6);
-            ctx.lineTo(tower.x - 1, tower.y - 6);
-            ctx.lineTo(tower.x + 2, tower.y + 1);
-            ctx.lineTo(tower.x - 6, tower.y - 6);
-            ctx.lineTo(tower.x - 2, tower.y - 6);
+            ctx.moveTo(tower.x, tower.y - 15 + bob);
+            ctx.lineTo(tower.x + 4, tower.y - 7 + bob);
+            ctx.lineTo(tower.x - 1, tower.y - 7 + bob);
+            ctx.lineTo(tower.x + 2, tower.y + 1 + bob);
+            ctx.lineTo(tower.x - 6, tower.y - 7 + bob);
+            ctx.lineTo(tower.x - 2, tower.y - 7 + bob);
             ctx.closePath();
             ctx.fill();
+            ctx.strokeStyle = 'rgba(221, 198, 255, 0.8)';
+            ctx.beginPath();
+            ctx.arc(tower.x, tower.y + bob * 0.4, 10 + Math.sin(td.frameClock * 8 + tower.id) * 1.5, 0, Math.PI * 2);
+            ctx.stroke();
         } else if (tower.type === 'missile') {
             ctx.fillStyle = '#ffe2dc';
-            ctx.fillRect(tower.x - 3, tower.y - 14, 6, 10);
+            ctx.fillRect(tower.x - 3, tower.y - 14 + bob, 6, 10);
             ctx.fillStyle = '#ff9c90';
             ctx.beginPath();
-            ctx.moveTo(tower.x, tower.y - 18);
-            ctx.lineTo(tower.x + 4, tower.y - 12);
-            ctx.lineTo(tower.x - 4, tower.y - 12);
+            ctx.moveTo(tower.x, tower.y - 19 + bob);
+            ctx.lineTo(tower.x + 4, tower.y - 12 + bob);
+            ctx.lineTo(tower.x - 4, tower.y - 12 + bob);
             ctx.closePath();
             ctx.fill();
+            ctx.fillStyle = 'rgba(255, 208, 170, 0.7)';
+            ctx.fillRect(tower.x - 1.3, tower.y - 9 + bob, 2.6, 5);
         } else if (tower.type === 'relay') {
             ctx.fillStyle = '#d6ffbe';
             ctx.beginPath();
-            ctx.moveTo(tower.x, tower.y - 13);
-            ctx.lineTo(tower.x + 8, tower.y);
-            ctx.lineTo(tower.x, tower.y + 13);
-            ctx.lineTo(tower.x - 8, tower.y);
+            ctx.moveTo(tower.x, tower.y - 13 + bob);
+            ctx.lineTo(tower.x + 8, tower.y + bob);
+            ctx.lineTo(tower.x, tower.y + 13 + bob);
+            ctx.lineTo(tower.x - 8, tower.y + bob);
             ctx.closePath();
             ctx.fill();
+            ctx.strokeStyle = 'rgba(214, 255, 190, 0.7)';
+            ctx.beginPath();
+            ctx.moveTo(tower.x + Math.cos(spin) * 4, tower.y + Math.sin(spin) * 4);
+            ctx.lineTo(tower.x + Math.cos(spin + 2.09) * 8, tower.y + Math.sin(spin + 2.09) * 8);
+            ctx.lineTo(tower.x + Math.cos(spin + 4.18) * 8, tower.y + Math.sin(spin + 4.18) * 8);
+            ctx.closePath();
+            ctx.stroke();
+        } else if (tower.type === 'investment') {
+            ctx.fillStyle = '#fff0be';
+            ctx.beginPath();
+            ctx.arc(tower.x, tower.y - 3 + bob, 5.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(255, 226, 142, 0.9)';
+            ctx.strokeRect(tower.x - 7, tower.y - 7 + bob, 14, 14);
+            ctx.fillStyle = 'rgba(255, 226, 142, 0.7)';
+            ctx.fillRect(tower.x - 0.8, tower.y - 11 + bob, 1.6, 8);
         } else {
             ctx.fillStyle = '#d8e9ff';
             ctx.beginPath();
-            ctx.arc(tower.x, tower.y - 5, 5, 0, Math.PI * 2);
+            ctx.arc(tower.x, tower.y - 5 + bob, 5, 0, Math.PI * 2);
             ctx.fill();
         }
 
         if (selected) {
             ctx.strokeStyle = '#ffffff';
             ctx.strokeRect(tower.x - 12, tower.y - 12, 24, 24);
+        }
+
+        if ((tower.flash || 0) > 0.01) {
+            const alpha = Math.min(0.72, tower.flash * 0.62);
+            const flare = ctx.createRadialGradient(tower.x, tower.y, 3, tower.x, tower.y, 24);
+            flare.addColorStop(0, `rgba(255, 255, 255, ${alpha})`);
+            flare.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            ctx.fillStyle = flare;
+            ctx.beginPath();
+            ctx.arc(tower.x, tower.y, 24, 0, Math.PI * 2);
+            ctx.fill();
         }
 
         if (td.showRanges && (selected || hovered)) {
@@ -3202,6 +3288,10 @@ function tdDraw() {
         const tType = TOWER_TYPES[td.selectedTowerType];
         const ghostX = td.hoverCell.col * td.cell + td.cell / 2;
         const ghostY = td.hoverCell.row * td.cell + td.cell / 2;
+        ctx.fillStyle = 'rgba(154, 238, 255, 0.09)';
+        ctx.fillRect(td.hoverCell.col * td.cell + 1, td.hoverCell.row * td.cell + 1, td.cell - 2, td.cell - 2);
+        ctx.strokeStyle = 'rgba(154, 238, 255, 0.34)';
+        ctx.strokeRect(td.hoverCell.col * td.cell + 1.5, td.hoverCell.row * td.cell + 1.5, td.cell - 3, td.cell - 3);
         if (tType && tType.range > 0 && !tdTowerAtCell(td.hoverCell.col, td.hoverCell.row)) {
             ctx.strokeStyle = tdIsOnPath(td.hoverCell.row, td.hoverCell.col)
                 ? 'rgba(255, 140, 140, 0.55)'
@@ -3263,16 +3353,17 @@ function tdDraw() {
     });
 
     td.shots.forEach((shot) => {
+        const trailLen = 5 + Math.sin(td.frameClock * 10 + shot.x * 0.05) * 2.5;
         ctx.fillStyle = shot.color;
         ctx.beginPath();
         ctx.arc(shot.x, shot.y, 3, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
-        ctx.lineWidth = 1;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.lineWidth = 1.15;
         ctx.beginPath();
         ctx.moveTo(shot.x, shot.y);
-        ctx.lineTo(shot.x - 6, shot.y - 2);
+        ctx.lineTo(shot.x - trailLen, shot.y - 2.2);
         ctx.stroke();
     });
 
@@ -3525,6 +3616,8 @@ function tdHandleCanvasMove(evt) {
     const scaleY = td.height / rect.height;
     const x = (evt.clientX - rect.left) * scaleX;
     const y = (evt.clientY - rect.top) * scaleY;
+    td.cursorX = x;
+    td.cursorY = y;
     const col = Math.floor(x / td.cell);
     const row = Math.floor(y / td.cell);
 
@@ -3539,6 +3632,8 @@ function tdHandleCanvasMove(evt) {
 
 function tdHandleCanvasLeave() {
     td.hoverCell = null;
+    td.cursorX = null;
+    td.cursorY = null;
     tdDraw();
 }
 
@@ -3605,6 +3700,7 @@ function tdPlaceOrSelect(evt) {
         pathA: 0,
         pathB: 0,
         cooldown: 0,
+        flash: 0,
         spentEnergy: 0,
         targetMode: td.selectedTowerType === 'tesla'
             ? 'armor'
@@ -3842,7 +3938,7 @@ function boot() {
         tdDraw();
         renderTdStats();
         renderTdMeta();
-        renderSelectedTower();
+        renderSelectedTower();A
         return;
     }
 
