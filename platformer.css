@@ -1,0 +1,189 @@
+:root {
+  --bg: #0a1222;
+  --bg2: #172944;
+  --panel: rgba(10, 18, 30, 0.78);
+  --line: rgba(131, 214, 255, 0.33);
+  --text: #e8f4ff;
+  --muted: #9ec0db;
+  --accent: #83ffd4;
+  --accent2: #ffd692;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--text);
+  font-family: "Space Grotesk", "Segoe UI", sans-serif;
+  background:
+    radial-gradient(1100px 600px at 7% -6%, rgba(131, 255, 212, 0.13), transparent 60%),
+    radial-gradient(1000px 540px at 100% 0%, rgba(255, 214, 146, 0.1), transparent 58%),
+    linear-gradient(150deg, var(--bg), var(--bg2));
+}
+
+.wrap {
+  width: min(1120px, 95vw);
+  margin: 1.1rem auto 1.8rem;
+}
+
+.panel {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.34);
+  padding: 0.9rem;
+  margin-bottom: 0.8rem;
+  backdrop-filter: blur(6px);
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+}
+
+h1,
+h2 {
+  margin: 0;
+  font-family: "Orbitron", sans-serif;
+}
+
+.eyebrow {
+  margin: 0;
+  letter-spacing: 0.14em;
+  font-size: 0.72rem;
+  color: var(--accent);
+}
+
+.sub,
+.shop-sub {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+}
+
+.home-link,
+button {
+  border: 1px solid rgba(131, 214, 255, 0.55);
+  border-radius: 10px;
+  color: var(--text);
+  background: rgba(20, 35, 58, 0.9);
+  text-decoration: none;
+  padding: 0.45rem 0.72rem;
+  font-family: "Orbitron", sans-serif;
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+.hud-row {
+  display: flex;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+}
+
+.hud-row.small {
+  margin-top: 0.4rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.buffs {
+  margin-top: 0.45rem;
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.buff-chip {
+  border: 1px solid rgba(131, 255, 212, 0.5);
+  border-radius: 999px;
+  padding: 0.2rem 0.52rem;
+  font-size: 0.78rem;
+  background: rgba(19, 66, 66, 0.7);
+}
+
+.game-panel {
+  position: relative;
+  padding: 0.55rem;
+}
+
+#pfCanvas {
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  border: 1px solid rgba(131, 214, 255, 0.42);
+  background: #0a1829;
+  display: block;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0.55rem;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  text-align: center;
+  font-family: "Orbitron", sans-serif;
+  font-size: 1.6rem;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  color: #f7fbff;
+  text-shadow: 0 0 20px rgba(141, 238, 255, 0.4);
+}
+
+.overlay.show {
+  opacity: 1;
+}
+
+.shop-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.shop-list {
+  margin-top: 0.6rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.shop-item {
+  border: 1px solid rgba(131, 214, 255, 0.26);
+  border-radius: 12px;
+  background: rgba(15, 27, 44, 0.8);
+  padding: 0.52rem;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.shop-item strong {
+  display: block;
+}
+
+.shop-item p {
+  margin: 0.2rem 0 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.shop-item button[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 760px) {
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .overlay {
+    font-size: 1.2rem;
+  }
+}

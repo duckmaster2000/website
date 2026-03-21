@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Astro Platformer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Space+Grotesk:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="platformer.css" />
+</head>
+<body>
+  <main class="wrap">
+    <header class="panel topbar">
+      <div>
+        <p class="eyebrow">ULTRA PLATFORMER</p>
+        <h1>Astro Ruins Platformer</h1>
+        <p class="sub">WASD/Arrows move, Space jump, Shift dash, B open shop, R restart level.</p>
+      </div>
+      <a class="home-link" href="index.html">Back Home</a>
+    </header>
+
+    <section class="panel hud">
+      <div class="hud-row">
+        <span>Level: <strong id="pfLevel">1</strong></span>
+        <span>Health: <strong id="pfHealth">3</strong></span>
+        <span>Lives: <strong id="pfLives">3</strong></span>
+        <span>Coins (run): <strong id="pfRunCoins">0</strong></span>
+        <span>Wallet Coins: <strong id="pfWallet">0</strong></span>
+      </div>
+      <div class="hud-row small">
+        <span>Objective: <strong id="pfObjective">Collect coins and reach the portal.</strong></span>
+        <span>Status: <strong id="pfStatus">Ready</strong></span>
+      </div>
+      <div class="buffs" id="pfBuffs"></div>
+    </section>
+
+    <section class="panel game-panel">
+      <canvas id="pfCanvas" width="960" height="540" aria-label="Platformer game canvas"></canvas>
+      <div class="overlay" id="pfOverlay"></div>
+    </section>
+
+    <section class="panel shop-panel" id="pfShop" hidden>
+      <div class="shop-head">
+        <h2>Permanent Upgrade Shop</h2>
+        <button id="pfCloseShop" type="button">Close (B)</button>
+      </div>
+      <p class="shop-sub">Spend wallet coins on permanent upgrades. These persist between runs.</p>
+      <div class="shop-list" id="pfShopList"></div>
+    </section>
+  </main>
+
+  <script src="anti-inspect.js"></script>
+  <script src="platformer.js"></script>
+</body>
+</html>
