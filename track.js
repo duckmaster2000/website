@@ -34,6 +34,7 @@ let compareB = '';
 let compareEventKey = '100 M';
 let pinnedAthletes = [];
 let standards = {};
+let revealObserver = null;
 
 /* ── DOM refs ── */
 const $ = (id) => document.getElementById(id);
@@ -74,7 +75,10 @@ const el = {
   compareChartWrap: $('tkCompareChartWrap'),
   compareChartTitle: $('tkCompareChartTitle'),
   chartCompare:  $('tkChartCompare'),
-  cmpEventTabs:  $('tkCmpEventTabs')
+  cmpEventTabs:  $('tkCmpEventTabs'),
+  eventPulse:    $('tkEventPulse'),
+  powerRankings: $('tkPowerRankings'),
+  watchlist:     $('tkWatchlist')
 };
 
 /* ── Chart interactivity (hover + click stats) ── */
@@ -145,6 +149,7 @@ function showChartTooltip(clientX, clientY, html) {
 function bindCanvasInteraction(canvas) {
   if (!canvas || canvas.dataset.tkInteractiveBound === '1') return;
   canvas.dataset.tkInteractiveBound = '1';
+  canvas.classList.add('tk-interactive-canvas');
 
   canvas.addEventListener('mousemove', (e) => {
     const rect = canvas.getBoundingClientRect();
@@ -153,15 +158,18 @@ function bindCanvasInteraction(canvas) {
     const hit = getHotspotAt(canvas, x, y);
     if (!hit) {
       canvas.style.cursor = 'default';
+      canvas.classList.remove('tk-canvas-active');
       hideChartTooltip();
       return;
     }
+    canvas.classList.add('tk-canvas-active');
     canvas.style.cursor = hit.onClick ? 'pointer' : 'crosshair';
     showChartTooltip(e.clientX, e.clientY, hit.tooltip || hit.label || '');
   });
 
   canvas.addEventListener('mouseleave', () => {
     canvas.style.cursor = 'default';
+    canvas.classList.remove('tk-canvas-active');
     hideChartTooltip();
   });
 
@@ -170,12 +178,45 @@ function bindCanvasInteraction(canvas) {
     const x = ((e.clientX - rect.left) / rect.width) * canvas.width;
     const y = ((e.clientY - rect.top) / rect.height) * canvas.height;
     const hit = getHotspotAt(canvas, x, y);
+    if (hit) {
+      canvas.classList.remove('tk-canvas-pop');
+      void canvas.offsetWidth;
+      canvas.classList.add('tk-canvas-pop');
+      window.setTimeout(() => canvas.classList.remove('tk-canvas-pop'), 260);
+    }
     if (hit && typeof hit.onClick === 'function') hit.onClick();
   });
 }
 
 function bindStaticChartInteractions() {
   [el.chartTop10, el.chartGrade, el.chartHist, el.chartPie, el.chartProgress, el.chartCompare].forEach(bindCanvasInteraction);
+}
+
+function setupRevealObserver() {
+  if (revealObserver || !('IntersectionObserver' in window)) return;
+  revealObserver = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) entry.target.classList.add('is-visible');
+    });
+  }, { threshold: 0.15 });
+}
+
+function applyRevealAnimation(scope = document) {
+  setupRevealObserver();
+  const targets = scope.querySelectorAll('.tk-card,.tk-chart-wrap,.tk-table-wrap,.tk-insight-card,.tk-pinned-card,.tk-relay-card,.tk-modal-chart-card');
+  targets.forEach((node, idx) => {
+    node.classList.add('tk-reveal');
+    node.style.setProperty('--tk-delay', `${Math.min(idx * 40, 360)}ms`);
+    if (revealObserver) revealObserver.observe(node);
+    else node.classList.add('is-visible');
+  });
+}
+
+function pulseViewTransition() {
+  document.body.classList.remove('tk-view-swapping');
+  void document.body.offsetWidth;
+  document.body.classList.add('tk-view-swapping');
+  window.setTimeout(() => document.body.classList.remove('tk-view-swapping'), 480);
 }
 
 /* ── View management ── */
@@ -196,6 +237,7 @@ function switchView(view) {
     node.hidden = !visible;
   });
   document.querySelectorAll('.tk-view').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
+  pulseViewTransition();
   render();
 }
 
@@ -470,6 +512,156 @@ async function renderPinnedSection() {
     </div>`;
   }).join('');
   el.pinnedList.innerHTML = `<div class="tk-pinned-cards">${cards}</div>`;
+}
+
+async function renderEventPulse(athletes, sheetData) {
+  if (!el.eventPulse) return;
+  const timed = timedAthletes(athletes);
+  if (!sheetData || !timed.length) {
+    el.eventPulse.innerHTML = '<p class="tk-empty-msg">Not enough data for pulse insights yet.</p>';
+    return;
+  }
+
+  const gradeSummary = [6, 7, 8].map((grade) => {
+    const group = timed.filter((a) => a.grade === grade);
+    if (!group.length) return null;
+    const avg = group.reduce((sum, a) => sum + a.best, 0) / group.length;
+    return { grade, avg, count: group.length };
+  }).filter(Boolean).sort((a, b) => a.avg - b.avg);
+
+  const improvedCount = timed.filter((a) => a.improvement != null && a.improvement > 0).length;
+  const mostActive = sheetData.dateCols.map((dc) => {
+    const count = athletes.filter((a) => a.times[dc] != null).length;
+    return { date: dc, count };
+  }).sort((a, b) => b.count - a.count)[0];
+
+  const bestGrade = gradeSummary[0];
+  const improvementRate = timed.length ? ((improvedCount / timed.length) * 100) : 0;
+
+  el.eventPulse.innerHTML = `
+    <div class="tk-pulse-grid">
+      <div class="tk-pulse-item">
+        <span class="tk-pulse-label">Fastest Grade Average</span>
+        <strong>${bestGrade ? `Grade ${bestGrade.grade}` : '—'}</strong>
+        <small>${bestGrade ? `${formatTime(bestGrade.avg)} avg (${bestGrade.count} athletes)` : 'No graded data'}</small>
+      </div>
+      <div class="tk-pulse-item">
+        <span class="tk-pulse-label">Improvement Rate</span>
+        <strong>${improvementRate.toFixed(1)}%</strong>
+        <small>${improvedCount} of ${timed.length} timed athletes are trending faster</small>
+      </div>
+      <div class="tk-pulse-item">
+        <span class="tk-pulse-label">Most Active Date</span>
+        <strong>${mostActive?.date || '—'}</strong>
+        <small>${mostActive ? `${mostActive.count} recorded marks` : 'No mark density yet'}</small>
+      </div>
+    </div>`;
+}
+
+async function renderPowerRankings() {
+  if (!el.powerRankings) return;
+  const athleteMap = {};
+
+  for (const sheet of SHEETS) {
+    const data = await fetchSheet(sheet.key);
+    if (!data) continue;
+    const timed = timedAthletes(processData(data)).sort((a, b) => a.best - b.best);
+    timed.forEach((athlete, index) => {
+      if (!athleteMap[athlete.name]) {
+        athleteMap[athlete.name] = { name: athlete.name, grade: athlete.grade, scores: [], events: 0 };
+      }
+      const score = timed.length === 1 ? 100 : ((timed.length - 1 - index) / (timed.length - 1)) * 100;
+      athleteMap[athlete.name].scores.push(score);
+      athleteMap[athlete.name].events += 1;
+    });
+  }
+
+  const rankings = Object.values(athleteMap)
+    .filter((a) => a.events > 0)
+    .map((a) => ({
+      ...a,
+      rating: a.scores.reduce((sum, v) => sum + v, 0) / a.scores.length
+    }))
+    .sort((a, b) => {
+      if (b.rating !== a.rating) return b.rating - a.rating;
+      if (b.events !== a.events) return b.events - a.events;
+      return a.name.localeCompare(b.name);
+    })
+    .slice(0, 10);
+
+  if (!rankings.length) {
+    el.powerRankings.innerHTML = '<p class="tk-empty-msg">No timed data yet across events.</p>';
+    return;
+  }
+
+  const rows = rankings.map((athlete, idx) => `
+    <tr>
+      <td>${idx + 1}</td>
+      <td><span class="tk-clickable" data-athlete="${encodeURIComponent(athlete.name)}">${athlete.name}</span></td>
+      <td class="tk-grade-${athlete.grade}">${athlete.grade}</td>
+      <td>${athlete.events}</td>
+      <td>${athlete.rating.toFixed(1)}</td>
+    </tr>`).join('');
+
+  el.powerRankings.innerHTML = `
+    <div class="tk-insight-table-wrap">
+      <table class="tk-insight-table">
+        <thead><tr><th>#</th><th>Athlete</th><th>Grade</th><th>Events</th><th>Rating</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <p class="tk-insight-note">Rating is the average percentile score across all timed events (higher is better).</p>`;
+}
+
+function renderWatchlist(athletes) {
+  if (!el.watchlist) return;
+  const sheetStandards = standards[currentSheet] || {};
+  const levels = [
+    { key: 'state', label: 'State' },
+    { key: 'regionals', label: 'Regionals' },
+    { key: 'conference', label: 'Conference' }
+  ].map((level) => ({
+    ...level,
+    threshold: parseTimeStr(sheetStandards[level.key])
+  })).filter((level) => level.threshold != null).sort((a, b) => a.threshold - b.threshold);
+
+  if (!levels.length) {
+    el.watchlist.innerHTML = '<p class="tk-empty-msg">Set standards in the Standards tab to unlock who is close.</p>';
+    return;
+  }
+
+  const watch = timedAthletes(athletes).map((athlete) => {
+    const gaps = levels
+      .map((level) => ({
+        ...level,
+        gap: athlete.best - level.threshold
+      }))
+      .filter((item) => item.gap > 0);
+    if (!gaps.length) return null;
+    const next = gaps.sort((a, b) => a.gap - b.gap)[0];
+    return {
+      name: athlete.name,
+      grade: athlete.grade,
+      level: next.label,
+      gap: next.gap,
+      pct: (next.gap / next.threshold) * 100,
+      best: athlete.best
+    };
+  }).filter(Boolean)
+    .filter((row) => row.pct <= 3.5)
+    .sort((a, b) => a.pct - b.pct)
+    .slice(0, 8);
+
+  if (!watch.length) {
+    el.watchlist.innerHTML = `<p class="tk-empty-msg">No athletes are within 3.5% of the next ${currentSheet} standard right now.</p>`;
+    return;
+  }
+
+  el.watchlist.innerHTML = `<div class="tk-watchlist">${watch.map((row) => `
+    <button class="tk-watch-chip" data-athlete="${encodeURIComponent(row.name)}">
+      <span class="tk-watch-name tk-grade-${row.grade}">${row.name}</span>
+      <span class="tk-watch-meta">${row.level}: +${row.gap.toFixed(2)}s (${row.pct.toFixed(2)}%)</span>
+    </button>`).join('')}</div>`;
 }
 
 /* ── Athletes overview (cross-event table) ── */
@@ -938,6 +1130,7 @@ async function showAthleteModal(name) {
     const canvas = document.getElementById(`tkModalChart${idx}`);
     drawModalEventChart(canvas, b, name);
   });
+  applyRevealAnimation(el.modalContent);
 }
 
 function drawModalEventChart(canvas, bundle, athleteName) {
@@ -1310,9 +1503,13 @@ async function render() {
     drawPie(allAthletes);
     populateAthleteSelect(filtered);
     drawProgress(filtered, data);
+    await renderEventPulse(filtered, data);
+    await renderPowerRankings();
+    renderWatchlist(filtered);
     await renderPinnedSection();
   }
 
+  applyRevealAnimation(document);
   el.loading.classList.add('hidden');
 }
 
@@ -1372,6 +1569,11 @@ function bindEvents() {
     if (link) { showAthleteModal(decodeURIComponent(link.dataset.athlete)); return; }
     const qualChip = e.target.closest('.tk-qual-chip');
     if (qualChip) { showAthleteModal(decodeURIComponent(qualChip.dataset.athlete)); return; }
+    const watchChip = e.target.closest('[data-athlete]');
+    if (watchChip && watchChip.classList.contains('tk-watch-chip')) {
+      showAthleteModal(decodeURIComponent(watchChip.dataset.athlete));
+      return;
+    }
   });
 
   // Athlete select (progress chart)
@@ -1435,6 +1637,7 @@ async function boot() {
   loadStandards();
   bindEvents();
   bindStaticChartInteractions();
+  applyRevealAnimation(document);
 
   // Start with dashboard view active
   switchView('dashboard');
