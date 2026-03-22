@@ -348,3 +348,213 @@ body{
   .tk-chart-full{padding:.85rem .6rem}
   .tk-search{width:160px}
 }
+
+/* ── View navigation ── */
+[hidden]{display:none!important}
+.tk-views{
+  display:flex;justify-content:center;gap:.5rem;
+  padding:.8rem 1rem;flex-wrap:wrap;
+  background:rgba(11,22,40,.6);
+  border-bottom:1px solid rgba(100,180,255,.08);
+  position:sticky;top:0;z-index:50;
+}
+.tk-view{
+  font-size:.84rem;font-weight:600;
+  padding:.5rem 1rem;
+  border:1px solid rgba(100,180,255,.14);
+  border-radius:20px;background:transparent;
+  color:#8fb8dc;cursor:pointer;transition:all .2s;
+}
+.tk-view:hover{color:#c4e3ff;border-color:rgba(100,180,255,.3)}
+.tk-view.active{
+  background:rgba(110,198,255,.14);border-color:#6ec6ff;
+  color:#fff;box-shadow:0 0 14px rgba(110,198,255,.18);
+}
+
+/* ── Panel layout ── */
+.tk-view-panel{max-width:1120px;margin:.8rem auto;padding:0 1.2rem}
+.tk-panel-header{margin-bottom:1rem}
+.tk-panel-header h2{
+  font-family:'Orbitron',sans-serif;font-size:1rem;
+  color:#8fb8dc;margin-bottom:.4rem;
+}
+.tk-panel-desc{font-size:.85rem;color:#6a8dbb;line-height:1.5}
+.tk-panel-desc-sm{font-size:.78rem;color:#556a88;margin-top:.25rem}
+.tk-panel-desc code{font-size:.8rem;background:rgba(110,198,255,.1);padding:0 .3rem;border-radius:3px}
+
+/* ── Table header + legend ── */
+.tk-table-header-row{
+  display:flex;align-items:flex-start;justify-content:space-between;
+  flex-wrap:wrap;gap:.5rem;margin-bottom:.5rem;
+}
+.tk-legend{
+  font-size:.75rem;color:#6a8dbb;
+  display:flex;align-items:center;gap:.45rem;flex-wrap:wrap;
+}
+.tk-legend-pr{
+  background:rgba(126,232,255,.13);border-radius:3px;
+  padding:1px 5px;font-weight:700;color:#7ee8ff;font-size:.72rem;
+}
+
+/* ── Standard badges ── */
+.tk-std-badge{
+  display:inline-block;font-size:.64rem;font-weight:700;
+  padding:.1rem .32rem;border-radius:3px;
+  line-height:1.4;vertical-align:middle;margin-left:.2rem;
+}
+.tk-std-conf{background:rgba(205,127,50,.22);color:#cd7f32;border:1px solid rgba(205,127,50,.4)}
+.tk-std-reg {background:rgba(192,192,192,.18);color:#c0c0c0;border:1px solid rgba(192,192,192,.4)}
+.tk-std-state{background:rgba(255,215,0,.18);color:#ffd700;border:1px solid rgba(255,215,0,.4)}
+
+/* ── Qualification star + pin ── */
+.tk-qual-star{font-size:.8rem;margin-left:.25rem;vertical-align:middle;line-height:1}
+.tk-pin{
+  background:none;border:none;cursor:pointer;
+  font-size:.95rem;color:#556a88;padding:0 .15rem;
+  line-height:1;transition:color .18s,transform .15s;vertical-align:middle;
+}
+.tk-pin:hover{color:#ffd700;transform:scale(1.2)}
+.tk-pin.pinned{color:#ffd700}
+
+/* ── Delta colors ── */
+.tk-delta-pos{color:#85e89d;font-size:.8rem}
+.tk-delta-neg{color:#f97b6b;font-size:.8rem}
+
+/* ── Pinned section ── */
+.tk-pinned-section{max-width:1120px;margin:.8rem auto;padding:0 1.2rem 1rem}
+.tk-pinned-section h2{
+  font-family:'Orbitron',sans-serif;font-size:.92rem;
+  color:#8fb8dc;margin-bottom:.6rem;
+}
+.tk-pinned-cards{display:flex;flex-wrap:wrap;gap:.75rem}
+.tk-pinned-card{
+  background:rgba(14,28,52,.9);border:1px solid rgba(100,180,255,.1);
+  border-radius:8px;padding:.75rem 1rem;min-width:180px;font-size:.82rem;
+}
+.tk-pinned-name{font-weight:700;margin-bottom:.2rem}
+.tk-pinned-grade{font-size:.74rem;margin-bottom:.2rem}
+.tk-pinned-time{font-family:'Orbitron',sans-serif;font-size:.82rem;margin-bottom:.3rem}
+.tk-pinned-imp{color:#85e89d;font-size:.74rem;margin-bottom:.3rem}
+
+/* ── Athletes overview table ── */
+.tk-ath-table{width:100%;border-collapse:collapse;font-size:.8rem}
+.tk-ath-table th{
+  position:sticky;top:0;background:#0b1628;color:#7ee8ff;
+  font-weight:700;padding:.5rem .6rem;text-align:left;
+  cursor:pointer;user-select:none;white-space:nowrap;
+  border-bottom:1px solid rgba(100,180,255,.12);
+}
+.tk-ath-table td{
+  padding:.42rem .6rem;
+  border-bottom:1px solid rgba(100,180,255,.05);
+  white-space:nowrap;
+}
+.tk-ath-table tbody tr:hover{background:rgba(110,198,255,.05)}
+
+/* ── Relay view ── */
+.tk-relay-controls{margin-bottom:1rem}
+.tk-relay-card{
+  background:rgba(14,28,52,.85);border:1px solid rgba(100,180,255,.1);
+  border-radius:8px;padding:1rem 1.2rem;margin-bottom:.85rem;
+}
+.tk-relay-card h3{
+  font-family:'Orbitron',sans-serif;font-size:.88rem;
+  color:#8fb8dc;margin-bottom:.7rem;
+}
+.tk-relay-runner{
+  display:flex;gap:.75rem;align-items:center;
+  padding:.35rem 0;border-bottom:1px solid rgba(100,180,255,.05);
+  font-size:.83rem;flex-wrap:wrap;
+}
+.tk-relay-runner:last-of-type{border-bottom:none}
+.tk-relay-leg{width:44px;font-weight:700;color:#a78bfa;font-size:.75rem;flex-shrink:0}
+.tk-relay-name{flex:1;font-weight:600}
+.tk-relay-grade{color:#556a88;font-size:.75rem}
+.tk-relay-split{font-family:'Orbitron',sans-serif;font-size:.8rem;color:#7ee8ff;margin-left:auto}
+.tk-relay-total{
+  display:flex;gap:1.5rem;flex-wrap:wrap;
+  margin-top:.65rem;padding-top:.5rem;
+  border-top:1px solid rgba(100,180,255,.1);
+  font-size:.8rem;color:#8fb8dc;
+}
+.tk-relay-total strong{color:#7ee8ff;font-family:'Orbitron',sans-serif}
+
+/* ── Standards form ── */
+.tk-std-form{display:flex;flex-direction:column;gap:.6rem;margin-bottom:1rem}
+.tk-std-row{
+  display:flex;align-items:center;gap:.8rem;flex-wrap:wrap;
+  background:rgba(14,28,52,.7);border:1px solid rgba(100,180,255,.08);
+  border-radius:6px;padding:.6rem .85rem;
+}
+.tk-std-event{
+  font-family:'Orbitron',sans-serif;font-size:.82rem;
+  color:#8fb8dc;width:70px;flex-shrink:0;
+}
+.tk-std-inputs{display:flex;gap:.6rem;flex-wrap:wrap}
+.tk-std-inputs label{display:flex;flex-direction:column;font-size:.7rem;color:#6a8dbb;gap:.2rem}
+.tk-std-input{
+  font-size:.82rem;padding:.32rem .5rem;
+  background:rgba(6,13,26,.8);border:1px solid rgba(100,180,255,.15);
+  border-radius:4px;color:#d4e0f0;width:95px;outline:none;
+  transition:border-color .2s;
+}
+.tk-std-input:focus{border-color:#6ec6ff}
+.tk-qual-group{margin-bottom:.8rem}
+.tk-qual-group h4{
+  font-size:.82rem;color:#8fb8dc;margin-bottom:.4rem;
+  display:flex;align-items:center;gap:.4rem;
+}
+.tk-qual-chips{display:flex;flex-wrap:wrap;gap:.4rem}
+.tk-qual-chip{
+  font-size:.76rem;padding:.25rem .55rem;border-radius:4px;
+  background:rgba(14,28,52,.9);border:1px solid rgba(100,180,255,.1);
+  cursor:pointer;transition:border-color .15s;
+}
+.tk-qual-chip:hover{border-color:#6ec6ff}
+
+/* ── Compare view ── */
+.tk-compare-pickers{
+  display:flex;align-items:center;justify-content:center;
+  gap:1.5rem;flex-wrap:wrap;margin-bottom:1.2rem;
+}
+.tk-compare-picker{
+  display:flex;flex-direction:column;gap:.4rem;
+  align-items:center;min-width:200px;
+}
+.tk-compare-picker label{
+  font-size:.78rem;text-transform:uppercase;
+  letter-spacing:.05em;color:#6a8dbb;font-weight:700;
+}
+.tk-compare-picker select{
+  font-size:.88rem;padding:.45rem .65rem;
+  background:rgba(14,28,52,.8);border:1px solid rgba(100,180,255,.15);
+  border-radius:6px;color:#d4e0f0;outline:none;width:100%;
+}
+.tk-compare-vs{
+  font-family:'Orbitron',sans-serif;font-size:1.2rem;
+  color:#a78bfa;font-weight:700;padding-top:1.4rem;
+}
+.tk-cmp-header{
+  display:flex;align-items:center;justify-content:center;
+  gap:1rem;margin-bottom:.8rem;flex-wrap:wrap;
+}
+.tk-cmp-athlete-a,.tk-cmp-athlete-b{
+  font-family:'Orbitron',sans-serif;font-size:.88rem;
+  display:flex;flex-direction:column;align-items:center;gap:.2rem;
+}
+.tk-cmp-athlete-a small,.tk-cmp-athlete-b small{color:#556a88;font-family:'Inter',sans-serif;font-size:.72rem}
+.tk-cmp-score{
+  display:flex;flex-direction:column;align-items:center;
+  background:rgba(110,198,255,.08);border:1px solid rgba(100,180,255,.12);
+  border-radius:6px;padding:.5rem .85rem;
+}
+.tk-cmp-score span{font-family:'Orbitron',sans-serif;font-size:1.5rem;color:#7ee8ff}
+.tk-cmp-score small{font-size:.68rem;color:#556a88;text-transform:uppercase}
+.tk-cmp-score-vs{font-family:'Orbitron',sans-serif;font-size:.8rem;color:#a78bfa}
+.tk-cmp-winner{background:rgba(133,232,157,.08);color:#85e89d;font-weight:700}
+.tk-cmp-winner-cell{color:#8fb8dc;font-size:.76rem}
+.tk-compare-event-tabs{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.6rem}
+
+/* ── Misc ── */
+.tk-empty-msg{color:#556a88;font-size:.84rem;padding:.6rem 0}
+.tk-divider{border:none;border-top:1px solid rgba(100,180,255,.08);margin:1rem 0}
