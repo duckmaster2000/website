@@ -206,6 +206,12 @@ h3 {
     transform: scale(0.85);
 }
 
+.golden-gem.wrath {
+    color: #2d0308;
+    background: radial-gradient(circle at 30% 18%, #ffb2b2, #ff6767 45%, #7a0808 92%);
+    box-shadow: 0 0 18px rgba(255, 75, 75, 0.58);
+}
+
 .right {
     display: grid;
     align-content: start;

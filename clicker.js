@@ -421,6 +421,14 @@ const DEFAULTS = {
     critMultiplier: 2,
     goldenChance: 0.05,
     frenzyTime: 0,
+    frenzyMultiplier: 2,
+    clickFrenzyTime: 0,
+    clickFrenzyMultiplier: 1,
+    buildingSpecialTime: 0,
+    buildingSpecialMultiplier: 1,
+    solarEventType: 'golden',
+    solarNextSpawnAt: 0,
+    solarClicks: 0,
     secretRedeemed: false,
 
     globalGpsMult: 1,
@@ -583,6 +591,7 @@ const ACHIEVEMENTS = [
 let feedbackTimer = null;
 let achievementTick = -1;
 let leaderboardEntries = [];
+let solarGemTimeout = null;
 
 function fmt(n) {
     return Math.floor(n).toLocaleString();
@@ -844,6 +853,14 @@ function validateState() {
 
     state.critChance = Math.min(Math.max(state.critChance, 0), 0.95);
     state.goldenChance = Math.min(Math.max(state.goldenChance, 0.01), 0.95);
+    state.frenzyMultiplier = Math.min(12, Math.max(1, Number(state.frenzyMultiplier || 1)));
+    state.clickFrenzyMultiplier = Math.min(999, Math.max(1, Number(state.clickFrenzyMultiplier || 1)));
+    state.buildingSpecialMultiplier = Math.min(12, Math.max(1, Number(state.buildingSpecialMultiplier || 1)));
+    state.clickFrenzyTime = Math.max(0, Number(state.clickFrenzyTime || 0));
+    state.buildingSpecialTime = Math.max(0, Number(state.buildingSpecialTime || 0));
+    state.solarNextSpawnAt = Math.max(0, Number(state.solarNextSpawnAt || 0));
+    state.solarClicks = Math.max(0, Number(state.solarClicks || 0));
+    state.solarEventType = state.solarEventType === 'wrath' ? 'wrath' : 'golden';
     state.playerName = state.playerName.trim().slice(0, 16) || 'Pilot';
     state.tdBestWave = Math.max(state.tdBestWave, 0);
     state.tdBestEndlessWave = Math.max(0, Number(state.tdBestEndlessWave || 0));
@@ -880,6 +897,14 @@ function saveGame() {
         critMultiplier: state.critMultiplier,
         goldenChance: state.goldenChance,
         frenzyTime: state.frenzyTime,
+        frenzyMultiplier: state.frenzyMultiplier,
+        clickFrenzyTime: state.clickFrenzyTime,
+        clickFrenzyMultiplier: state.clickFrenzyMultiplier,
+        buildingSpecialTime: state.buildingSpecialTime,
+        buildingSpecialMultiplier: state.buildingSpecialMultiplier,
+        solarEventType: state.solarEventType,
+        solarNextSpawnAt: state.solarNextSpawnAt,
+        solarClicks: state.solarClicks,
         secretRedeemed: state.secretRedeemed,
 
         globalGpsMult: state.globalGpsMult,
@@ -1158,7 +1183,11 @@ function renderCoreStats() {
     safeSet(el.buildingTotal, fmt(totalBuildings()));
     safeSet(el.researchTotal, fmt(state.researchCount));
     safeSet(el.comboValue, `x${fmtDec(state.comboMultiplier, 2)}`);
-    safeSet(el.frenzyValue, state.frenzyTime > 0 ? `${Math.ceil(state.frenzyTime)}s` : 'OFF');
+    const frenzyTag = state.frenzyTime > 0 ? `Frenzy x${fmtDec(state.frenzyMultiplier, 1)} ${Math.ceil(state.frenzyTime)}s` : '';
+    const clickTag = state.clickFrenzyTime > 0 ? `Click x${fmt(state.clickFrenzyMultiplier)} ${Math.ceil(state.clickFrenzyTime)}s` : '';
+    const specialTag = state.buildingSpecialTime > 0 ? `Special x${fmtDec(state.buildingSpecialMultiplier, 2)} ${Math.ceil(state.buildingSpecialTime)}s` : '';
+    const joined = [frenzyTag, clickTag, specialTag].filter(Boolean).join(' | ');
+    safeSet(el.frenzyValue, joined || 'OFF');
     safeSet(el.tdWins, fmt(state.tdWins));
     safeSet(el.tdWinsPreview, fmt(state.tdWins));
     safeSet(el.tdBestWaveReadout, fmt(state.tdBestWave));
@@ -1479,10 +1508,12 @@ function clickGem(event) {
 
     state.comboMultiplier = 1 + Math.min(state.comboCount * 0.04, state.comboSoftCap);
 
-    const frenzyMult = state.frenzyTime > 0 ? 2 : 1;
+    const frenzyMult = state.frenzyTime > 0 ? state.frenzyMultiplier : 1;
+    const clickFrenzyMult = state.clickFrenzyTime > 0 ? state.clickFrenzyMultiplier : 1;
+    const specialMult = state.buildingSpecialTime > 0 ? state.buildingSpecialMultiplier : 1;
     const isCrit = Math.random() < state.critChance;
     const critMult = isCrit ? state.critMultiplier : 1;
-    const gain = state.gpc * prestigeClickMultiplier() * state.comboMultiplier * frenzyMult * critMult;
+    const gain = state.gpc * prestigeClickMultiplier() * state.comboMultiplier * frenzyMult * clickFrenzyMult * specialMult * critMult;
 
     addGems(gain);
     playSound(el.clickSound, 0.35);
@@ -1498,29 +1529,137 @@ function clickGem(event) {
 
 function spawnGoldenGem() {
     if (state.goldenGemActive) return;
-    state.goldenGemActive = true;
-    if (el.goldenGem) el.goldenGem.classList.remove('hidden');
+    const goldenChanceEffective = Math.min(0.95, state.goldenChance + prestigeGoldenBonus());
+    const wrathChance = Math.min(0.42, 0.12 + goldenChanceEffective * 0.32);
 
-    setTimeout(() => {
+    state.goldenGemActive = true;
+    state.solarEventType = Math.random() < wrathChance ? 'wrath' : 'golden';
+
+    if (el.goldenGem) {
+        el.goldenGem.classList.remove('hidden');
+        el.goldenGem.classList.toggle('wrath', state.solarEventType === 'wrath');
+        el.goldenGem.textContent = state.solarEventType === 'wrath' ? 'WRATH SOLAR EVENT' : 'SOLAR GEM EVENT';
+    }
+
+    const duration = solarGemDurationMs();
+    if (solarGemTimeout) clearTimeout(solarGemTimeout);
+    solarGemTimeout = setTimeout(() => {
         if (!state.goldenGemActive) return;
-        state.goldenGemActive = false;
-        if (el.goldenGem) el.goldenGem.classList.add('hidden');
-    }, 7000);
+        endGoldenGemEvent();
+    }, duration);
+}
+
+function solarGemDurationMs() {
+    const goldenChanceEffective = Math.min(0.95, state.goldenChance + prestigeGoldenBonus());
+    return Math.round(13000 * (1 + goldenChanceEffective * 1.5));
+}
+
+function scheduleNextSolarGemSpawn() {
+    const goldenChanceEffective = Math.min(0.95, state.goldenChance + prestigeGoldenBonus());
+    const intervalMult = Math.max(0.3, 1 - goldenChanceEffective * 1.9);
+    const minMs = Math.round(5 * 60 * 1000 * intervalMult);
+    const maxMs = Math.round(15 * 60 * 1000 * intervalMult);
+    const nextIn = minMs + Math.floor(Math.random() * Math.max(1000, maxMs - minMs));
+    state.solarNextSpawnAt = Date.now() + nextIn;
+}
+
+function endGoldenGemEvent() {
+    state.goldenGemActive = false;
+    if (solarGemTimeout) {
+        clearTimeout(solarGemTimeout);
+        solarGemTimeout = null;
+    }
+
+    if (el.goldenGem) {
+        el.goldenGem.classList.add('hidden');
+        el.goldenGem.classList.remove('wrath');
+        el.goldenGem.textContent = 'SOLAR GEM EVENT';
+    }
+
+    scheduleNextSolarGemSpawn();
+}
+
+function applySolarGemOutcome() {
+    const wrath = state.solarEventType === 'wrath';
+    const economyNow = state.gps + state.gpc * 30;
+    const outcomes = wrath
+        ? ['frenzy', 'lucky', 'click', 'special', 'storm', 'debuff', 'blab']
+        : ['frenzy', 'lucky', 'click', 'special', 'chain', 'storm', 'blab'];
+    const roll = outcomes[Math.floor(Math.random() * outcomes.length)];
+
+    if (roll === 'frenzy') {
+        state.frenzyTime += wrath ? 45 : 77;
+        state.frenzyMultiplier = wrath ? 5 : 7;
+        return wrath ? 'Wrath Frenzy! x5 income surge.' : 'Frenzy! x7 income surge.';
+    }
+
+    if (roll === 'lucky') {
+        const bonus = Math.max(280, economyNow * (wrath ? 26 : 44) + state.gems * (wrath ? 0.06 : 0.12));
+        addGems(bonus);
+        return `${wrath ? 'Dark Lucky' : 'Lucky'}! +${fmt(bonus)} gems.`;
+    }
+
+    if (roll === 'click') {
+        state.clickFrenzyTime += wrath ? 9 : 13;
+        state.clickFrenzyMultiplier = wrath ? 111 : 777;
+        return `Click Frenzy! x${fmt(state.clickFrenzyMultiplier)} clicks.`;
+    }
+
+    if (roll === 'special') {
+        const bCount = totalBuildings();
+        const mult = 1 + Math.min(6, bCount * 0.1);
+        state.buildingSpecialTime += wrath ? 36 : 62;
+        state.buildingSpecialMultiplier = mult;
+        return `Building Special! x${fmtDec(mult, 2)} production.`;
+    }
+
+    if (roll === 'chain') {
+        let chain = 0;
+        let payout = 0;
+        let next = Math.max(7, Math.floor(economyNow * 0.4));
+        while (chain < 8 && Math.random() < 0.84 - chain * 0.07) {
+            payout += next;
+            next *= 2;
+            chain += 1;
+        }
+        addGems(payout);
+        return `Cookie Chain! ${chain} links, +${fmt(payout)} gems.`;
+    }
+
+    if (roll === 'storm') {
+        let payout = 0;
+        const count = wrath ? 11 : 17;
+        for (let i = 0; i < count; i += 1) {
+            payout += Math.max(25, economyNow * (wrath ? 0.25 : 0.38));
+        }
+        addGems(payout);
+        return `Cookie Storm! ${count} shards, +${fmt(payout)} gems.`;
+    }
+
+    if (roll === 'debuff') {
+        state.frenzyTime = 0;
+        state.clickFrenzyTime = 0;
+        state.buildingSpecialTime = 0;
+        const loss = Math.min(state.gems * 0.08, Math.max(100, economyNow * 4));
+        state.gems = Math.max(0, state.gems - loss);
+        return `Wrath backlash! -${fmt(loss)} gems and buffs cleared.`;
+    }
+
+    return 'Blab: The solar core hums politely and does nothing.';
 }
 
 function collectGoldenGem() {
     if (!state.goldenGemActive) return;
 
-    const bonus = Math.max(160, state.gps * 10 + state.gpc * 24);
-    addGems(bonus);
-    state.frenzyTime += 10;
-    state.goldenGemActive = false;
-    if (el.goldenGem) el.goldenGem.classList.add('hidden');
+    state.solarClicks += 1;
+    const outcomeText = applySolarGemOutcome();
+    endGoldenGemEvent();
 
     if (el.goldenGem) {
         const rect = el.goldenGem.getBoundingClientRect();
-        showFloat(rect.left + rect.width / 2, rect.top + rect.height / 2, `+${fmt(bonus)} SOLAR`, 'golden');
+        showFloat(rect.left + rect.width / 2, rect.top + rect.height / 2, outcomeText, 'golden');
     }
+    showBuyFeedback(outcomeText);
 
     playSound(el.upgradeSound, 0.56);
     renderAll();
@@ -1801,7 +1940,9 @@ function performPrestige() {
 
 function passiveIncomeTick() {
     if (state.gps > 0) {
-        addGems(state.gps / 5);
+        const frenzyMult = state.frenzyTime > 0 ? state.frenzyMultiplier : 1;
+        const specialMult = state.buildingSpecialTime > 0 ? state.buildingSpecialMultiplier : 1;
+        addGems((state.gps / 5) * frenzyMult * specialMult);
         safeSet(el.gem, fmt(state.gems));
     }
 }
@@ -1810,9 +1951,14 @@ function timedTick() {
     if (state.frenzyTime > 0) {
         state.frenzyTime = Math.max(0, state.frenzyTime - 1);
     }
+    if (state.clickFrenzyTime > 0) {
+        state.clickFrenzyTime = Math.max(0, state.clickFrenzyTime - 1);
+    }
+    if (state.buildingSpecialTime > 0) {
+        state.buildingSpecialTime = Math.max(0, state.buildingSpecialTime - 1);
+    }
 
-    const goldenChanceEffective = Math.min(0.95, state.goldenChance + prestigeGoldenBonus());
-    if (!state.goldenGemActive && Math.random() < goldenChanceEffective) {
+    if (!state.goldenGemActive && (!state.solarNextSpawnAt || Date.now() >= state.solarNextSpawnAt)) {
         spawnGoldenGem();
     }
 
@@ -3987,7 +4133,7 @@ function boot() {
         tdDraw();
         renderTdStats();
         renderTdMeta();
-        renderSelectedTower();A
+        renderSelectedTower();
         return;
     }
 
@@ -4004,6 +4150,10 @@ function boot() {
 
     if (el.lbNameInput) {
         el.lbNameInput.value = normalizeCommanderName(state.playerName);
+    }
+
+    if (!state.solarNextSpawnAt) {
+        scheduleNextSolarGemSpawn();
     }
 
     setInterval(passiveIncomeTick, 200);
