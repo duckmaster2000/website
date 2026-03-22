@@ -124,6 +124,17 @@
     <h3>Timeline Replay</h3>
     <div class="tk-timeline-controls">
       <button id="tkTimelinePlay" class="tk-timeline-btn" type="button">▶ Play</button>
+      <label for="tkTimelineSpeed">Speed</label>
+      <select id="tkTimelineSpeed" class="tk-timeline-speed">
+        <option value="1400">0.75x</option>
+        <option value="950" selected>1.0x</option>
+        <option value="650">1.5x</option>
+        <option value="450">2.0x</option>
+      </select>
+      <label class="tk-timeline-toggle" for="tkTimelineGhost">
+        <input id="tkTimelineGhost" type="checkbox" checked />
+        Ghost trail
+      </label>
       <label for="tkTimelineRange">Date</label>
       <input id="tkTimelineRange" type="range" min="0" max="0" value="0" step="1" />
       <span id="tkTimelineLabel">—</span>

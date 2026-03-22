@@ -38,6 +38,12 @@ let revealObserver = null;
 let timelineDates = [];
 let timelineFrame = 0;
 let timelineTimer = null;
+let timelineSpeedMs = 950;
+let timelineGhostOn = true;
+let timelineAnimRaf = null;
+let timelineLastRenderedFrame = 0;
+let timelineAthletes = [];
+let timelineSheetData = null;
 
 /* ── DOM refs ── */
 const $ = (id) => document.getElementById(id);
@@ -63,6 +69,8 @@ const el = {
   athleteSelect: $('tkAthleteSelect'),
   timelineWrap:   $('tkTimelineWrap'),
   timelinePlay:   $('tkTimelinePlay'),
+  timelineSpeed:  $('tkTimelineSpeed'),
+  timelineGhost:  $('tkTimelineGhost'),
   timelineRange:  $('tkTimelineRange'),
   timelineLabel:  $('tkTimelineLabel'),
   modal:         $('tkModal'),
@@ -396,6 +404,10 @@ function stopTimelinePlayback() {
   if (timelineTimer) {
     window.clearInterval(timelineTimer);
     timelineTimer = null;
+  }
+  if (timelineAnimRaf) {
+    window.cancelAnimationFrame(timelineAnimRaf);
+    timelineAnimRaf = null;
   }
   if (el.timelinePlay) el.timelinePlay.textContent = '▶ Play';
 }
@@ -1549,7 +1561,30 @@ function drawProgress(athletes, sheetData) {
   setChartHotspots(canvas, hotspots);
 }
 
-function drawTimelineChart(athletes, sheetData, frameIndex) {
+function getTimelineFrameModel(athletes, sheetData, frameIndex) {
+  const dates = sheetData?.dateCols || [];
+  if (!dates.length) return null;
+  const idx = Math.min(Math.max(frameIndex, 0), dates.length - 1);
+  const date = dates[idx];
+  const leaders = athletes
+    .map((athlete) => ({
+      name: athlete.name,
+      grade: athlete.grade,
+      time: athlete.times[date] ?? null
+    }))
+    .filter((row) => row.time != null)
+    .sort((a, b) => a.time - b.time)
+    .slice(0, 8)
+    .map((row, i) => ({ ...row, rank: i + 1 }));
+  const maxT = leaders.length ? Math.max(...leaders.map((l) => l.time)) : 1;
+  return { idx, date, leaders, maxT };
+}
+
+function easeInOutCubic(t) {
+  return t < 0.5 ? 4 * t * t * t : 1 - ((-2 * t + 2) ** 3) / 2;
+}
+
+function drawTimelineChart(athletes, sheetData, frameIndex, opts = {}) {
   const canvas = el.chartTimeline;
   if (!canvas || !sheetData) return;
   const ctx = canvas.getContext('2d');
@@ -1566,44 +1601,69 @@ function drawTimelineChart(athletes, sheetData, frameIndex) {
     return;
   }
 
-  const idx = Math.min(Math.max(frameIndex, 0), dates.length - 1);
-  const date = dates[idx];
-  if (el.timelineLabel) el.timelineLabel.textContent = date;
-  if (el.timelineRange && String(el.timelineRange.value) !== String(idx)) el.timelineRange.value = String(idx);
-
-  const leaders = athletes
-    .map((athlete) => ({
-      name: athlete.name,
-      grade: athlete.grade,
-      time: athlete.times[date] ?? null
-    }))
-    .filter((row) => row.time != null)
-    .sort((a, b) => a.time - b.time)
-    .slice(0, 8);
-
-  if (!leaders.length) {
+  const current = getTimelineFrameModel(athletes, sheetData, frameIndex);
+  if (!current || !current.leaders.length) {
     setChartHotspots(canvas, []);
+    const fallbackDate = dates[Math.min(Math.max(frameIndex, 0), dates.length - 1)] || 'this date';
     ctx.fillStyle = '#556a88';
     ctx.font = '13px Inter';
-    ctx.fillText(`No recorded marks on ${date}`, W / 2 - 82, H / 2);
+    ctx.fillText(`No recorded marks on ${fallbackDate}`, W / 2 - 82, H / 2);
     return;
   }
 
-  const maxT = Math.max(...leaders.map((l) => l.time));
-  const pad = { top: 26, bottom: 28, left: 178, right: 48 };
+  const fromIdx = opts.fromIndex == null ? current.idx : opts.fromIndex;
+  const prev = getTimelineFrameModel(athletes, sheetData, fromIdx) || current;
+  const t = Math.min(Math.max(opts.t ?? 1, 0), 1);
+  const ghostEnabled = opts.ghostEnabled !== false;
+  const maxT = (prev.maxT * (1 - t)) + (current.maxT * t);
+
+  if (el.timelineLabel) el.timelineLabel.textContent = current.date;
+  if (el.timelineRange && String(el.timelineRange.value) !== String(current.idx)) el.timelineRange.value = String(current.idx);
+
+  const pad = { top: 28, bottom: 28, left: 178, right: 48 };
   const areaW = W - pad.left - pad.right;
-  const rowH = Math.min(24, (H - pad.top - pad.bottom) / leaders.length - 5);
+  const rowH = Math.min(24, (H - pad.top - pad.bottom) / current.leaders.length - 5);
   const hotspots = [];
+  const prevMap = new Map(prev.leaders.map((row) => [row.name, row]));
+
+  if (ghostEnabled) {
+    prev.leaders.forEach((leader, i) => {
+      const y = pad.top + i * (rowH + 5);
+      const width = (leader.time / Math.max(prev.maxT, 0.001)) * areaW;
+      const color = GRADE_COLORS[leader.grade] || '#7ee8ff';
+      ctx.fillStyle = color;
+      ctx.globalAlpha = 0.16;
+      ctx.fillRect(pad.left, y, width, rowH);
+    });
+    ctx.globalAlpha = 1;
+  }
 
   ctx.fillStyle = '#8fb8dc';
   ctx.font = '11px Inter';
   ctx.textAlign = 'left';
-  ctx.fillText(`Top marks on ${date}`, pad.left, 16);
+  ctx.fillText(`Top marks on ${current.date}`, pad.left, 16);
 
-  leaders.forEach((leader, i) => {
-    const y = pad.top + i * (rowH + 5);
-    const width = (leader.time / maxT) * areaW;
+  current.leaders.forEach((leader, i) => {
+    const prevLeader = prevMap.get(leader.name) || leader;
+    const rankA = (prevLeader.rank || (i + 1)) - 1;
+    const rankB = i;
+    const interpRank = rankA + (rankB - rankA) * t;
+    const y = pad.top + interpRank * (rowH + 5);
+    const interpTime = prevLeader.time + (leader.time - prevLeader.time) * t;
+    const width = (interpTime / Math.max(maxT, 0.001)) * areaW;
     const color = GRADE_COLORS[leader.grade] || '#7ee8ff';
+
+    if (ghostEnabled && prevMap.has(leader.name)) {
+      const yFrom = pad.top + rankA * (rowH + 5) + rowH / 2;
+      const yTo = y + rowH / 2;
+      ctx.strokeStyle = 'rgba(126,232,255,.22)';
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.moveTo(pad.left - 20, yFrom);
+      ctx.lineTo(pad.left - 20, yTo);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+    }
 
     ctx.fillStyle = color;
     ctx.globalAlpha = 0.74;
@@ -1625,7 +1685,7 @@ function drawTimelineChart(athletes, sheetData, frameIndex) {
       y,
       w: width,
       h: rowH,
-      tooltip: `<strong>#${i + 1} ${leader.name}</strong><br>${date}: ${formatTime(leader.time)}<br>Grade: ${leader.grade}<br>Click for full profile`,
+      tooltip: `<strong>#${i + 1} ${leader.name}</strong><br>${current.date}: ${formatTime(leader.time)}<br>Grade: ${leader.grade}<br>Click for full profile`,
       onClick: () => showAthleteModal(leader.name)
     });
   });
@@ -1633,10 +1693,50 @@ function drawTimelineChart(athletes, sheetData, frameIndex) {
   setChartHotspots(canvas, hotspots);
 }
 
+function animateTimelineTransition(athletes, sheetData, fromIndex, toIndex) {
+  if (timelineAnimRaf) {
+    window.cancelAnimationFrame(timelineAnimRaf);
+    timelineAnimRaf = null;
+  }
+
+  if (fromIndex === toIndex) {
+    drawTimelineChart(athletes, sheetData, toIndex, { ghostEnabled: timelineGhostOn });
+    timelineLastRenderedFrame = toIndex;
+    timelineFrame = toIndex;
+    return;
+  }
+
+  const duration = Math.max(220, Math.min(620, timelineSpeedMs * 0.55));
+  const started = performance.now();
+
+  const step = (now) => {
+    const raw = Math.min(1, (now - started) / duration);
+    const eased = easeInOutCubic(raw);
+    drawTimelineChart(athletes, sheetData, toIndex, {
+      fromIndex,
+      t: eased,
+      ghostEnabled: timelineGhostOn
+    });
+
+    if (raw < 1) {
+      timelineAnimRaf = window.requestAnimationFrame(step);
+      return;
+    }
+    timelineAnimRaf = null;
+    timelineLastRenderedFrame = toIndex;
+    timelineFrame = toIndex;
+  };
+
+  timelineAnimRaf = window.requestAnimationFrame(step);
+}
+
 function renderTimelineReplay(athletes, sheetData) {
   if (!el.timelineWrap || !el.timelineRange || !el.timelinePlay) return;
   const dates = sheetData?.dateCols || [];
   timelineDates = dates;
+  timelineAthletes = athletes;
+  timelineSheetData = sheetData;
+  timelineGhostOn = el.timelineGhost ? el.timelineGhost.checked : timelineGhostOn;
   if (!dates.length) {
     el.timelineWrap.hidden = true;
     stopTimelinePlayback();
@@ -1646,7 +1746,8 @@ function renderTimelineReplay(athletes, sheetData) {
   el.timelineWrap.hidden = false;
   el.timelineRange.max = String(Math.max(0, dates.length - 1));
   timelineFrame = Math.min(Math.max(timelineFrame, 0), dates.length - 1);
-  drawTimelineChart(athletes, sheetData, timelineFrame);
+  timelineLastRenderedFrame = timelineFrame;
+  drawTimelineChart(athletes, sheetData, timelineFrame, { ghostEnabled: timelineGhostOn });
 }
 
 function populateAthleteSelect(athletes) {
@@ -1743,6 +1844,7 @@ function bindEvents() {
     tab.classList.add('active');
     stopTimelinePlayback();
     timelineFrame = 0;
+    timelineLastRenderedFrame = 0;
     currentSheet = tab.dataset.sheet;
     sortCol = null; sortAsc = true;
     delete cache[currentSheet];
@@ -1801,27 +1903,36 @@ function bindEvents() {
 
   // Timeline replay controls
   el.timelineRange?.addEventListener('input', async () => {
-    const data = await fetchSheet(currentSheet);
-    if (!data) return;
-    const athletes = filterAthletes(processData(data));
-    timelineFrame = parseInt(el.timelineRange.value, 10) || 0;
-    drawTimelineChart(athletes, data, timelineFrame);
+    if (!timelineSheetData || !timelineAthletes.length) return;
+    const nextFrame = parseInt(el.timelineRange.value, 10) || 0;
+    animateTimelineTransition(timelineAthletes, timelineSheetData, timelineLastRenderedFrame, nextFrame);
   });
 
-  el.timelinePlay?.addEventListener('click', async () => {
+  el.timelinePlay?.addEventListener('click', () => {
     if (timelineTimer) {
       stopTimelinePlayback();
       return;
     }
-    const data = await fetchSheet(currentSheet);
-    if (!data || !data.dateCols?.length) return;
-    const athletes = filterAthletes(processData(data));
+    if (!timelineSheetData || !timelineDates.length || !timelineAthletes.length) return;
     el.timelinePlay.textContent = '⏸ Pause';
     timelineTimer = window.setInterval(() => {
-      timelineFrame = (timelineFrame + 1) % data.dateCols.length;
-      drawTimelineChart(athletes, data, timelineFrame);
-      if (el.timelineRange) el.timelineRange.value = String(timelineFrame);
-    }, 950);
+      const nextFrame = (timelineLastRenderedFrame + 1) % timelineDates.length;
+      animateTimelineTransition(timelineAthletes, timelineSheetData, timelineLastRenderedFrame, nextFrame);
+    }, timelineSpeedMs);
+  });
+
+  el.timelineSpeed?.addEventListener('change', () => {
+    const nextMs = parseInt(el.timelineSpeed.value, 10);
+    timelineSpeedMs = Number.isFinite(nextMs) ? Math.max(250, nextMs) : 950;
+    if (!timelineTimer) return;
+    stopTimelinePlayback();
+    el.timelinePlay?.click();
+  });
+
+  el.timelineGhost?.addEventListener('change', () => {
+    timelineGhostOn = !!el.timelineGhost.checked;
+    if (!timelineSheetData || !timelineAthletes.length) return;
+    drawTimelineChart(timelineAthletes, timelineSheetData, timelineLastRenderedFrame, { ghostEnabled: timelineGhostOn });
   });
 
   // Modal close
