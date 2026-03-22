@@ -214,6 +214,52 @@ main,section,nav{scroll-margin-top:72px}
   outline:none;
 }
 
+.tk-timeline-controls{
+  display:flex;
+  align-items:center;
+  gap:.65rem;
+  flex-wrap:wrap;
+  margin-bottom:.6rem;
+}
+
+.tk-timeline-controls label{
+  font-size:.74rem;
+  text-transform:uppercase;
+  letter-spacing:.05em;
+  color:#7aa0c4;
+}
+
+.tk-timeline-btn{
+  appearance:none;
+  border:1px solid rgba(126,232,255,.35);
+  background:linear-gradient(160deg,rgba(32,93,128,.6),rgba(17,55,86,.55));
+  color:#dff3ff;
+  font-weight:700;
+  border-radius:999px;
+  padding:.36rem .82rem;
+  cursor:pointer;
+  transition:transform .16s ease,border-color .2s ease,box-shadow .2s ease;
+}
+
+.tk-timeline-btn:hover{
+  transform:translateY(-1px);
+  border-color:#7ee8ff;
+  box-shadow:0 6px 16px rgba(0,0,0,.25);
+}
+
+#tkTimelineRange{
+  flex:1;
+  min-width:200px;
+  accent-color:#7ee8ff;
+}
+
+#tkTimelineLabel{
+  min-width:120px;
+  font-family:'Orbitron',sans-serif;
+  font-size:.76rem;
+  color:#9fdcff;
+}
+
 /* ── Table ── */
 .tk-table-section{
   max-width:1120px;
@@ -380,6 +426,8 @@ main,section,nav{scroll-margin-top:72px}
   .tk-chart-full{padding:.85rem .6rem}
   .tk-search{width:160px}
   .tk-insights-grid{grid-template-columns:1fr;padding:0 .7rem}
+  .tk-timeline-controls{gap:.45rem}
+  #tkTimelineLabel{min-width:auto}
   .tk-modal-content{padding:.9rem .7rem 1rem}
   .tk-modal-stat-grid{grid-template-columns:repeat(2,minmax(120px,1fr))}
   .tk-modal-charts-grid{grid-template-columns:1fr}

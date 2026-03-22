@@ -35,6 +35,9 @@ let compareEventKey = '100 M';
 let pinnedAthletes = [];
 let standards = {};
 let revealObserver = null;
+let timelineDates = [];
+let timelineFrame = 0;
+let timelineTimer = null;
 
 /* ── DOM refs ── */
 const $ = (id) => document.getElementById(id);
@@ -56,7 +59,12 @@ const el = {
   chartHist:     $('tkChartHist'),
   chartPie:      $('tkChartPie'),
   chartProgress: $('tkChartProgress'),
+  chartTimeline: $('tkChartTimeline'),
   athleteSelect: $('tkAthleteSelect'),
+  timelineWrap:   $('tkTimelineWrap'),
+  timelinePlay:   $('tkTimelinePlay'),
+  timelineRange:  $('tkTimelineRange'),
+  timelineLabel:  $('tkTimelineLabel'),
   modal:         $('tkModal'),
   modalContent:  $('tkModalContent'),
   modalClose:    $('tkModalClose'),
@@ -189,7 +197,7 @@ function bindCanvasInteraction(canvas) {
 }
 
 function bindStaticChartInteractions() {
-  [el.chartTop10, el.chartGrade, el.chartHist, el.chartPie, el.chartProgress, el.chartCompare].forEach(bindCanvasInteraction);
+  [el.chartTop10, el.chartGrade, el.chartHist, el.chartPie, el.chartProgress, el.chartTimeline, el.chartCompare].forEach(bindCanvasInteraction);
 }
 
 function setupRevealObserver() {
@@ -231,6 +239,7 @@ const VIEW_SHOW = {
 
 function switchView(view) {
   currentView = view;
+  if (view !== 'dashboard') stopTimelinePlayback();
   const show = VIEW_SHOW[view] || [];
   document.querySelectorAll('.tk-section-dl,.tk-section-d,.tk-section-l,.tk-section-a,.tk-section-r,.tk-section-s,.tk-section-c,.tk-view-panel').forEach((node) => {
     const visible = show.some((cls) => node.classList.contains(cls));
@@ -358,6 +367,37 @@ function stdDev(values) {
   const mean = values.reduce((sum, v) => sum + v, 0) / values.length;
   const variance = values.reduce((sum, v) => sum + ((v - mean) ** 2), 0) / values.length;
   return Math.sqrt(variance);
+}
+
+function computeTrendProjection(points) {
+  if (!points || points.length < 2) return null;
+  const n = points.length;
+  const xs = points.map((_, i) => i + 1);
+  const ys = points.map((p) => p.time);
+  const sumX = xs.reduce((s, v) => s + v, 0);
+  const sumY = ys.reduce((s, v) => s + v, 0);
+  const sumXY = xs.reduce((s, x, i) => s + (x * ys[i]), 0);
+  const sumXX = xs.reduce((s, x) => s + (x * x), 0);
+  const denom = (n * sumXX) - (sumX * sumX);
+  if (!denom) return null;
+
+  const slope = ((n * sumXY) - (sumX * sumY)) / denom;
+  const intercept = (sumY - (slope * sumX)) / n;
+  const nextX = n + 1;
+  const predicted = intercept + (slope * nextX);
+  const residuals = ys.map((y, i) => y - (intercept + slope * xs[i]));
+  const sigma = stdDev(residuals) || 0;
+  const lower = Math.max(0, predicted - sigma);
+  const upper = predicted + sigma;
+  return { predicted, lower, upper, sigma, slope };
+}
+
+function stopTimelinePlayback() {
+  if (timelineTimer) {
+    window.clearInterval(timelineTimer);
+    timelineTimer = null;
+  }
+  if (el.timelinePlay) el.timelinePlay.textContent = '▶ Play';
 }
 
 /* ── Data processing ── */
@@ -1172,6 +1212,36 @@ function drawModalEventChart(canvas, bundle, athleteName) {
   }
 
   const color = GRADE_COLORS[bundle.athlete.grade] || '#7ee8ff';
+  const projection = computeTrendProjection(bundle.attempts);
+
+  if (projection) {
+    const projX = pad.left + areaW;
+    const predY = pad.top + ((maxT - projection.predicted) / range) * areaH;
+    const lowY = pad.top + ((maxT - projection.lower) / range) * areaH;
+    const highY = pad.top + ((maxT - projection.upper) / range) * areaH;
+
+    ctx.fillStyle = 'rgba(126,232,255,.16)';
+    ctx.beginPath();
+    ctx.rect(projX - 12, Math.min(lowY, highY), 24, Math.abs(highY - lowY));
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(126,232,255,.45)';
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    ctx.moveTo(projX - 12, predY);
+    ctx.lineTo(projX + 12, predY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    hotspots.push({
+      type: 'rect',
+      x: projX - 14,
+      y: Math.min(lowY, highY) - 4,
+      w: 28,
+      h: Math.abs(highY - lowY) + 8,
+      tooltip: `<strong>${athleteName}</strong><br>Projected next: ${formatTime(projection.predicted)}<br>Band: ${formatTime(projection.lower)} - ${formatTime(projection.upper)}`
+    });
+  }
+
   ctx.strokeStyle = color;
   ctx.lineWidth = 2.3;
   ctx.beginPath();
@@ -1413,6 +1483,46 @@ function drawProgress(athletes, sheetData) {
     ctx.fillStyle = '#556a88'; ctx.font = '10px Inter'; ctx.textAlign = 'right'; ctx.fillText(formatTime(maxT - (range / 4) * i), pad.left - 8, y + 4);
   }
   const color = GRADE_COLORS[athlete.grade] || '#7ee8ff';
+  const projection = computeTrendProjection(points);
+
+  if (projection) {
+    const xLast = pad.left + (points.length === 1 ? areaW / 2 : ((points.length - 1) / (points.length - 1)) * areaW);
+    const xPred = pad.left + areaW + 18;
+    const yLast = pad.top + ((maxT - points[points.length - 1].time) / range) * areaH;
+    const yPred = pad.top + ((maxT - projection.predicted) / range) * areaH;
+    const yLow = pad.top + ((maxT - projection.lower) / range) * areaH;
+    const yHigh = pad.top + ((maxT - projection.upper) / range) * areaH;
+
+    ctx.strokeStyle = 'rgba(126,232,255,.45)';
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    ctx.moveTo(xLast, yLast);
+    ctx.lineTo(xPred, yPred);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = 'rgba(126,232,255,.16)';
+    ctx.fillRect(xPred - 6, Math.min(yLow, yHigh), 12, Math.abs(yHigh - yLow));
+    ctx.beginPath();
+    ctx.arc(xPred, yPred, 4.8, 0, Math.PI * 2);
+    ctx.fillStyle = '#9de7ff';
+    ctx.fill();
+
+    ctx.fillStyle = '#9ecdf6';
+    ctx.font = '10px Inter';
+    ctx.textAlign = 'left';
+    ctx.fillText('Projected next', xPred + 8, yPred + 4);
+
+    hotspots.push({
+      type: 'rect',
+      x: xPred - 8,
+      y: Math.min(yLow, yHigh) - 4,
+      w: 16,
+      h: Math.abs(yHigh - yLow) + 8,
+      tooltip: `<strong>${athlete.name}</strong><br>Projected next: ${formatTime(projection.predicted)}<br>Likely range: ${formatTime(projection.lower)} - ${formatTime(projection.upper)}`
+    });
+  }
+
   ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.beginPath();
   points.forEach((p, i) => {
     const x = pad.left + (points.length === 1 ? areaW / 2 : (i / (points.length - 1)) * areaW);
@@ -1437,6 +1547,106 @@ function drawProgress(athletes, sheetData) {
   });
   ctx.lineWidth = 1;
   setChartHotspots(canvas, hotspots);
+}
+
+function drawTimelineChart(athletes, sheetData, frameIndex) {
+  const canvas = el.chartTimeline;
+  if (!canvas || !sheetData) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width;
+  const H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const dates = sheetData.dateCols || [];
+  if (!dates.length) {
+    setChartHotspots(canvas, []);
+    ctx.fillStyle = '#556a88';
+    ctx.font = '13px Inter';
+    ctx.fillText('No date columns found for timeline replay', W / 2 - 130, H / 2);
+    return;
+  }
+
+  const idx = Math.min(Math.max(frameIndex, 0), dates.length - 1);
+  const date = dates[idx];
+  if (el.timelineLabel) el.timelineLabel.textContent = date;
+  if (el.timelineRange && String(el.timelineRange.value) !== String(idx)) el.timelineRange.value = String(idx);
+
+  const leaders = athletes
+    .map((athlete) => ({
+      name: athlete.name,
+      grade: athlete.grade,
+      time: athlete.times[date] ?? null
+    }))
+    .filter((row) => row.time != null)
+    .sort((a, b) => a.time - b.time)
+    .slice(0, 8);
+
+  if (!leaders.length) {
+    setChartHotspots(canvas, []);
+    ctx.fillStyle = '#556a88';
+    ctx.font = '13px Inter';
+    ctx.fillText(`No recorded marks on ${date}`, W / 2 - 82, H / 2);
+    return;
+  }
+
+  const maxT = Math.max(...leaders.map((l) => l.time));
+  const pad = { top: 26, bottom: 28, left: 178, right: 48 };
+  const areaW = W - pad.left - pad.right;
+  const rowH = Math.min(24, (H - pad.top - pad.bottom) / leaders.length - 5);
+  const hotspots = [];
+
+  ctx.fillStyle = '#8fb8dc';
+  ctx.font = '11px Inter';
+  ctx.textAlign = 'left';
+  ctx.fillText(`Top marks on ${date}`, pad.left, 16);
+
+  leaders.forEach((leader, i) => {
+    const y = pad.top + i * (rowH + 5);
+    const width = (leader.time / maxT) * areaW;
+    const color = GRADE_COLORS[leader.grade] || '#7ee8ff';
+
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.74;
+    ctx.fillRect(pad.left, y, width, rowH);
+    ctx.globalAlpha = 1;
+
+    ctx.fillStyle = '#d4e0f0';
+    ctx.font = '11px Inter';
+    ctx.textAlign = 'right';
+    ctx.fillText(`#${i + 1} ${leader.name}`, pad.left - 8, y + rowH / 2 + 4);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'left';
+    ctx.fillText(formatTime(leader.time), pad.left + width + 6, y + rowH / 2 + 4);
+
+    hotspots.push({
+      type: 'rect',
+      x: pad.left,
+      y,
+      w: width,
+      h: rowH,
+      tooltip: `<strong>#${i + 1} ${leader.name}</strong><br>${date}: ${formatTime(leader.time)}<br>Grade: ${leader.grade}<br>Click for full profile`,
+      onClick: () => showAthleteModal(leader.name)
+    });
+  });
+
+  setChartHotspots(canvas, hotspots);
+}
+
+function renderTimelineReplay(athletes, sheetData) {
+  if (!el.timelineWrap || !el.timelineRange || !el.timelinePlay) return;
+  const dates = sheetData?.dateCols || [];
+  timelineDates = dates;
+  if (!dates.length) {
+    el.timelineWrap.hidden = true;
+    stopTimelinePlayback();
+    return;
+  }
+
+  el.timelineWrap.hidden = false;
+  el.timelineRange.max = String(Math.max(0, dates.length - 1));
+  timelineFrame = Math.min(Math.max(timelineFrame, 0), dates.length - 1);
+  drawTimelineChart(athletes, sheetData, timelineFrame);
 }
 
 function populateAthleteSelect(athletes) {
@@ -1503,10 +1713,13 @@ async function render() {
     drawPie(allAthletes);
     populateAthleteSelect(filtered);
     drawProgress(filtered, data);
+    renderTimelineReplay(filtered, data);
     await renderEventPulse(filtered, data);
     await renderPowerRankings();
     renderWatchlist(filtered);
     await renderPinnedSection();
+  } else {
+    stopTimelinePlayback();
   }
 
   applyRevealAnimation(document);
@@ -1528,6 +1741,8 @@ function bindEvents() {
     if (!tab) return;
     el.tabs.querySelectorAll('.tk-tab').forEach((t) => t.classList.remove('active'));
     tab.classList.add('active');
+    stopTimelinePlayback();
+    timelineFrame = 0;
     currentSheet = tab.dataset.sheet;
     sortCol = null; sortAsc = true;
     delete cache[currentSheet];
@@ -1582,6 +1797,31 @@ function bindEvents() {
     if (!data) return;
     const athletes = filterAthletes(processData(data));
     drawProgress(athletes, data);
+  });
+
+  // Timeline replay controls
+  el.timelineRange?.addEventListener('input', async () => {
+    const data = await fetchSheet(currentSheet);
+    if (!data) return;
+    const athletes = filterAthletes(processData(data));
+    timelineFrame = parseInt(el.timelineRange.value, 10) || 0;
+    drawTimelineChart(athletes, data, timelineFrame);
+  });
+
+  el.timelinePlay?.addEventListener('click', async () => {
+    if (timelineTimer) {
+      stopTimelinePlayback();
+      return;
+    }
+    const data = await fetchSheet(currentSheet);
+    if (!data || !data.dateCols?.length) return;
+    const athletes = filterAthletes(processData(data));
+    el.timelinePlay.textContent = '⏸ Pause';
+    timelineTimer = window.setInterval(() => {
+      timelineFrame = (timelineFrame + 1) % data.dateCols.length;
+      drawTimelineChart(athletes, data, timelineFrame);
+      if (el.timelineRange) el.timelineRange.value = String(timelineFrame);
+    }, 950);
   });
 
   // Modal close

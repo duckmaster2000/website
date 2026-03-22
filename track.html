@@ -120,6 +120,17 @@
     <canvas id="tkChartProgress" width="900" height="300"></canvas>
   </section>
 
+  <section class="tk-chart-wrap tk-chart-full tk-section-d" id="tkTimelineWrap">
+    <h3>Timeline Replay</h3>
+    <div class="tk-timeline-controls">
+      <button id="tkTimelinePlay" class="tk-timeline-btn" type="button">▶ Play</button>
+      <label for="tkTimelineRange">Date</label>
+      <input id="tkTimelineRange" type="range" min="0" max="0" value="0" step="1" />
+      <span id="tkTimelineLabel">—</span>
+    </div>
+    <canvas id="tkChartTimeline" width="900" height="300"></canvas>
+  </section>
+
   <!-- ── Pinned athletes — Dashboard only ── -->
   <section class="tk-pinned-section tk-section-d" id="tkPinnedSection">
     <h2>📌 Pinned Athletes</h2>
