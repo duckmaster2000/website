@@ -13,6 +13,7 @@ const KEYS = {
   left: false,
   right: false,
   up: false,
+  upPressed: false,
   dash: false
 };
 
@@ -449,6 +450,7 @@ function parseLevel(index) {
     vy: 0,
     facing: 1,
     onGround: false,
+    airJumpsUsed: 0,
     coyote: 0,
     jumpBuffer: 0,
     dashCd: 0,
@@ -480,7 +482,10 @@ function handleInputDown(e) {
   const key = e.key.toLowerCase();
   if (key === 'a' || key === 'arrowleft') KEYS.left = true;
   if (key === 'd' || key === 'arrowright') KEYS.right = true;
-  if (key === 'w' || key === 'arrowup' || key === ' ') KEYS.up = true;
+  if (key === 'w' || key === 'arrowup' || key === ' ') {
+    if (!KEYS.up) KEYS.upPressed = true;
+    KEYS.up = true;
+  }
   if (key === 'shift') KEYS.dash = true;
 
   if (key === 'r') restartLevel();
@@ -491,7 +496,10 @@ function handleInputUp(e) {
   const key = e.key.toLowerCase();
   if (key === 'a' || key === 'arrowleft') KEYS.left = false;
   if (key === 'd' || key === 'arrowright') KEYS.right = false;
-  if (key === 'w' || key === 'arrowup' || key === ' ') KEYS.up = false;
+  if (key === 'w' || key === 'arrowup' || key === ' ') {
+    KEYS.up = false;
+    KEYS.upPressed = false;
+  }
   if (key === 'shift') KEYS.dash = false;
 }
 
@@ -549,6 +557,7 @@ function respawnPlayer() {
   game.player.y = game.start.y;
   game.player.vx = 0;
   game.player.vy = 0;
+  game.player.airJumpsUsed = 0;
   game.player.hp = game.player.maxHp;
   game.player.invuln = 1.2;
 }
@@ -590,7 +599,7 @@ function updatePlayer(dt) {
   p.buffs.magnet = Math.max(0, p.buffs.magnet - dt);
 
   const moveSpeed = playerMoveSpeed() * (p.buffs.speed > 0 ? 1.45 : 1);
-  const jumpPower = playerJumpPower() * (p.buffs.jump > 0 ? 1.35 : 1);
+  const jumpPower = playerJumpPower() * (p.buffs.jump > 0 ? 1.28 : 1);
 
   const dir = (KEYS.right ? 1 : 0) - (KEYS.left ? 1 : 0);
   if (dir !== 0) {
@@ -601,13 +610,28 @@ function updatePlayer(dt) {
     if (Math.abs(p.vx) < 2) p.vx = 0;
   }
 
-  if (KEYS.up) p.jumpBuffer = 0.13;
+  if (KEYS.upPressed) {
+    p.jumpBuffer = 0.14;
+    KEYS.upPressed = false;
+  }
 
-  if (p.jumpBuffer > 0 && (p.onGround || p.coyote > 0)) {
-    p.vy = -jumpPower;
-    p.onGround = false;
-    p.coyote = 0;
-    p.jumpBuffer = 0;
+  if (p.jumpBuffer > 0) {
+    const groundedJump = p.onGround || p.coyote > 0;
+    const maxAirJumps = p.buffs.jump > 0 ? 2 : 1;
+    const airJump = !groundedJump && p.airJumpsUsed < maxAirJumps;
+
+    if (groundedJump || airJump) {
+      p.vy = -jumpPower;
+      p.onGround = false;
+      p.coyote = 0;
+      p.jumpBuffer = 0;
+
+      if (groundedJump) {
+        p.airJumpsUsed = 0;
+      } else {
+        p.airJumpsUsed += 1;
+      }
+    }
   }
 
   if (KEYS.dash && p.dashCd <= 0) {
@@ -638,6 +662,7 @@ function updatePlayer(dt) {
       p.y = hit.y - p.h;
       p.vy = 0;
       p.onGround = true;
+      p.airJumpsUsed = 0;
       p.coyote = 0.1;
     } else if (p.vy < 0) {
       p.y = hit.y + hit.h;

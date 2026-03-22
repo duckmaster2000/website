@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Harker MS Track 2026 — Stats Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="track.css" />
+</head>
+<body>
+  <header class="tk-header">
+    <a href="index.html" class="tk-back">&larr; Home</a>
+    <h1>Harker MS Track 2026</h1>
+    <p class="tk-subtitle">Live Stats Dashboard &mdash; updates automatically from the official timing sheet</p>
+  </header>
+
+  <nav class="tk-tabs" id="tkTabs">
+    <button class="tk-tab active" data-sheet="50 M">50 M</button>
+    <button class="tk-tab" data-sheet="100 M">100 M</button>
+    <button class="tk-tab" data-sheet="200 M">200 M</button>
+    <button class="tk-tab" data-sheet="400 M">400 M</button>
+    <button class="tk-tab" data-sheet="800 M">800 M</button>
+    <button class="tk-tab" data-sheet="1200 M (7th and 8th ONLY)">1200 M</button>
+  </nav>
+
+  <section class="tk-controls">
+    <div class="tk-grade-filters" id="tkGradeFilters">
+      <button class="tk-grade active" data-grade="all">All Grades</button>
+      <button class="tk-grade" data-grade="6">6th</button>
+      <button class="tk-grade" data-grade="7">7th</button>
+      <button class="tk-grade" data-grade="8">8th</button>
+    </div>
+    <input type="text" class="tk-search" id="tkSearch" placeholder="Search athlete..." autocomplete="off" />
+  </section>
+
+  <section class="tk-stats-cards" id="tkCards">
+    <div class="tk-card">
+      <span class="tk-card-label">Fastest</span>
+      <span class="tk-card-value" id="tkFastest">—</span>
+    </div>
+    <div class="tk-card">
+      <span class="tk-card-label">Average</span>
+      <span class="tk-card-value" id="tkAverage">—</span>
+    </div>
+    <div class="tk-card">
+      <span class="tk-card-label">Median</span>
+      <span class="tk-card-value" id="tkMedian">—</span>
+    </div>
+    <div class="tk-card">
+      <span class="tk-card-label">Timed Athletes</span>
+      <span class="tk-card-value" id="tkParticipation">—</span>
+    </div>
+    <div class="tk-card">
+      <span class="tk-card-label">Most Improved</span>
+      <span class="tk-card-value tk-card-value-sm" id="tkImproved">—</span>
+    </div>
+    <div class="tk-card">
+      <span class="tk-card-label">Total Roster</span>
+      <span class="tk-card-value" id="tkRoster">—</span>
+    </div>
+  </section>
+
+  <section class="tk-charts-row">
+    <div class="tk-chart-wrap">
+      <h3>Top 10 Fastest</h3>
+      <canvas id="tkChartTop10" width="520" height="280"></canvas>
+    </div>
+    <div class="tk-chart-wrap">
+      <h3>Average by Grade</h3>
+      <canvas id="tkChartGrade" width="520" height="280"></canvas>
+    </div>
+  </section>
+
+  <section class="tk-charts-row">
+    <div class="tk-chart-wrap">
+      <h3>Time Distribution</h3>
+      <canvas id="tkChartHist" width="520" height="280"></canvas>
+    </div>
+    <div class="tk-chart-wrap">
+      <h3>Participation by Grade</h3>
+      <canvas id="tkChartPie" width="520" height="280"></canvas>
+    </div>
+  </section>
+
+  <section class="tk-chart-wrap tk-chart-full">
+    <h3>Athlete Progress Over Time</h3>
+    <div class="tk-progress-controls">
+      <select id="tkAthleteSelect"><option value="">Select an athlete…</option></select>
+    </div>
+    <canvas id="tkChartProgress" width="900" height="300"></canvas>
+  </section>
+
+  <section class="tk-table-section">
+    <h2 id="tkTableHeading">Leaderboard</h2>
+    <div class="tk-table-wrap">
+      <table id="tkTable">
+        <thead>
+          <tr id="tkTableHead"></tr>
+        </thead>
+        <tbody id="tkTableBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="tk-athlete-modal" id="tkModal" hidden>
+    <div class="tk-modal-content" id="tkModalContent"></div>
+    <button class="tk-modal-close" id="tkModalClose">&times;</button>
+  </div>
+
+  <div class="tk-loading" id="tkLoading">
+    <div class="tk-spinner"></div>
+    <p>Fetching live data from Google Sheets…</p>
+  </div>
+
+  <footer class="tk-footer">
+    <p>Data sourced live from the <a href="https://docs.google.com/spreadsheets/d/1otSAiM7Y8u5l0_ZxjA9snO2VV2XYGOOwWCAWFq-epR4" target="_blank" rel="noopener">official timing spreadsheet</a>. Refresh to see latest updates.</p>
+  </footer>
+
+  <script src="track.js"></script>
+</body>
+</html>
