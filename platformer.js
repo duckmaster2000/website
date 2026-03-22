@@ -1,11 +1,11 @@
 const PF_SAVE_KEY = 'caleb_platformer_meta_v1';
 
 const TILE = 40;
-const GRAVITY = 1900;
+const GRAVITY = 1780;
 const TERMINAL_VY = 920;
-const BASE_MOVE = 260;
-const BASE_JUMP = 620;
-const BASE_DASH_FORCE = 520;
+const BASE_MOVE = 282;
+const BASE_JUMP = 700;
+const BASE_DASH_FORCE = 620;
 const BASE_MAX_HEALTH = 3;
 const BASE_LIVES = 3;
 
@@ -77,10 +77,10 @@ const SHOP = [
   }
 ];
 
-const LEVELS = [
+const BASE_LEVELS = [
   {
     name: 'Entry Cavern',
-    requiredCoinPct: 0.55,
+    requiredCoinPct: 0.42,
     map: [
       '####################################################################',
       '#.................C...............................C............E...#',
@@ -101,7 +101,7 @@ const LEVELS = [
   },
   {
     name: 'Molten Relay',
-    requiredCoinPct: 0.62,
+    requiredCoinPct: 0.44,
     map: [
       '####################################################################',
       '#S......C.............#####...............C.......................E#',
@@ -122,7 +122,7 @@ const LEVELS = [
   },
   {
     name: 'Sky Forge',
-    requiredCoinPct: 0.7,
+    requiredCoinPct: 0.46,
     map: [
       '####################################################################',
       '#S....C...............#####...............C.......................E#',
@@ -143,7 +143,7 @@ const LEVELS = [
   },
   {
     name: 'Citadel Core',
-    requiredCoinPct: 0.74,
+    requiredCoinPct: 0.48,
     map: [
       '####################################################################',
       '#S....C...........#####.....................C.....................E#',
@@ -163,6 +163,74 @@ const LEVELS = [
     ]
   }
 ];
+
+function mirrorRow(row) {
+  return [...row].reverse().map((ch) => {
+    if (ch === 'S') return 'E';
+    if (ch === 'E') return 'S';
+    return ch;
+  }).join('');
+}
+
+function mirrorMap(map) {
+  return map.map((row) => mirrorRow(row));
+}
+
+function softenMap(map, seed) {
+  return map.map((row, ry) => [...row].map((ch, rx) => {
+    const roll = (rx * 17 + ry * 11 + seed * 23) % 13;
+
+    if ((ch === 'L' || ch === '^') && roll < 5) return '.';
+    if ((ch === 'G' || ch === 'B' || ch === 'R') && roll < 6) return '.';
+    if ((ch === 'H' || ch === 'J' || ch === 'V' || ch === 'M') && roll < 6) return 'C';
+
+    return ch;
+  }).join(''));
+}
+
+function powerupsToCoinsMap(map) {
+  return map.map((row) => row.replace(/[HJVM]/g, 'C'));
+}
+
+function levelMinCoinPct(basePct, delta) {
+  return clamp(basePct + delta, 0.24, 0.52);
+}
+
+function buildLevelVariants(levelDef, seed) {
+  const easyPct = levelDef.requiredCoinPct;
+  const softened = softenMap(levelDef.map, seed);
+  const noPower = powerupsToCoinsMap(softened);
+
+  return [
+    {
+      name: `${levelDef.name}`,
+      requiredCoinPct: levelMinCoinPct(easyPct, 0),
+      map: levelDef.map
+    },
+    {
+      name: `${levelDef.name} Mirror`,
+      requiredCoinPct: levelMinCoinPct(easyPct, -0.02),
+      map: mirrorMap(levelDef.map)
+    },
+    {
+      name: `${levelDef.name} Drift`,
+      requiredCoinPct: levelMinCoinPct(easyPct, -0.05),
+      map: softened
+    },
+    {
+      name: `${levelDef.name} No-Power`,
+      requiredCoinPct: levelMinCoinPct(easyPct, -0.09),
+      map: noPower
+    },
+    {
+      name: `${levelDef.name} Mirror No-Power`,
+      requiredCoinPct: levelMinCoinPct(easyPct, -0.11),
+      map: mirrorMap(noPower)
+    }
+  ];
+}
+
+const LEVELS = BASE_LEVELS.flatMap((levelDef, idx) => buildLevelVariants(levelDef, idx + 1));
 
 const game = {
   ctx: null,
@@ -363,7 +431,12 @@ function parseLevel(index) {
   });
 
   game.totalCoins = game.coins.length;
-  game.requiredCoins = Math.ceil(game.totalCoins * def.requiredCoinPct);
+  if (game.totalCoins <= 0) {
+    game.requiredCoins = 0;
+  } else {
+    const byPercent = Math.ceil(game.totalCoins * def.requiredCoinPct);
+    game.requiredCoins = clamp(byPercent, 1, game.totalCoins);
+  }
   game.collectedCoins = 0;
   game.runCoins = 0;
 
