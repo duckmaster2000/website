@@ -44,6 +44,7 @@ let timelineAnimRaf = null;
 let timelineLastRenderedFrame = 0;
 let timelineAthletes = [];
 let timelineSheetData = null;
+let timelinePlaying = false;
 
 /* ── DOM refs ── */
 const $ = (id) => document.getElementById(id);
@@ -401,8 +402,9 @@ function computeTrendProjection(points) {
 }
 
 function stopTimelinePlayback() {
+  timelinePlaying = false;
   if (timelineTimer) {
-    window.clearInterval(timelineTimer);
+    window.clearTimeout(timelineTimer);
     timelineTimer = null;
   }
   if (timelineAnimRaf) {
@@ -410,6 +412,28 @@ function stopTimelinePlayback() {
     timelineAnimRaf = null;
   }
   if (el.timelinePlay) el.timelinePlay.textContent = '▶ Play';
+}
+
+function startTimelinePlayback() {
+  if (!timelineSheetData || !timelineDates.length || !timelineAthletes.length) return;
+  if (timelineDates.length <= 1) return;
+  timelinePlaying = true;
+  if (el.timelinePlay) el.timelinePlay.textContent = '⏸ Pause';
+
+  const runStep = () => {
+    if (!timelinePlaying || !timelineSheetData || !timelineAthletes.length || timelineDates.length <= 1) return;
+    const from = timelineLastRenderedFrame;
+    const to = (from + 1) % timelineDates.length;
+    animateTimelineTransition(timelineAthletes, timelineSheetData, from, to, {
+      durationMs: Math.max(260, Math.min(900, Math.round(timelineSpeedMs * 0.92))),
+      onComplete: () => {
+        if (!timelinePlaying) return;
+        timelineTimer = window.setTimeout(runStep, 40);
+      }
+    });
+  };
+
+  runStep();
 }
 
 /* ── Data processing ── */
@@ -1632,7 +1656,7 @@ function drawTimelineChart(athletes, sheetData, frameIndex, opts = {}) {
       const width = (leader.time / Math.max(prev.maxT, 0.001)) * areaW;
       const color = GRADE_COLORS[leader.grade] || '#7ee8ff';
       ctx.fillStyle = color;
-      ctx.globalAlpha = 0.16;
+      ctx.globalAlpha = 0.22;
       ctx.fillRect(pad.left, y, width, rowH);
     });
     ctx.globalAlpha = 1;
@@ -1693,7 +1717,9 @@ function drawTimelineChart(athletes, sheetData, frameIndex, opts = {}) {
   setChartHotspots(canvas, hotspots);
 }
 
-function animateTimelineTransition(athletes, sheetData, fromIndex, toIndex) {
+function animateTimelineTransition(athletes, sheetData, fromIndex, toIndex, options = {}) {
+  const duration = options.durationMs || Math.max(220, Math.min(620, timelineSpeedMs * 0.55));
+  const onComplete = typeof options.onComplete === 'function' ? options.onComplete : null;
   if (timelineAnimRaf) {
     window.cancelAnimationFrame(timelineAnimRaf);
     timelineAnimRaf = null;
@@ -1703,10 +1729,9 @@ function animateTimelineTransition(athletes, sheetData, fromIndex, toIndex) {
     drawTimelineChart(athletes, sheetData, toIndex, { ghostEnabled: timelineGhostOn });
     timelineLastRenderedFrame = toIndex;
     timelineFrame = toIndex;
+    if (onComplete) onComplete();
     return;
   }
-
-  const duration = Math.max(220, Math.min(620, timelineSpeedMs * 0.55));
   const started = performance.now();
 
   const step = (now) => {
@@ -1725,6 +1750,7 @@ function animateTimelineTransition(athletes, sheetData, fromIndex, toIndex) {
     timelineAnimRaf = null;
     timelineLastRenderedFrame = toIndex;
     timelineFrame = toIndex;
+    if (onComplete) onComplete();
   };
 
   timelineAnimRaf = window.requestAnimationFrame(step);
@@ -1748,6 +1774,13 @@ function renderTimelineReplay(athletes, sheetData) {
   timelineFrame = Math.min(Math.max(timelineFrame, 0), dates.length - 1);
   timelineLastRenderedFrame = timelineFrame;
   drawTimelineChart(athletes, sheetData, timelineFrame, { ghostEnabled: timelineGhostOn });
+  el.timelinePlay.disabled = dates.length <= 1;
+  if (dates.length <= 1) {
+    stopTimelinePlayback();
+    el.timelinePlay.textContent = 'Only 1 Date';
+  } else if (!timelinePlaying) {
+    el.timelinePlay.textContent = '▶ Play';
+  }
 }
 
 function populateAthleteSelect(athletes) {
@@ -1903,30 +1936,26 @@ function bindEvents() {
 
   // Timeline replay controls
   el.timelineRange?.addEventListener('input', async () => {
+    stopTimelinePlayback();
     if (!timelineSheetData || !timelineAthletes.length) return;
     const nextFrame = parseInt(el.timelineRange.value, 10) || 0;
     animateTimelineTransition(timelineAthletes, timelineSheetData, timelineLastRenderedFrame, nextFrame);
   });
 
   el.timelinePlay?.addEventListener('click', () => {
-    if (timelineTimer) {
+    if (timelinePlaying) {
       stopTimelinePlayback();
       return;
     }
-    if (!timelineSheetData || !timelineDates.length || !timelineAthletes.length) return;
-    el.timelinePlay.textContent = '⏸ Pause';
-    timelineTimer = window.setInterval(() => {
-      const nextFrame = (timelineLastRenderedFrame + 1) % timelineDates.length;
-      animateTimelineTransition(timelineAthletes, timelineSheetData, timelineLastRenderedFrame, nextFrame);
-    }, timelineSpeedMs);
+    startTimelinePlayback();
   });
 
   el.timelineSpeed?.addEventListener('change', () => {
     const nextMs = parseInt(el.timelineSpeed.value, 10);
     timelineSpeedMs = Number.isFinite(nextMs) ? Math.max(250, nextMs) : 950;
-    if (!timelineTimer) return;
+    if (!timelinePlaying) return;
     stopTimelinePlayback();
-    el.timelinePlay?.click();
+    startTimelinePlayback();
   });
 
   el.timelineGhost?.addEventListener('change', () => {
