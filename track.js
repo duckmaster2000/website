@@ -16,6 +16,7 @@ const SHEETS = [
 
 const GRADE_COLORS = { 6: '#85e89d', 7: '#b8a8ff', 8: '#7ee8ff' };
 const STD_COLORS   = { conference: '#cd7f32', regionals: '#c0c0c0', state: '#ffd700' };
+const CHART_HIT_RADIUS = 9;
 
 /* ── State ── */
 const cache = {};
@@ -75,6 +76,107 @@ const el = {
   chartCompare:  $('tkChartCompare'),
   cmpEventTabs:  $('tkCmpEventTabs')
 };
+
+/* ── Chart interactivity (hover + click stats) ── */
+const chartHotspots = new Map();
+let chartTooltipEl = null;
+
+function ensureChartTooltip() {
+  if (chartTooltipEl) return chartTooltipEl;
+  chartTooltipEl = document.createElement('div');
+  chartTooltipEl.className = 'tk-chart-tooltip';
+  chartTooltipEl.hidden = true;
+  document.body.appendChild(chartTooltipEl);
+  return chartTooltipEl;
+}
+
+function setChartHotspots(canvas, hotspots) {
+  if (!canvas) return;
+  chartHotspots.set(canvas.id, hotspots || []);
+}
+
+function isWithinArc(h, mx, my) {
+  const dx = mx - h.cx;
+  const dy = my - h.cy;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist > h.r || dist < (h.innerR || 0)) return false;
+  let ang = Math.atan2(dy, dx);
+  if (ang < 0) ang += Math.PI * 2;
+  let s = h.start;
+  let e = h.end;
+  if (s < 0) s += Math.PI * 2;
+  if (e < 0) e += Math.PI * 2;
+  if (s <= e) return ang >= s && ang <= e;
+  return ang >= s || ang <= e;
+}
+
+function getHotspotAt(canvas, mx, my) {
+  const hotspots = chartHotspots.get(canvas.id) || [];
+  for (let i = hotspots.length - 1; i >= 0; i--) {
+    const h = hotspots[i];
+    if (h.type === 'rect') {
+      if (mx >= h.x && mx <= h.x + h.w && my >= h.y && my <= h.y + h.h) return h;
+    } else if (h.type === 'circle') {
+      const dx = mx - h.x;
+      const dy = my - h.y;
+      const rr = (h.r || CHART_HIT_RADIUS);
+      if (dx * dx + dy * dy <= rr * rr) return h;
+    } else if (h.type === 'arc') {
+      if (isWithinArc(h, mx, my)) return h;
+    }
+  }
+  return null;
+}
+
+function hideChartTooltip() {
+  if (!chartTooltipEl) return;
+  chartTooltipEl.hidden = true;
+}
+
+function showChartTooltip(clientX, clientY, html) {
+  const tip = ensureChartTooltip();
+  tip.innerHTML = html;
+  tip.hidden = false;
+  const offset = 14;
+  tip.style.left = `${clientX + offset}px`;
+  tip.style.top = `${clientY + offset}px`;
+}
+
+function bindCanvasInteraction(canvas) {
+  if (!canvas || canvas.dataset.tkInteractiveBound === '1') return;
+  canvas.dataset.tkInteractiveBound = '1';
+
+  canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * canvas.width;
+    const y = ((e.clientY - rect.top) / rect.height) * canvas.height;
+    const hit = getHotspotAt(canvas, x, y);
+    if (!hit) {
+      canvas.style.cursor = 'default';
+      hideChartTooltip();
+      return;
+    }
+    canvas.style.cursor = hit.onClick ? 'pointer' : 'crosshair';
+    showChartTooltip(e.clientX, e.clientY, hit.tooltip || hit.label || '');
+  });
+
+  canvas.addEventListener('mouseleave', () => {
+    canvas.style.cursor = 'default';
+    hideChartTooltip();
+  });
+
+  canvas.addEventListener('click', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * canvas.width;
+    const y = ((e.clientY - rect.top) / rect.height) * canvas.height;
+    const hit = getHotspotAt(canvas, x, y);
+    if (hit && typeof hit.onClick === 'function') hit.onClick();
+  });
+}
+
+function bindStaticChartInteractions() {
+  [el.chartTop10, el.chartGrade, el.chartHist, el.chartPie, el.chartProgress, el.chartCompare].forEach(bindCanvasInteraction);
+}
 
 /* ── View management ── */
 const VIEW_SHOW = {
@@ -199,6 +301,21 @@ function formatTime(seconds) {
     return `${m}:${String(s).padStart(2,'0')}.${String(cs).padStart(2,'0')}`;
   }
   return seconds.toFixed(2);
+}
+
+function median(values) {
+  if (!values.length) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 0) return (sorted[mid - 1] + sorted[mid]) / 2;
+  return sorted[mid];
+}
+
+function stdDev(values) {
+  if (!values.length) return null;
+  const mean = values.reduce((sum, v) => sum + v, 0) / values.length;
+  const variance = values.reduce((sum, v) => sum + ((v - mean) ** 2), 0) / values.length;
+  return Math.sqrt(variance);
 }
 
 /* ── Data processing ── */
@@ -585,7 +702,7 @@ async function renderCompareView() {
       <div class="tk-cmp-score"><span>${winsB}</span><small>wins</small></div>
       <div class="tk-cmp-athlete-b"><span class="tk-grade-${gradeB}">${nameB}</span><small>Grade ${gradeB}</small></div>
     </div>
-    <div class="tk-table-wrap"><table>
+    <div class="tk-table-wrap tk-compare-table-wrap"><table class="tk-compare-table">
       <thead><tr><th>Event</th><th>${nameA}</th><th>${nameB}</th><th>Faster</th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>`;
@@ -607,8 +724,10 @@ async function drawCompareChart(athleteA, athleteB, sheetData, nameA, nameB) {
   const dateCols = sheetData.dateCols;
   const ptsA = dateCols.map((dc) => ({ date: dc, time: athleteA?.times?.[dc] ?? null })).filter((p) => p.time != null);
   const ptsB = dateCols.map((dc) => ({ date: dc, time: athleteB?.times?.[dc] ?? null })).filter((p) => p.time != null);
+  const hotspots = [];
 
   if (ptsA.length === 0 && ptsB.length === 0) {
+    setChartHotspots(canvas, []);
     ctx.fillStyle = '#556a88'; ctx.font = '13px Inter'; ctx.fillText('No recorded times for either athlete in this event', 60, H / 2); return;
   }
 
@@ -647,6 +766,13 @@ async function drawCompareChart(athleteA, athleteB, sheetData, nameA, nameB) {
       ctx.strokeStyle = '#0c1a32'; ctx.lineWidth = 2; ctx.stroke();
       ctx.fillStyle = '#fff'; ctx.font = 'bold 10px Inter'; ctx.textAlign = 'center';
       ctx.fillText(formatTime(p.time), x, y - 9);
+      hotspots.push({
+        type: 'circle',
+        x,
+        y,
+        r: 9,
+        tooltip: `<strong>${p.date}</strong><br>${formatTime(p.time)}`
+      });
     });
     ctx.lineWidth = 1;
   };
@@ -666,32 +792,229 @@ async function drawCompareChart(athleteA, athleteB, sheetData, nameA, nameB) {
   ctx.fillStyle = '#d4e0f0'; ctx.font = '11px Inter'; ctx.textAlign = 'left'; ctx.fillText(nameA, W - 164, 19);
   ctx.fillStyle = GRADE_COLORS[athleteB?.grade] || '#f97316'; ctx.fillRect(W - 180, 26, 12, 12);
   ctx.fillStyle = '#d4e0f0'; ctx.fillText(nameB, W - 164, 37);
+  setChartHotspots(canvas, hotspots);
 }
 
 /* ── Athlete modal (cross-event profile) ── */
 async function showAthleteModal(name) {
-  const content = [`<h2>${name}</h2>`];
+  const bundles = [];
   for (const sheet of SHEETS) {
     const data = await fetchSheet(sheet.key);
     if (!data) continue;
-    const a = processData(data).find((at) => at.name === name);
-    if (!a || a.best === null) continue;
-    content.push(`<h3>${sheet.label}</h3><table><tr><th>Date</th><th>Time</th></tr>`);
-    data.dateCols.forEach((dc) => {
-      const t = a.times[dc];
-      if (t !== null) {
-        const pr = t === a.best ? ' class="tk-pr"' : '';
-        content.push(`<tr><td>${dc}</td><td${pr}>${formatTime(t)}</td></tr>`);
-      }
+    const all = processData(data);
+    const athlete = all.find((at) => at.name === name);
+    if (!athlete || athlete.best == null) continue;
+    const timedAll = timedAthletes(all).sort((a, b) => a.best - b.best);
+    const gradeAll = timedAll.filter((a) => a.grade === athlete.grade);
+    const attempts = data.dateCols
+      .map((dc) => ({ date: dc, time: athlete.times[dc] }))
+      .filter((p) => p.time != null);
+    const values = attempts.map((a) => a.time);
+    const avg = values.length ? values.reduce((s, v) => s + v, 0) / values.length : null;
+    const med = median(values);
+    const sd = stdDev(values);
+    const worst = values.length ? Math.max(...values) : null;
+    const rankOverall = Math.max(1, timedAll.findIndex((a) => a.name === name) + 1);
+    const rankGrade = Math.max(1, gradeAll.findIndex((a) => a.name === name) + 1);
+    const percentile = timedAll.length <= 1 ? 100 : ((timedAll.length - rankOverall) / (timedAll.length - 1)) * 100;
+    const leader = timedAll[0]?.best ?? athlete.best;
+    bundles.push({
+      sheet,
+      data,
+      athlete,
+      attempts,
+      values,
+      avg,
+      med,
+      sd,
+      worst,
+      rankOverall,
+      rankGrade,
+      percentile,
+      leaderGap: athlete.best - leader,
+      stdLabel: getStandardLabel(sheet.key, athlete.best)
     });
-    content.push(`<tr><td><strong>Best</strong></td><td><strong>${formatTime(a.best)}</strong></td></tr>`);
-    const std = getStandardLabel(sheet.key, a.best);
-    if (std) content.push(`<tr><td>Standard Met</td><td><span class="tk-std-badge tk-std-${std}">${std.charAt(0).toUpperCase()+std.slice(1)}</span></td></tr>`);
-    if (a.improvement != null && a.improvement > 0) content.push(`<tr><td>Improvement</td><td style="color:#85e89d">−${a.improvement.toFixed(2)}s</td></tr>`);
-    content.push('</table>');
   }
-  el.modalContent.innerHTML = content.join('');
+
+  if (!bundles.length) {
+    el.modalContent.innerHTML = `<h2>${name}</h2><p class="tk-empty-msg">No timed marks found yet across tracked events.</p>`;
+    el.modal.hidden = false;
+    return;
+  }
+
+  const grade = bundles[0].athlete.grade;
+  const eventsRun = bundles.length;
+  const totalAttempts = bundles.reduce((sum, b) => sum + b.attempts.length, 0);
+  const podiumEvents = bundles.filter((b) => b.rankGrade <= 3).length;
+  const avgPercentile = bundles.reduce((sum, b) => sum + b.percentile, 0) / bundles.length;
+  const strongest = [...bundles].sort((a, b) => b.percentile - a.percentile)[0];
+  const mostImproved = [...bundles]
+    .filter((b) => b.athlete.improvement != null)
+    .sort((a, b) => (b.athlete.improvement || 0) - (a.athlete.improvement || 0))[0];
+
+  const summaryCards = `
+    <div class="tk-modal-stat-grid">
+      <div class="tk-modal-stat"><span class="tk-modal-stat-label">Grade</span><strong>${grade}</strong></div>
+      <div class="tk-modal-stat"><span class="tk-modal-stat-label">Events Run</span><strong>${eventsRun}</strong></div>
+      <div class="tk-modal-stat"><span class="tk-modal-stat-label">Total Timed Marks</span><strong>${totalAttempts}</strong></div>
+      <div class="tk-modal-stat"><span class="tk-modal-stat-label">Grade Podium Events</span><strong>${podiumEvents}</strong></div>
+      <div class="tk-modal-stat"><span class="tk-modal-stat-label">Avg Event Percentile</span><strong>${avgPercentile.toFixed(1)}%</strong></div>
+      <div class="tk-modal-stat"><span class="tk-modal-stat-label">Best Event</span><strong>${strongest.sheet.label}</strong></div>
+    </div>`;
+
+  const insights = `
+    <div class="tk-modal-insights">
+      <h3>Performance Insights</h3>
+      <ul>
+        <li>Strongest ranking is <strong>${strongest.sheet.label}</strong> at top ${Math.max(0.1, (100 - strongest.percentile)).toFixed(1)}% of all athletes for that event.</li>
+        <li>${mostImproved ? `Largest event improvement is <strong>${mostImproved.sheet.label}</strong> by <strong>${(mostImproved.athlete.improvement || 0).toFixed(2)}s</strong>.` : 'Improvement trend will appear once multiple dates are recorded per event.'}</li>
+        <li>${podiumEvents > 0 ? `Currently in grade top 3 for <strong>${podiumEvents}</strong> event${podiumEvents === 1 ? '' : 's'}.` : 'Not yet in grade top 3; closest events are highlighted in the table below.'}</li>
+      </ul>
+    </div>`;
+
+  const eventRows = bundles.map((b) => {
+    const std = b.stdLabel ? `<span class="tk-std-badge tk-std-${b.stdLabel}">${b.stdLabel[0].toUpperCase()}</span>` : '';
+    const improve = b.athlete.improvement != null ? `${b.athlete.improvement > 0 ? '−' : '+'}${Math.abs(b.athlete.improvement).toFixed(2)}s` : '—';
+    return `<tr>
+      <td><strong>${b.sheet.label}</strong> ${std}</td>
+      <td>${formatTime(b.athlete.best)}</td>
+      <td>${formatTime(b.avg)}</td>
+      <td>${formatTime(b.med)}</td>
+      <td>${formatTime(b.worst)}</td>
+      <td>${b.sd != null ? b.sd.toFixed(2) : '—'}s</td>
+      <td>#${b.rankOverall}</td>
+      <td>#${b.rankGrade}</td>
+      <td>${b.leaderGap > 0 ? `+${b.leaderGap.toFixed(2)}s` : 'Leader'}</td>
+      <td>${improve}</td>
+    </tr>`;
+  }).join('');
+
+  const chartBlocks = bundles.map((b, idx) => `
+    <article class="tk-modal-chart-card">
+      <div class="tk-modal-chart-head">
+        <h4>${b.sheet.label}</h4>
+        <span>${b.attempts.length} mark${b.attempts.length === 1 ? '' : 's'}</span>
+      </div>
+      <canvas id="tkModalChart${idx}" width="440" height="190"></canvas>
+    </article>
+  `).join('');
+
+  el.modalContent.innerHTML = `
+    <section class="tk-modal-hero">
+      <h2>${name}</h2>
+      <p>Comprehensive athlete profile with ranking, trend, consistency, and per-event breakdowns.</p>
+    </section>
+    ${summaryCards}
+    ${insights}
+    <section class="tk-modal-table-block">
+      <h3>Event Analytics</h3>
+      <div class="tk-modal-table-wrap">
+        <table class="tk-modal-analytics-table">
+          <thead>
+            <tr>
+              <th>Event</th>
+              <th>Best</th>
+              <th>Average</th>
+              <th>Median</th>
+              <th>Worst</th>
+              <th>Consistency</th>
+              <th>Overall Rank</th>
+              <th>Grade Rank</th>
+              <th>Gap to Leader</th>
+              <th>Improvement</th>
+            </tr>
+          </thead>
+          <tbody>${eventRows}</tbody>
+        </table>
+      </div>
+    </section>
+    <section class="tk-modal-charts-grid">
+      ${chartBlocks}
+    </section>
+  `;
   el.modal.hidden = false;
+
+  bundles.forEach((b, idx) => {
+    const canvas = document.getElementById(`tkModalChart${idx}`);
+    drawModalEventChart(canvas, b, name);
+  });
+}
+
+function drawModalEventChart(canvas, bundle, athleteName) {
+  if (!canvas || !bundle) return;
+  bindCanvasInteraction(canvas);
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width;
+  const H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  if (!bundle.attempts.length) {
+    ctx.fillStyle = '#556a88';
+    ctx.font = '12px Inter';
+    ctx.fillText('No timed marks for this event yet', 20, H / 2);
+    setChartHotspots(canvas, []);
+    return;
+  }
+
+  const pad = { top: 20, bottom: 32, left: 56, right: 20 };
+  const areaW = W - pad.left - pad.right;
+  const areaH = H - pad.top - pad.bottom;
+  const minT = Math.min(...bundle.values) * 0.96;
+  const maxT = Math.max(...bundle.values) * 1.04;
+  const range = (maxT - minT) || 1;
+  const hotspots = [];
+
+  ctx.strokeStyle = 'rgba(100,180,255,.08)';
+  for (let i = 0; i <= 3; i++) {
+    const y = pad.top + (areaH / 3) * i;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(W - pad.right, y);
+    ctx.stroke();
+    const value = maxT - (range / 3) * i;
+    ctx.fillStyle = '#556a88';
+    ctx.font = '10px Inter';
+    ctx.textAlign = 'right';
+    ctx.fillText(formatTime(value), pad.left - 7, y + 4);
+  }
+
+  const color = GRADE_COLORS[bundle.athlete.grade] || '#7ee8ff';
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2.3;
+  ctx.beginPath();
+  bundle.attempts.forEach((pt, i) => {
+    const x = pad.left + (bundle.attempts.length === 1 ? areaW / 2 : (i / (bundle.attempts.length - 1)) * areaW);
+    const y = pad.top + ((maxT - pt.time) / range) * areaH;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  bundle.attempts.forEach((pt, i) => {
+    const x = pad.left + (bundle.attempts.length === 1 ? areaW / 2 : (i / (bundle.attempts.length - 1)) * areaW);
+    const y = pad.top + ((maxT - pt.time) / range) * areaH;
+    ctx.beginPath();
+    ctx.arc(x, y, 4.8, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = '#08162c';
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+    ctx.fillStyle = '#8fb8dc';
+    ctx.font = '10px Inter';
+    ctx.textAlign = 'center';
+    ctx.fillText(pt.date, x, H - 10);
+
+    hotspots.push({
+      type: 'circle',
+      x,
+      y,
+      r: 10,
+      tooltip: `<strong>${athleteName}</strong><br>${bundle.sheet.label} • ${pt.date}<br>Time: ${formatTime(pt.time)}`
+    });
+  });
+
+  setChartHotspots(canvas, hotspots);
 }
 
 /* ── Charts ── */
@@ -701,11 +1024,12 @@ function drawTop10(athletes) {
   const W = canvas.width, H = canvas.height;
   ctx.clearRect(0, 0, W, H);
   const timed = timedAthletes(athletes).sort((a, b) => a.best - b.best).slice(0, 10);
-  if (timed.length === 0) { ctx.fillStyle = '#556a88'; ctx.font = '13px Inter'; ctx.fillText('No data', W / 2 - 20, H / 2); return; }
+  if (timed.length === 0) { setChartHotspots(canvas, []); ctx.fillStyle = '#556a88'; ctx.font = '13px Inter'; ctx.fillText('No data', W / 2 - 20, H / 2); return; }
   const maxTime = Math.max(...timed.map((a) => a.best));
   const pad = { top: 10, bottom: 20, left: 130, right: 50 };
   const barH = Math.min(22, (H - pad.top - pad.bottom) / timed.length - 4);
   const areaW = W - pad.left - pad.right;
+  const hotspots = [];
   timed.forEach((a, i) => {
     const y = pad.top + i * (barH + 4);
     const w = (a.best / maxTime) * areaW;
@@ -715,7 +1039,17 @@ function drawTop10(athletes) {
     ctx.fillText(a.name, pad.left - 6, y + barH / 2 + 4);
     ctx.textAlign = 'left'; ctx.fillStyle = '#ffffff'; ctx.font = 'bold 11px Inter';
     ctx.fillText(formatTime(a.best), pad.left + w + 5, y + barH / 2 + 4);
+    hotspots.push({
+      type: 'rect',
+      x: pad.left,
+      y,
+      w,
+      h: barH,
+      tooltip: `<strong>${a.name}</strong><br>Best: ${formatTime(a.best)}<br>Grade: ${a.grade}<br>Click for full profile`,
+      onClick: () => showAthleteModal(a.name)
+    });
   });
+  setChartHotspots(canvas, hotspots);
 }
 
 function drawGradeChart(athletes) {
@@ -734,6 +1068,7 @@ function drawGradeChart(athletes) {
   const pad = { top: 20, bottom: 38, left: 56, right: 20 };
   const areaW = W - pad.left - pad.right, areaH = H - pad.top - pad.bottom;
   const groupW = areaW / grades.length;
+  const hotspots = [];
   ctx.strokeStyle = 'rgba(100,180,255,.08)';
   for (let i = 0; i <= 4; i++) {
     const y = pad.top + (areaH / 4) * i;
@@ -755,7 +1090,24 @@ function drawGradeChart(athletes) {
     ctx.font = '9px Inter'; ctx.fillStyle = '#8fb8dc';
     ctx.fillText('avg', x + gapW + bW / 2, H - pad.bottom + 28);
     ctx.fillText('best', x + gapW + bW + 4 + bW / 2, H - pad.bottom + 28);
+    hotspots.push({
+      type: 'rect',
+      x: x + gapW,
+      y: pad.top + areaH - avgH,
+      w: bW,
+      h: avgH,
+      tooltip: `<strong>Grade ${d.grade}</strong><br>Average: ${formatTime(d.avg)}<br>Timed Athletes: ${d.count}`
+    });
+    hotspots.push({
+      type: 'rect',
+      x: x + gapW + bW + 4,
+      y: pad.top + areaH - bestH,
+      w: bW,
+      h: bestH,
+      tooltip: `<strong>Grade ${d.grade}</strong><br>Best: ${formatTime(d.best)}<br>Timed Athletes: ${d.count}`
+    });
   });
+  setChartHotspots(canvas, hotspots);
 }
 
 function drawHistogram(athletes) {
@@ -764,7 +1116,7 @@ function drawHistogram(athletes) {
   const W = canvas.width, H = canvas.height;
   ctx.clearRect(0, 0, W, H);
   const bests = timedAthletes(athletes).map((a) => a.best).sort((a, b) => a - b);
-  if (bests.length < 2) { ctx.fillStyle = '#556a88'; ctx.font = '13px Inter'; ctx.fillText('Not enough data', W / 2 - 40, H / 2); return; }
+  if (bests.length < 2) { setChartHotspots(canvas, []); ctx.fillStyle = '#556a88'; ctx.font = '13px Inter'; ctx.fillText('Not enough data', W / 2 - 40, H / 2); return; }
   const min = bests[0], max = bests[bests.length - 1];
   const binCount = Math.min(16, Math.max(6, Math.ceil(Math.sqrt(bests.length))));
   const binSize = (max - min) / binCount || 1;
@@ -774,6 +1126,7 @@ function drawHistogram(athletes) {
   const pad = { top: 12, bottom: 34, left: 40, right: 14 };
   const areaW = W - pad.left - pad.right, areaH = H - pad.top - pad.bottom;
   const bW = areaW / binCount;
+  const hotspots = [];
   bins.forEach((count, i) => {
     const h = maxBin > 0 ? (count / maxBin) * areaH : 0;
     const x = pad.left + i * bW, y = pad.top + areaH - h;
@@ -781,8 +1134,17 @@ function drawHistogram(athletes) {
     if (count > 0) { ctx.fillStyle = '#ffffff'; ctx.font = '10px Inter'; ctx.textAlign = 'center'; ctx.fillText(count, x + bW / 2, y - 3); }
     ctx.fillStyle = '#556a88'; ctx.font = '9px Inter'; ctx.textAlign = 'center';
     if (i % 2 === 0 || binCount <= 8) ctx.fillText(formatTime(min + i * binSize), x + bW / 2, H - pad.bottom + 14);
+    hotspots.push({
+      type: 'rect',
+      x: x + 1,
+      y,
+      w: bW - 2,
+      h,
+      tooltip: `<strong>Range:</strong> ${formatTime(min + i * binSize)} to ${formatTime(min + (i + 1) * binSize)}<br><strong>Athletes:</strong> ${count}`
+    });
   });
   ctx.strokeStyle = 'rgba(100,180,255,.08)'; ctx.beginPath(); ctx.moveTo(pad.left, pad.top + areaH); ctx.lineTo(pad.left + areaW, pad.top + areaH); ctx.stroke();
+  setChartHotspots(canvas, hotspots);
 }
 
 function drawPie(athletes) {
@@ -795,14 +1157,35 @@ function drawPie(athletes) {
   const totalAll = athletes.length || 1;
   const cx = W * 0.35, cy = H * 0.5, r = Math.min(cx - 20, cy - 20, 110);
   let angle = -Math.PI / 2;
+  const hotspots = [];
   slices.forEach((sl) => {
+    const startTimed = angle;
     const timedAngle   = (sl.timed / totalAll) * Math.PI * 2;
     const untimedAngle = ((sl.total - sl.timed) / totalAll) * Math.PI * 2;
     const gc = GRADE_COLORS[sl.grade];
     ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, r, angle, angle + timedAngle); ctx.closePath();
     ctx.fillStyle = gc; ctx.globalAlpha = 0.8; ctx.fill(); angle += timedAngle;
+    hotspots.push({
+      type: 'arc',
+      cx,
+      cy,
+      r,
+      start: startTimed,
+      end: startTimed + timedAngle,
+      tooltip: `<strong>Grade ${sl.grade}</strong><br>Timed: ${sl.timed}<br>Total: ${sl.total}`
+    });
+    const startUntimed = angle;
     ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, r, angle, angle + untimedAngle); ctx.closePath();
     ctx.fillStyle = gc; ctx.globalAlpha = 0.2; ctx.fill(); angle += untimedAngle;
+    hotspots.push({
+      type: 'arc',
+      cx,
+      cy,
+      r,
+      start: startUntimed,
+      end: startUntimed + untimedAngle,
+      tooltip: `<strong>Grade ${sl.grade}</strong><br>Untimed: ${Math.max(0, sl.total - sl.timed)}<br>Total: ${sl.total}`
+    });
   });
   ctx.globalAlpha = 1;
   const legendX = W * 0.68; let legendY = 40;
@@ -812,6 +1195,7 @@ function drawPie(athletes) {
     ctx.fillText(`Gr ${sl.grade}: ${sl.timed} timed / ${sl.total}`, legendX + 18, legendY + 10);
     legendY += 24;
   });
+  setChartHotspots(canvas, hotspots);
 }
 
 function drawProgress(athletes, sheetData) {
@@ -821,9 +1205,10 @@ function drawProgress(athletes, sheetData) {
   ctx.clearRect(0, 0, W, H);
   const selectedName = el.athleteSelect.value;
   const athlete = athletes.find((a) => a.name === selectedName);
-  if (!athlete) { ctx.fillStyle = '#556a88'; ctx.font = '13px Inter'; ctx.textAlign = 'left'; ctx.fillText('Select an athlete above', W / 2 - 80, H / 2); return; }
+  if (!athlete) { setChartHotspots(canvas, []); ctx.fillStyle = '#556a88'; ctx.font = '13px Inter'; ctx.textAlign = 'left'; ctx.fillText('Select an athlete above', W / 2 - 80, H / 2); return; }
   const points = sheetData.dateCols.map((dc) => ({ date: dc, time: athlete.times[dc] })).filter((p) => p.time !== null);
-  if (points.length === 0) { ctx.fillStyle = '#556a88'; ctx.font = '13px Inter'; ctx.fillText('No times recorded in this event', W / 2 - 100, H / 2); return; }
+  const hotspots = [];
+  if (points.length === 0) { setChartHotspots(canvas, []); ctx.fillStyle = '#556a88'; ctx.font = '13px Inter'; ctx.fillText('No times recorded in this event', W / 2 - 100, H / 2); return; }
   const pad = { top: 24, bottom: 40, left: 60, right: 30 };
   const areaW = W - pad.left - pad.right, areaH = H - pad.top - pad.bottom;
   const timesArr = points.map((p) => p.time);
@@ -849,8 +1234,16 @@ function drawProgress(athletes, sheetData) {
     ctx.strokeStyle = '#0c1a32'; ctx.lineWidth = 2; ctx.stroke();
     ctx.fillStyle = '#fff'; ctx.font = 'bold 11px Inter'; ctx.textAlign = 'center'; ctx.fillText(formatTime(p.time), x, y - 10);
     ctx.fillStyle = '#8fb8dc'; ctx.font = '10px Inter'; ctx.fillText(p.date, x, H - pad.bottom + 16);
+    hotspots.push({
+      type: 'circle',
+      x,
+      y,
+      r: 9,
+      tooltip: `<strong>${athlete.name}</strong><br>${p.date}: ${formatTime(p.time)}`
+    });
   });
   ctx.lineWidth = 1;
+  setChartHotspots(canvas, hotspots);
 }
 
 function populateAthleteSelect(athletes) {
@@ -1041,6 +1434,7 @@ async function boot() {
   loadPins();
   loadStandards();
   bindEvents();
+  bindStaticChartInteractions();
 
   // Start with dashboard view active
   switchView('dashboard');
