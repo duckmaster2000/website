@@ -17,8 +17,9 @@ const SHEETS = [
 const GRADE_COLORS = { 6: '#85e89d', 7: '#b8a8ff', 8: '#7ee8ff' };
 const STD_COLORS   = { conference: '#cd7f32', regionals: '#c0c0c0', state: '#ffd700' };
 const CHART_HIT_RADIUS = 9;
-const TRACK_LAT = 37.30;
-const TRACK_LON = -121.90;
+// San Jose, CA city center coordinates for weather pulls.
+const TRACK_LAT = 37.3382;
+const TRACK_LON = -121.8863;
 
 /* ── State ── */
 const cache = {};
@@ -382,11 +383,19 @@ function dateToKey(date) {
   return `${y}-${m}-${d}`;
 }
 
-function parseSheetDateLabel(label, fallbackYear = new Date().getFullYear()) {
+function parseSheetDateLabel(label, fallbackYear = new Date().getFullYear(), fallbackMonth = new Date().getMonth()) {
   if (!label) return null;
   let text = String(label).trim();
   if (!text) return null;
   text = text.replace(/(\d+)(st|nd|rd|th)/gi, '$1').replace(/\s+/g, ' ').trim();
+
+  // Day-only headers like "9" should map to the current season month/year,
+  // not Date("9") which becomes a 2001 date in many browsers.
+  if (/^\d{1,2}$/.test(text)) {
+    const day = parseInt(text, 10);
+    const dt = new Date(fallbackYear, fallbackMonth, day, 12, 0, 0, 0);
+    return Number.isNaN(dt.getTime()) ? null : dt;
+  }
 
   const numeric = text.match(/^(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2,4}))?$/);
   if (numeric) {
@@ -861,14 +870,16 @@ function renderWatchlist(athletes) {
 
 async function buildCalendarDataset() {
   const dayMap = new Map();
-  const fallbackYear = new Date().getFullYear();
+  const now = new Date();
+  const fallbackYear = now.getFullYear();
+  const fallbackMonth = now.getMonth();
 
   for (const sheet of SHEETS) {
     const data = await fetchSheet(sheet.key);
     if (!data) continue;
     const athletes = processData(data);
     data.dateCols.forEach((dc) => {
-      const parsed = parseSheetDateLabel(dc, fallbackYear);
+      const parsed = parseSheetDateLabel(dc, fallbackYear, fallbackMonth);
       if (!parsed) return;
       const key = dateToKey(parsed);
       if (!dayMap.has(key)) {
@@ -916,15 +927,12 @@ async function renderCalendarView() {
     if (nowMonth >= calendarBounds.min && nowMonth <= calendarBounds.max) calendarMonthCursor = nowMonth;
     else calendarMonthCursor = new Date(calendarBounds.max);
   }
-  if (calendarMonthCursor < calendarBounds.min) calendarMonthCursor = new Date(calendarBounds.min);
-  if (calendarMonthCursor > calendarBounds.max) calendarMonthCursor = new Date(calendarBounds.max);
-
   const monthStart = new Date(calendarMonthCursor.getFullYear(), calendarMonthCursor.getMonth(), 1);
   const monthEnd = new Date(calendarMonthCursor.getFullYear(), calendarMonthCursor.getMonth() + 1, 0);
   const weatherMap = await fetchMonthWeather(monthStart);
   el.calMonth.textContent = monthStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-  if (el.calPrev) el.calPrev.disabled = monthStart <= calendarBounds.min;
-  if (el.calNext) el.calNext.disabled = monthStart >= calendarBounds.max;
+  if (el.calPrev) el.calPrev.disabled = false;
+  if (el.calNext) el.calNext.disabled = false;
 
   const today = new Date();
   const todayKey = dateToKey(new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12, 0, 0, 0));
