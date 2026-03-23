@@ -30,6 +30,7 @@ let currentView   = 'dashboard';
 let sortCol  = null;
 let sortAsc  = true;
 let relayGrade   = 'all';
+let relayGender  = 'all';
 let athletesGrade  = 'all';
 let athletesSearch = '';
 let compareA = '';
@@ -95,6 +96,7 @@ const el = {
   athGradeFilters: $('tkAthGradeFilters'),
   athSearch:     $('tkAthSearch'),
   relayGrade:    $('tkRelayGrade'),
+  relayGender:   $('tkRelayGender'),
   relayResults:  $('tkRelayResults'),
   standardsForm: $('tkStandardsForm'),
   qualifierList: $('tkQualifierList'),
@@ -364,6 +366,15 @@ function parseTimeStr(val) {
   return isNaN(num) ? null : num;
 }
 
+function normalizeGenderValue(value) {
+  if (value == null) return 'unknown';
+  const raw = String(value).trim().toLowerCase();
+  if (!raw) return 'unknown';
+  if (raw === 'm' || raw === 'male' || raw === 'boy' || raw === 'boys' || raw === 'man' || raw === 'men') return 'male';
+  if (raw === 'f' || raw === 'female' || raw === 'girl' || raw === 'girls' || raw === 'woman' || raw === 'women') return 'female';
+  return 'unknown';
+}
+
 function formatTime(seconds) {
   if (seconds == null) return '—';
   if (seconds >= 60) {
@@ -581,6 +592,8 @@ function processData(sheetData) {
     const lastName  = row['Last Name']  || '';
     const firstName = row['First Name'] || '';
     const grade     = row['Grade'] != null ? Math.round(row['Grade']) : 0;
+    const rawGender = row['Gender'] ?? row['gender'] ?? row['Sex'] ?? row['sex'] ?? row['M/F'] ?? row['m/f'] ?? null;
+    const gender    = normalizeGenderValue(rawGender);
     const times = {};
     let best = null, bestDate = null, first = null, firstDate = null, last = null, lastDate = null;
     sheetData.dateCols.forEach((dc) => {
@@ -593,7 +606,7 @@ function processData(sheetData) {
       }
     });
     const improvement = (first !== null && last !== null && firstDate !== lastDate) ? first - last : null;
-    return { lastName, firstName, grade, times, best, bestDate, first, last, improvement, name: `${firstName} ${lastName}` };
+    return { lastName, firstName, grade, gender, times, best, bestDate, first, last, improvement, name: `${firstName} ${lastName}` };
   });
 }
 
@@ -1067,46 +1080,79 @@ async function renderRelayView() {
 
   let athletes = timedAthletes(processData(data));
   if (relayGrade !== 'all') athletes = athletes.filter((a) => a.grade === parseInt(relayGrade, 10));
+  if (relayGender !== 'all') athletes = athletes.filter((a) => a.gender === relayGender);
   athletes.sort((a, b) => a.best - b.best);
 
-  const buildTeam = (pool, size = 4) => {
-    const team = pool.slice(0, size);
-    const legTimes = team.map((a) => a.best);
-    const totalRaw = legTimes.reduce((s, v) => s + v, 0);
-    const exchanges = Math.max(0, team.length - 1) * EXCHANGE_TIME;
-    return { team, legTimes, totalRaw, totalEstimate: totalRaw + exchanges };
+  const relayTeamsFromPool = (pool, teamCount = 3, teamSize = 4) => {
+    const sorted = [...pool].sort((a, b) => a.best - b.best);
+    const teams = [];
+    for (let i = 0; i < teamCount; i++) {
+      const members = sorted.slice(i * teamSize, (i + 1) * teamSize);
+      const complete = members.length === teamSize;
+      const totalRaw = members.reduce((sum, m) => sum + m.best, 0);
+      const exchanges = Math.max(0, members.length - 1) * EXCHANGE_TIME;
+      teams.push({
+        index: i + 1,
+        members,
+        complete,
+        totalRaw,
+        totalEstimate: totalRaw + exchanges,
+        needed: Math.max(0, teamSize - members.length)
+      });
+    }
+    return teams;
   };
 
-  const renderTeam = (label, team, exchanges) => {
-    if (team.team.length === 0) return `<div class="tk-relay-card"><h3>${label}</h3><p class="tk-empty-msg">Not enough athletes.</p></div>`;
-    const rows = team.team.map((a, i) => `
+  const genderLabel = (g) => {
+    if (g === 'female') return 'Girls';
+    if (g === 'male') return 'Boys';
+    return 'Unspecified';
+  };
+
+  const renderTeamCard = (team, grade, gender) => {
+    const title = `Team ${team.index} • Grade ${grade} ${genderLabel(gender)}`;
+    if (!team.members.length) {
+      return `<article class="tk-relay-card tk-relay-team-card">
+        <h3>${title}</h3>
+        <p class="tk-empty-msg">Need ${team.needed} more athlete${team.needed === 1 ? '' : 's'} to form this team.</p>
+      </article>`;
+    }
+    const rows = team.members.map((a, i) => `
       <div class="tk-relay-runner">
         <span class="tk-relay-leg">Leg ${i + 1}</span>
         <span class="tk-relay-name tk-grade-${a.grade}"><span class="tk-clickable" data-athlete="${encodeURIComponent(a.name)}">${a.name}</span></span>
-        <span class="tk-relay-grade">(Gr ${a.grade})</span>
+        <span class="tk-relay-grade">(${a.gender === 'female' ? 'Girls' : a.gender === 'male' ? 'Boys' : 'Unspecified'})</span>
         <span class="tk-relay-split">${formatTime(a.best)}</span>
       </div>`).join('');
-    return `<div class="tk-relay-card">
-      <h3>${label}</h3>
+    const status = team.complete
+      ? `<span class="tk-relay-status ok">Ready</span>`
+      : `<span class="tk-relay-status warn">Need ${team.needed}</span>`;
+    return `<article class="tk-relay-card tk-relay-team-card">
+      <h3>${title} ${status}</h3>
       ${rows}
       <div class="tk-relay-total">
         <span>Raw legs total: <strong>${formatTime(team.totalRaw)}</strong></span>
-        <span>Est. relay time (+${exchanges}×0.2s exchange): <strong>${formatTime(team.totalEstimate)}</strong></span>
+        <span>Est. relay time: <strong>${formatTime(team.totalEstimate)}</strong></span>
       </div>
-    </div>`;
+    </article>`;
   };
 
-  let html = '';
-  if (relayGrade === 'all') {
-    html += renderTeam('Combined Best 4×100m Team', buildTeam(athletes), 3);
-    [6, 7, 8].forEach((g) => {
-      const pool = athletes.filter((a) => a.grade === g);
-      html += renderTeam(`Grade ${g} 4×100m Team`, buildTeam(pool), 3);
-    });
-  } else {
-    html = renderTeam(`Grade ${relayGrade} 4×100m Team`, buildTeam(athletes), 3);
-  }
-  el.relayResults.innerHTML = html;
+  const gradeBuckets = relayGrade === 'all' ? [6, 7, 8] : [parseInt(relayGrade, 10)];
+  const genderBuckets = relayGender === 'all' ? ['female', 'male', 'unknown'] : [relayGender];
+
+  const sections = gradeBuckets.map((grade) => {
+    return genderBuckets.map((gender) => {
+      const pool = athletes.filter((a) => a.grade === grade && a.gender === gender);
+      const teams = relayTeamsFromPool(pool, 3, 4);
+      const cards = teams.map((team) => renderTeamCard(team, grade, gender)).join('');
+      return `<section class="tk-relay-group">
+        <h3 class="tk-relay-group-title">Grade ${grade} • ${genderLabel(gender)} (${pool.length} sprinters)</h3>
+        <div class="tk-relay-team-grid">${cards}</div>
+      </section>`;
+    }).join('');
+  }).join('');
+
+  el.relayResults.innerHTML = sections || '<p class="tk-empty-msg">No athletes match the current relay filters.</p>';
 }
 
 /* ── Standards panel ── */
@@ -2280,6 +2326,16 @@ function bindEvents() {
     el.relayGrade.querySelectorAll('.tk-grade').forEach((b) => b.classList.remove('active'));
     btn.classList.add('active');
     relayGrade = btn.dataset.rgrade;
+    renderRelayView();
+  });
+
+  // Relay gender filter
+  el.relayGender?.addEventListener('click', (e) => {
+    const btn = e.target.closest('.tk-grade');
+    if (!btn) return;
+    el.relayGender.querySelectorAll('.tk-grade').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    relayGender = btn.dataset.rgender;
     renderRelayView();
   });
 

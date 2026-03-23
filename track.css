@@ -576,6 +576,7 @@ main,section,nav{scroll-margin-top:72px}
 
 /* ── Relay view ── */
 .tk-relay-controls{margin-bottom:1rem}
+.tk-relay-controls{display:flex;flex-direction:column;gap:.55rem}
 .tk-relay-card{
   background:rgba(14,28,52,.85);border:1px solid rgba(100,180,255,.1);
   border-radius:8px;padding:1rem 1.2rem;margin-bottom:.85rem;
@@ -601,6 +602,46 @@ main,section,nav{scroll-margin-top:72px}
   font-size:.8rem;color:#8fb8dc;
 }
 .tk-relay-total strong{color:#7ee8ff;font-family:'Orbitron',sans-serif}
+
+.tk-relay-group{margin-bottom:1rem}
+.tk-relay-group-title{
+  font-family:'Orbitron',sans-serif;
+  color:#8fb8dc;
+  font-size:.9rem;
+  margin-bottom:.55rem;
+}
+
+.tk-relay-team-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
+  gap:.7rem;
+}
+
+.tk-relay-team-card{
+  margin-bottom:0;
+  padding:.8rem .9rem;
+}
+
+.tk-relay-team-card h3{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:.4rem;
+  font-size:.78rem;
+}
+
+.tk-relay-status{
+  display:inline-block;
+  font-size:.62rem;
+  font-weight:700;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+  padding:.1rem .4rem;
+  border-radius:999px;
+}
+
+.tk-relay-status.ok{background:rgba(69,200,145,.23);color:#89f5c5}
+.tk-relay-status.warn{background:rgba(255,184,96,.23);color:#ffd9a3}
 
 /* ── Standards form ── */
 .tk-std-form{display:flex;flex-direction:column;gap:.6rem;margin-bottom:1rem}
