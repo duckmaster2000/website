@@ -45,6 +45,8 @@ let timelineLastRenderedFrame = 0;
 let timelineAthletes = [];
 let timelineSheetData = null;
 let timelinePlaying = false;
+let calendarMonthCursor = null;
+let calendarBounds = { min: null, max: null };
 
 /* ── DOM refs ── */
 const $ = (id) => document.getElementById(id);
@@ -74,6 +76,12 @@ const el = {
   timelineGhost:  $('tkTimelineGhost'),
   timelineRange:  $('tkTimelineRange'),
   timelineLabel:  $('tkTimelineLabel'),
+  calToday:      $('tkCalToday'),
+  calPrev:       $('tkCalPrev'),
+  calNext:       $('tkCalNext'),
+  calMonth:      $('tkCalMonth'),
+  calGrid:       $('tkCalGrid'),
+  calLegend:     $('tkCalLegend'),
   modal:         $('tkModal'),
   modalContent:  $('tkModalContent'),
   modalClose:    $('tkModalClose'),
@@ -241,6 +249,7 @@ const VIEW_SHOW = {
   dashboard:  ['tk-section-dl', 'tk-section-d'],
   leaderboard:['tk-section-dl', 'tk-section-l'],
   athletes:   ['tk-section-a'],
+  calendar:   ['tk-section-cal'],
   relay:      ['tk-section-r'],
   standards:  ['tk-section-s'],
   compare:    ['tk-section-c']
@@ -250,7 +259,7 @@ function switchView(view) {
   currentView = view;
   if (view !== 'dashboard') stopTimelinePlayback();
   const show = VIEW_SHOW[view] || [];
-  document.querySelectorAll('.tk-section-dl,.tk-section-d,.tk-section-l,.tk-section-a,.tk-section-r,.tk-section-s,.tk-section-c,.tk-view-panel').forEach((node) => {
+  document.querySelectorAll('.tk-section-dl,.tk-section-d,.tk-section-l,.tk-section-a,.tk-section-cal,.tk-section-r,.tk-section-s,.tk-section-c,.tk-view-panel').forEach((node) => {
     const visible = show.some((cls) => node.classList.contains(cls));
     node.hidden = !visible;
   });
@@ -361,6 +370,50 @@ function formatTime(seconds) {
     return `${m}:${String(s).padStart(2,'0')}.${String(cs).padStart(2,'0')}`;
   }
   return seconds.toFixed(2);
+}
+
+function dateToKey(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function parseSheetDateLabel(label, fallbackYear = new Date().getFullYear()) {
+  if (!label) return null;
+  let text = String(label).trim();
+  if (!text) return null;
+  text = text.replace(/(\d+)(st|nd|rd|th)/gi, '$1').replace(/\s+/g, ' ').trim();
+
+  const numeric = text.match(/^(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2,4}))?$/);
+  if (numeric) {
+    const month = parseInt(numeric[1], 10);
+    const day = parseInt(numeric[2], 10);
+    let year = numeric[3] ? parseInt(numeric[3], 10) : fallbackYear;
+    if (year < 100) year += 2000;
+    const dt = new Date(year, month - 1, day, 12, 0, 0, 0);
+    return Number.isNaN(dt.getTime()) ? null : dt;
+  }
+
+  let parsed = new Date(text);
+  if (!Number.isNaN(parsed.getTime())) return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate(), 12, 0, 0, 0);
+
+  parsed = new Date(`${text} ${fallbackYear}`);
+  if (!Number.isNaN(parsed.getTime())) return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate(), 12, 0, 0, 0);
+  return null;
+}
+
+function monthKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function eventColorClass(sheetKey) {
+  if (sheetKey === '50 M') return 'e50';
+  if (sheetKey === '100 M') return 'e100';
+  if (sheetKey === '200 M') return 'e200';
+  if (sheetKey === '400 M') return 'e400';
+  if (sheetKey === '800 M') return 'e800';
+  return 'e1200';
 }
 
 function median(values) {
@@ -738,6 +791,117 @@ function renderWatchlist(athletes) {
       <span class="tk-watch-name tk-grade-${row.grade}">${row.name}</span>
       <span class="tk-watch-meta">${row.level}: +${row.gap.toFixed(2)}s (${row.pct.toFixed(2)}%)</span>
     </button>`).join('')}</div>`;
+}
+
+async function buildCalendarDataset() {
+  const dayMap = new Map();
+  const fallbackYear = new Date().getFullYear();
+
+  for (const sheet of SHEETS) {
+    const data = await fetchSheet(sheet.key);
+    if (!data) continue;
+    const athletes = processData(data);
+    data.dateCols.forEach((dc) => {
+      const parsed = parseSheetDateLabel(dc, fallbackYear);
+      if (!parsed) return;
+      const key = dateToKey(parsed);
+      if (!dayMap.has(key)) {
+        dayMap.set(key, {
+          key,
+          date: parsed,
+          rawLabels: new Set(),
+          events: [],
+          totalMarks: 0
+        });
+      }
+      const row = dayMap.get(key);
+      row.rawLabels.add(dc);
+      const marks = athletes.reduce((count, athlete) => count + (athlete.times[dc] != null ? 1 : 0), 0);
+      if (marks > 0) {
+        row.events.push({ key: sheet.key, label: sheet.label, marks, colorClass: eventColorClass(sheet.key) });
+        row.totalMarks += marks;
+      }
+    });
+  }
+
+  const days = [...dayMap.values()].sort((a, b) => a.date - b.date);
+  return { dayMap, days };
+}
+
+async function renderCalendarView() {
+  if (!el.calGrid || !el.calMonth || !el.calToday) return;
+  el.calGrid.innerHTML = '<p class="tk-empty-msg">Loading calendar…</p>';
+  const dataset = await buildCalendarDataset();
+  const days = dataset.days;
+
+  if (!days.length) {
+    el.calGrid.innerHTML = '<p class="tk-empty-msg">No date columns found in the sheets yet.</p>';
+    el.calMonth.textContent = 'No calendar data';
+    el.calToday.textContent = 'Today — no schedule data';
+    return;
+  }
+
+  calendarBounds.min = new Date(days[0].date.getFullYear(), days[0].date.getMonth(), 1);
+  calendarBounds.max = new Date(days[days.length - 1].date.getFullYear(), days[days.length - 1].date.getMonth(), 1);
+
+  if (!calendarMonthCursor) {
+    const now = new Date();
+    const nowMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    if (nowMonth >= calendarBounds.min && nowMonth <= calendarBounds.max) calendarMonthCursor = nowMonth;
+    else calendarMonthCursor = new Date(calendarBounds.max);
+  }
+  if (calendarMonthCursor < calendarBounds.min) calendarMonthCursor = new Date(calendarBounds.min);
+  if (calendarMonthCursor > calendarBounds.max) calendarMonthCursor = new Date(calendarBounds.max);
+
+  const monthStart = new Date(calendarMonthCursor.getFullYear(), calendarMonthCursor.getMonth(), 1);
+  const monthEnd = new Date(calendarMonthCursor.getFullYear(), calendarMonthCursor.getMonth() + 1, 0);
+  el.calMonth.textContent = monthStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  if (el.calPrev) el.calPrev.disabled = monthStart <= calendarBounds.min;
+  if (el.calNext) el.calNext.disabled = monthStart >= calendarBounds.max;
+
+  const today = new Date();
+  const todayKey = dateToKey(new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12, 0, 0, 0));
+  const todayRow = dataset.dayMap.get(todayKey);
+  if (!todayRow || !todayRow.events.length) {
+    el.calToday.innerHTML = `<strong>Today</strong> ${today.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} — No time trials`;
+  } else {
+    const labels = todayRow.events.map((e) => e.label).join(', ');
+    el.calToday.innerHTML = `<strong>Today</strong> ${today.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} — ${labels}`;
+  }
+
+  const startWeekday = monthStart.getDay();
+  const totalDays = monthEnd.getDate();
+  const cells = [];
+  const headers = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    .map((h) => `<div class="tk-cal-weekday">${h}</div>`).join('');
+
+  for (let i = 0; i < startWeekday; i++) cells.push('<div class="tk-cal-day tk-cal-day-empty"></div>');
+
+  for (let day = 1; day <= totalDays; day++) {
+    const dt = new Date(monthStart.getFullYear(), monthStart.getMonth(), day, 12, 0, 0, 0);
+    const key = dateToKey(dt);
+    const entry = dataset.dayMap.get(key);
+    const chips = (entry?.events || [])
+      .sort((a, b) => b.marks - a.marks)
+      .slice(0, 3)
+      .map((evt) => `<button class="tk-cal-chip tk-cal-${evt.colorClass}" data-cal-event="${evt.key}" type="button">${evt.label} <span>${evt.marks}</span></button>`)
+      .join('');
+    const more = entry && entry.events.length > 3 ? `<div class="tk-cal-more">+${entry.events.length - 3} more events</div>` : '';
+    const marksLine = entry?.totalMarks ? `<div class="tk-cal-marks">${entry.totalMarks} recorded marks</div>` : '<div class="tk-cal-marks tk-cal-none">No trials</div>';
+    const cls = [
+      'tk-cal-day',
+      key === todayKey ? 'today' : '',
+      entry?.events?.length ? 'has-events' : ''
+    ].filter(Boolean).join(' ');
+    cells.push(`<div class="${cls}"><div class="tk-cal-daynum">${day}</div><div class="tk-cal-events">${chips || ''}${more}</div>${marksLine}</div>`);
+  }
+
+  while ((cells.length % 7) !== 0) cells.push('<div class="tk-cal-day tk-cal-day-empty"></div>');
+  el.calGrid.innerHTML = `${headers}${cells.join('')}`;
+
+  if (el.calLegend) {
+    el.calLegend.innerHTML = SHEETS.map((sheet) => `<span class="tk-cal-chip tk-cal-${eventColorClass(sheet.key)}">${sheet.label}</span>`).join('') + '<span class="tk-cal-legend-note">Click an event chip to jump to that event leaderboard.</span>';
+  }
 }
 
 /* ── Athletes overview (cross-event table) ── */
@@ -1812,6 +1976,11 @@ async function render() {
     el.loading.classList.add('hidden');
     return;
   }
+  if (currentView === 'calendar') {
+    await renderCalendarView();
+    el.loading.classList.add('hidden');
+    return;
+  }
   if (currentView === 'relay') {
     await renderRelayView();
     el.loading.classList.add('hidden');
@@ -1924,6 +2093,18 @@ function bindEvents() {
       showAthleteModal(decodeURIComponent(watchChip.dataset.athlete));
       return;
     }
+    const calChip = e.target.closest('[data-cal-event]');
+    if (calChip) {
+      const targetSheet = calChip.dataset.calEvent;
+      if (targetSheet) {
+        currentSheet = targetSheet;
+        el.tabs.querySelectorAll('.tk-tab').forEach((t) => t.classList.toggle('active', t.dataset.sheet === targetSheet));
+        sortCol = null;
+        sortAsc = true;
+        switchView('leaderboard');
+      }
+      return;
+    }
   });
 
   // Athlete select (progress chart)
@@ -1962,6 +2143,18 @@ function bindEvents() {
     timelineGhostOn = !!el.timelineGhost.checked;
     if (!timelineSheetData || !timelineAthletes.length) return;
     drawTimelineChart(timelineAthletes, timelineSheetData, timelineLastRenderedFrame, { ghostEnabled: timelineGhostOn });
+  });
+
+  el.calPrev?.addEventListener('click', async () => {
+    if (!calendarMonthCursor) return;
+    calendarMonthCursor = new Date(calendarMonthCursor.getFullYear(), calendarMonthCursor.getMonth() - 1, 1);
+    await renderCalendarView();
+  });
+
+  el.calNext?.addEventListener('click', async () => {
+    if (!calendarMonthCursor) return;
+    calendarMonthCursor = new Date(calendarMonthCursor.getFullYear(), calendarMonthCursor.getMonth() + 1, 1);
+    await renderCalendarView();
   });
 
   // Modal close

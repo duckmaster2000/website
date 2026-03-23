@@ -20,6 +20,7 @@
     <button class="tk-view active" data-view="dashboard">📊 Dashboard</button>
     <button class="tk-view" data-view="leaderboard">🏆 Leaderboard</button>
     <button class="tk-view" data-view="athletes">👟 Athletes</button>
+    <button class="tk-view" data-view="calendar">🗓️ Calendar</button>
     <button class="tk-view" data-view="relay">⚡ Relay</button>
     <button class="tk-view" data-view="standards">🎯 Standards</button>
     <button class="tk-view" data-view="compare">⚔️ Compare</button>
@@ -238,6 +239,24 @@
       <div class="tk-compare-event-tabs" id="tkCmpEventTabs"></div>
       <canvas id="tkChartCompare" width="860" height="300"></canvas>
     </div>
+  </section>
+
+  <!-- ── Calendar view only ── -->
+  <section class="tk-view-panel tk-section-cal" id="panelCalendar" hidden>
+    <div class="tk-panel-header">
+      <h2>🗓️ Race Calendar</h2>
+      <p class="tk-panel-desc">Daily event schedule inferred from sheet dates and recorded marks across all track events.</p>
+    </div>
+    <div class="tk-cal-today" id="tkCalToday">Loading calendar summary…</div>
+    <div class="tk-cal-shell">
+      <div class="tk-cal-toolbar">
+        <button id="tkCalPrev" class="tk-cal-nav" type="button" aria-label="Previous month">‹</button>
+        <h3 id="tkCalMonth">Month</h3>
+        <button id="tkCalNext" class="tk-cal-nav" type="button" aria-label="Next month">›</button>
+      </div>
+      <div class="tk-cal-grid" id="tkCalGrid"></div>
+    </div>
+    <div class="tk-cal-legend" id="tkCalLegend"></div>
   </section>
 
   <!-- ── Athlete modal ── -->
