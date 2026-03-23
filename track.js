@@ -17,6 +17,8 @@ const SHEETS = [
 const GRADE_COLORS = { 6: '#85e89d', 7: '#b8a8ff', 8: '#7ee8ff' };
 const STD_COLORS   = { conference: '#cd7f32', regionals: '#c0c0c0', state: '#ffd700' };
 const CHART_HIT_RADIUS = 9;
+const TRACK_LAT = 37.30;
+const TRACK_LON = -121.90;
 
 /* ── State ── */
 const cache = {};
@@ -47,6 +49,7 @@ let timelineSheetData = null;
 let timelinePlaying = false;
 let calendarMonthCursor = null;
 let calendarBounds = { min: null, max: null };
+const weatherMonthCache = new Map();
 
 /* ── DOM refs ── */
 const $ = (id) => document.getElementById(id);
@@ -414,6 +417,69 @@ function eventColorClass(sheetKey) {
   if (sheetKey === '400 M') return 'e400';
   if (sheetKey === '800 M') return 'e800';
   return 'e1200';
+}
+
+function isoDate(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function monthWeatherKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function weatherRiskLabel(weather) {
+  if (!weather) return { label: 'No weather data', level: 'unknown' };
+  const tempF = weather.tempF;
+  const wind = weather.windMph;
+  if (tempF >= 90 || wind >= 16) return { label: 'Likely Canceled', level: 'high' };
+  if (tempF >= 84 || wind >= 11) return { label: 'Caution', level: 'medium' };
+  return { label: 'Good Conditions', level: 'low' };
+}
+
+function mergeDailyWeather(mapTarget, payload) {
+  const daily = payload?.daily;
+  if (!daily?.time?.length) return;
+  for (let i = 0; i < daily.time.length; i++) {
+    const key = daily.time[i];
+    mapTarget.set(key, {
+      tempC: daily.temperature_2m_max?.[i] ?? null,
+      tempF: daily.temperature_2m_max?.[i] != null ? (daily.temperature_2m_max[i] * 9 / 5) + 32 : null,
+      windMph: daily.wind_speed_10m_max?.[i] != null ? daily.wind_speed_10m_max[i] * 0.621371 : null,
+      precipMm: daily.precipitation_sum?.[i] ?? null,
+      weatherCode: daily.weather_code?.[i] ?? null
+    });
+  }
+}
+
+async function fetchMonthWeather(date) {
+  const key = monthWeatherKey(date);
+  if (weatherMonthCache.has(key)) return weatherMonthCache.get(key);
+
+  const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
+  const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  const today = new Date();
+  const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const weatherMap = new Map();
+
+  const dailyFields = 'temperature_2m_max,wind_speed_10m_max,precipitation_sum,weather_code';
+  const tasks = [];
+
+  if (monthStart <= todayOnly) {
+    const pastEnd = monthEnd < todayOnly ? monthEnd : todayOnly;
+    const archiveUrl = `https://archive-api.open-meteo.com/v1/archive?latitude=${TRACK_LAT}&longitude=${TRACK_LON}&start_date=${isoDate(monthStart)}&end_date=${isoDate(pastEnd)}&daily=${dailyFields}&temperature_unit=celsius&windspeed_unit=mph&timezone=America%2FLos_Angeles`;
+    tasks.push(fetch(archiveUrl).then((r) => r.ok ? r.json() : null).catch(() => null));
+  }
+
+  if (monthEnd >= todayOnly) {
+    const futureStart = monthStart > todayOnly ? monthStart : todayOnly;
+    const forecastUrl = `https://api.open-meteo.com/v1/forecast?latitude=${TRACK_LAT}&longitude=${TRACK_LON}&start_date=${isoDate(futureStart)}&end_date=${isoDate(monthEnd)}&daily=${dailyFields}&temperature_unit=celsius&windspeed_unit=mph&timezone=America%2FLos_Angeles`;
+    tasks.push(fetch(forecastUrl).then((r) => r.ok ? r.json() : null).catch(() => null));
+  }
+
+  const responses = await Promise.all(tasks);
+  responses.forEach((payload) => { if (payload) mergeDailyWeather(weatherMap, payload); });
+  weatherMonthCache.set(key, weatherMap);
+  return weatherMap;
 }
 
 function median(values) {
@@ -855,18 +921,25 @@ async function renderCalendarView() {
 
   const monthStart = new Date(calendarMonthCursor.getFullYear(), calendarMonthCursor.getMonth(), 1);
   const monthEnd = new Date(calendarMonthCursor.getFullYear(), calendarMonthCursor.getMonth() + 1, 0);
+  const weatherMap = await fetchMonthWeather(monthStart);
   el.calMonth.textContent = monthStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   if (el.calPrev) el.calPrev.disabled = monthStart <= calendarBounds.min;
   if (el.calNext) el.calNext.disabled = monthStart >= calendarBounds.max;
 
   const today = new Date();
   const todayKey = dateToKey(new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12, 0, 0, 0));
+  const todayIso = isoDate(new Date(today.getFullYear(), today.getMonth(), today.getDate()));
+  const todayWeather = weatherMap.get(todayIso) || null;
+  const todayRisk = weatherRiskLabel(todayWeather);
+  const weatherLine = todayWeather && todayWeather.tempF != null && todayWeather.windMph != null
+    ? `${Math.round(todayWeather.tempF)}°F · ${Math.round(todayWeather.windMph)} mph wind`
+    : 'Weather unavailable';
   const todayRow = dataset.dayMap.get(todayKey);
   if (!todayRow || !todayRow.events.length) {
-    el.calToday.innerHTML = `<strong>Today</strong> ${today.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} — No time trials`;
+    el.calToday.innerHTML = `<strong>Today</strong> ${today.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} — No time trials <span class="tk-cal-weather">${weatherLine}</span> <span class="tk-cal-risk ${todayRisk.level}">${todayRisk.label}</span>`;
   } else {
     const labels = todayRow.events.map((e) => e.label).join(', ');
-    el.calToday.innerHTML = `<strong>Today</strong> ${today.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} — ${labels}`;
+    el.calToday.innerHTML = `<strong>Today</strong> ${today.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} — ${labels} <span class="tk-cal-weather">${weatherLine}</span> <span class="tk-cal-risk ${todayRisk.level}">${todayRisk.label}</span>`;
   }
 
   const startWeekday = monthStart.getDay();
@@ -880,7 +953,10 @@ async function renderCalendarView() {
   for (let day = 1; day <= totalDays; day++) {
     const dt = new Date(monthStart.getFullYear(), monthStart.getMonth(), day, 12, 0, 0, 0);
     const key = dateToKey(dt);
+    const iso = isoDate(dt);
     const entry = dataset.dayMap.get(key);
+    const weather = weatherMap.get(iso) || null;
+    const risk = weatherRiskLabel(weather);
     const chips = (entry?.events || [])
       .sort((a, b) => b.marks - a.marks)
       .slice(0, 3)
@@ -888,19 +964,24 @@ async function renderCalendarView() {
       .join('');
     const more = entry && entry.events.length > 3 ? `<div class="tk-cal-more">+${entry.events.length - 3} more events</div>` : '';
     const marksLine = entry?.totalMarks ? `<div class="tk-cal-marks">${entry.totalMarks} recorded marks</div>` : '<div class="tk-cal-marks tk-cal-none">No trials</div>';
+    const weatherLineDay = weather && weather.tempF != null && weather.windMph != null
+      ? `<div class="tk-cal-weather">${Math.round(weather.tempF)}°F · ${Math.round(weather.windMph)}mph</div>`
+      : '<div class="tk-cal-weather tk-cal-none">No weather</div>';
+    const riskLine = `<div class="tk-cal-risk ${risk.level}">${risk.label}</div>`;
     const cls = [
       'tk-cal-day',
       key === todayKey ? 'today' : '',
       entry?.events?.length ? 'has-events' : ''
     ].filter(Boolean).join(' ');
-    cells.push(`<div class="${cls}"><div class="tk-cal-daynum">${day}</div><div class="tk-cal-events">${chips || ''}${more}</div>${marksLine}</div>`);
+    cells.push(`<div class="${cls}"><div class="tk-cal-daynum">${day}</div><div class="tk-cal-events">${chips || ''}${more}</div>${marksLine}${weatherLineDay}${riskLine}</div>`);
   }
 
   while ((cells.length % 7) !== 0) cells.push('<div class="tk-cal-day tk-cal-day-empty"></div>');
   el.calGrid.innerHTML = `${headers}${cells.join('')}`;
 
   if (el.calLegend) {
-    el.calLegend.innerHTML = SHEETS.map((sheet) => `<span class="tk-cal-chip tk-cal-${eventColorClass(sheet.key)}">${sheet.label}</span>`).join('') + '<span class="tk-cal-legend-note">Click an event chip to jump to that event leaderboard.</span>';
+    const riskLegend = '<span class="tk-cal-risk low">Good Conditions</span><span class="tk-cal-risk medium">Caution</span><span class="tk-cal-risk high">Likely Canceled</span>';
+    el.calLegend.innerHTML = SHEETS.map((sheet) => `<span class="tk-cal-chip tk-cal-${eventColorClass(sheet.key)}">${sheet.label}</span>`).join('') + riskLegend + '<span class="tk-cal-legend-note">Click an event chip to jump to that event leaderboard. Weather from Open-Meteo.</span>';
   }
 }
 

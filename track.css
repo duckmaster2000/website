@@ -930,6 +930,28 @@ button.tk-cal-chip:hover{filter:brightness(1.08)}
   color:#86a8ca;
 }
 
+.tk-cal-weather{
+  margin-top:.28rem;
+  font-size:.66rem;
+  color:#a9c9e6;
+}
+
+.tk-cal-risk{
+  display:inline-block;
+  margin-top:.22rem;
+  font-size:.62rem;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+  padding:.12rem .42rem;
+  border-radius:999px;
+}
+
+.tk-cal-risk.low{background:rgba(69,200,145,.24);color:#86f0c2}
+.tk-cal-risk.medium{background:rgba(255,184,96,.26);color:#ffd89f}
+.tk-cal-risk.high{background:rgba(255,108,126,.26);color:#ffc2cc}
+.tk-cal-risk.unknown{background:rgba(153,177,204,.18);color:#b9cce0}
+
 /* ── Dashboard insights blocks ── */
 .tk-insights-grid{
   max-width:1120px;
