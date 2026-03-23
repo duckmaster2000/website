@@ -17,9 +17,9 @@ const SHEETS = [
 const GRADE_COLORS = { 6: '#85e89d', 7: '#b8a8ff', 8: '#7ee8ff' };
 const STD_COLORS   = { conference: '#cd7f32', regionals: '#c0c0c0', state: '#ffd700' };
 const CHART_HIT_RADIUS = 9;
-// San Jose, CA city center coordinates for weather pulls.
-const TRACK_LAT = 37.3382;
-const TRACK_LON = -121.8863;
+// Weather pulls pinned to the provided athletic field location.
+const TRACK_LAT = 37.3135503;
+const TRACK_LON = -121.9689221;
 
 /* ── State ── */
 const cache = {};
@@ -407,10 +407,20 @@ function parseSheetDateLabel(label, fallbackYear = new Date().getFullYear(), fal
     return Number.isNaN(dt.getTime()) ? null : dt;
   }
 
-  let parsed = new Date(text);
-  if (!Number.isNaN(parsed.getTime())) return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate(), 12, 0, 0, 0);
+  const hasYear = /\b\d{4}\b/.test(text);
+  const monthName = /(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/i.test(text);
 
-  parsed = new Date(`${text} ${fallbackYear}`);
+  // Month-name labels without explicit year (e.g. "March 9") must be pinned
+  // to the active season year to avoid browser default year quirks (e.g. 2001).
+  if (monthName && !hasYear) {
+    const withYear = `${text} ${fallbackYear}`;
+    const parsedWithYear = new Date(withYear);
+    if (!Number.isNaN(parsedWithYear.getTime())) {
+      return new Date(parsedWithYear.getFullYear(), parsedWithYear.getMonth(), parsedWithYear.getDate(), 12, 0, 0, 0);
+    }
+  }
+
+  const parsed = new Date(text);
   if (!Number.isNaN(parsed.getTime())) return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate(), 12, 0, 0, 0);
   return null;
 }
