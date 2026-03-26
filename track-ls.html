@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Harker Lower School Track 2026 — Stats Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="track.css" />
+</head>
+<body>
+  <header class="tk-header">
+    <a href="index.html" class="tk-back">&larr; Home</a>
+    <h1>Harker Lower School Track 2026</h1>
+    <p class="tk-subtitle">Live Stats Dashboard &mdash; updates automatically from the official timing sheet</p>
+  </header>
+
+  <!-- ── View navigation ── -->
+  <nav class="tk-views" id="tkViews">
+    <button class="tk-view active" data-view="dashboard">📊 Dashboard</button>
+    <button class="tk-view" data-view="leaderboard">🏆 Leaderboard</button>
+    <button class="tk-view" data-view="athletes">👟 Athletes</button>
+    <button class="tk-view" data-view="calendar">🗓️ Calendar</button>
+    <button class="tk-view" data-view="relay">⚡ Relay</button>
+    <button class="tk-view" data-view="standards">🎯 Standards</button>
+    <button class="tk-view" data-view="compare">⚔️ Compare</button>
+  </nav>
+
+  <!-- ── Event tabs — visible in Dashboard + Leaderboard ── -->
+  <nav class="tk-tabs tk-section-dl" id="tkTabs">
+    <button class="tk-tab active" data-sheet="50 M">50 M</button>
+    <button class="tk-tab" data-sheet="100 M">100 M</button>
+    <button class="tk-tab" data-sheet="200 M">200 M</button>
+    <button class="tk-tab" data-sheet="400 M">400 M</button>
+    <button class="tk-tab" data-sheet="800 M">800 M</button>
+    <button class="tk-tab" data-sheet="1200 M (7th and 8th ONLY)">1200 M</button>
+  </nav>
+
+  <!-- ── Grade + search — visible in Dashboard + Leaderboard ── -->
+  <section class="tk-controls tk-section-dl">
+    <div class="tk-grade-filters" id="tkGradeFilters">
+      <button class="tk-grade active" data-grade="all">All Grades</button>
+      <button class="tk-grade" data-grade="6">6th</button>
+      <button class="tk-grade" data-grade="7">7th</button>
+      <button class="tk-grade" data-grade="8">8th</button>
+    </div>
+    <input type="text" class="tk-search" id="tkSearch" placeholder="Search athlete..." autocomplete="off" />
+  </section>
+
+  <!-- ── Stats cards — visible in Dashboard + Leaderboard ── -->
+  <section class="tk-stats-cards tk-section-dl" id="tkCards">
+    <div class="tk-card">
+      <span class="tk-card-label">Fastest</span>
+      <span class="tk-card-value" id="tkFastest">—</span>
+    </div>
+    <div class="tk-card">
+      <span class="tk-card-label">Average</span>
+      <span class="tk-card-value" id="tkAverage">—</span>
+    </div>
+    <div class="tk-card">
+      <span class="tk-card-label">Median</span>
+      <span class="tk-card-value" id="tkMedian">—</span>
+    </div>
+    <div class="tk-card">
+      <span class="tk-card-label">Timed Athletes</span>
+      <span class="tk-card-value" id="tkParticipation">—</span>
+    </div>
+    <div class="tk-card">
+      <span class="tk-card-label">Most Improved</span>
+      <span class="tk-card-value tk-card-value-sm" id="tkImproved">—</span>
+    </div>
+    <div class="tk-card">
+      <span class="tk-card-label">Total Athletes</span>
+      <span class="tk-card-value" id="tkRoster">—</span>
+    </div>
+  </section>
+
+  <section class="tk-insights-grid tk-section-d" id="tkInsightsGrid">
+    <article class="tk-insight-card">
+      <h3>Event Pulse</h3>
+      <div id="tkEventPulse" class="tk-insight-body">Loading event pulse...</div>
+    </article>
+    <article class="tk-insight-card">
+      <h3>Power Rankings</h3>
+      <div id="tkPowerRankings" class="tk-insight-body">Calculating rankings...</div>
+    </article>
+    <article class="tk-insight-card">
+      <h3>Standards Watchlist</h3>
+      <div id="tkWatchlist" class="tk-insight-body">Set standards to unlock watchlist.</div>
+    </article>
+  </section>
+
+  <!-- ── Charts — Dashboard only ── -->
+  <section class="tk-charts-row tk-section-d">
+    <div class="tk-chart-wrap">
+      <h3>Top 10 Fastest</h3>
+      <canvas id="tkChartTop10" width="520" height="280"></canvas>
+    </div>
+    <div class="tk-chart-wrap">
+      <h3>Average by Grade</h3>
+      <canvas id="tkChartGrade" width="520" height="280"></canvas>
+    </div>
+  </section>
+
+  <section class="tk-charts-row tk-section-d">
+    <div class="tk-chart-wrap">
+      <h3>Time Distribution</h3>
+      <canvas id="tkChartHist" width="520" height="280"></canvas>
+    </div>
+    <div class="tk-chart-wrap">
+      <h3>Participation by Grade</h3>
+      <canvas id="tkChartPie" width="520" height="280"></canvas>
+    </div>
+  </section>
+
+  <section class="tk-chart-wrap tk-chart-full tk-section-d">
+    <h3>Athlete Progress Over Time</h3>
+    <div class="tk-progress-controls">
+      <select id="tkAthleteSelect"><option value="">Select an athlete…</option></select>
+    </div>
+    <canvas id="tkChartProgress" width="900" height="300"></canvas>
+  </section>
+
+  <section class="tk-chart-wrap tk-chart-full tk-section-d" id="tkTimelineWrap">
+    <h3>Timeline Replay</h3>
+    <div class="tk-timeline-controls">
+      <button id="tkTimelinePlay" class="tk-timeline-btn" type="button">▶ Play</button>
+      <label for="tkTimelineSpeed">Speed</label>
+      <select id="tkTimelineSpeed" class="tk-timeline-speed">
+        <option value="1400">0.75x</option>
+        <option value="950" selected>1.0x</option>
+        <option value="650">1.5x</option>
+        <option value="450">2.0x</option>
+      </select>
+      <label class="tk-timeline-toggle" for="tkTimelineGhost">
+        <input id="tkTimelineGhost" type="checkbox" checked />
+        Ghost trail
+      </label>
+      <label for="tkTimelineRange">Date</label>
+      <input id="tkTimelineRange" type="range" min="0" max="0" value="0" step="1" />
+      <span id="tkTimelineLabel">—</span>
+    </div>
+    <canvas id="tkChartTimeline" width="900" height="300"></canvas>
+  </section>
+
+  <!-- ── Pinned athletes — Dashboard only ── -->
+  <section class="tk-pinned-section tk-section-d" id="tkPinnedSection">
+    <h2>📌 Pinned Athletes</h2>
+    <div id="tkPinnedList"><p class="tk-empty-msg">No athletes pinned. Click ☆ in the Leaderboard to pin someone.</p></div>
+  </section>
+
+  <!-- ── Leaderboard table — Leaderboard only ── -->
+  <section class="tk-table-section tk-section-l" id="sectionLeaderboard">
+    <div class="tk-table-header-row">
+      <h2 id="tkTableHeading">Leaderboard</h2>
+      <div class="tk-legend">
+        <span class="tk-legend-pr">PR</span> Personal Best &nbsp;
+        <span class="tk-std-badge tk-std-conf">C</span> Conference &nbsp;
+        <span class="tk-std-badge tk-std-reg">R</span> Regionals &nbsp;
+        <span class="tk-std-badge tk-std-state">S</span> State &nbsp;
+        ⭐ Top 3 in grade
+      </div>
+    </div>
+    <div class="tk-table-wrap">
+      <table id="tkTable">
+        <thead><tr id="tkTableHead"></tr></thead>
+        <tbody id="tkTableBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── Athletes overview — Athletes view only ── -->
+  <section class="tk-view-panel tk-section-a" id="panelAthletes" hidden>
+    <div class="tk-panel-header">
+      <h2>All Athletes — Cross-Event Summary</h2>
+      <p class="tk-panel-desc">Best time per event for every athlete. Click a name for full profile.</p>
+    </div>
+    <div class="tk-controls" style="margin-bottom:.6rem">
+      <div class="tk-grade-filters" id="tkAthGradeFilters">
+        <button class="tk-grade active" data-agrade="all">All</button>
+        <button class="tk-grade" data-agrade="6">6th</button>
+        <button class="tk-grade" data-agrade="7">7th</button>
+        <button class="tk-grade" data-agrade="8">8th</button>
+      </div>
+      <input type="text" class="tk-search" id="tkAthSearch" placeholder="Search…" autocomplete="off" />
+    </div>
+    <div class="tk-table-wrap" id="tkAthTableWrap"></div>
+  </section>
+
+  <!-- ── Relay builder — Relay view only ── -->
+  <section class="tk-view-panel tk-section-r" id="panelRelay" hidden>
+    <div class="tk-panel-header">
+      <h2>⚡ 4×100m Relay Team Builder</h2>
+      <p class="tk-panel-desc">Auto-generates relay teams from best 100M sprint times. Estimated exchange: +0.2s per baton pass (3 total).</p>
+    </div>
+    <div class="tk-relay-controls">
+      <div class="tk-grade-filters" id="tkRelayGrade">
+        <button class="tk-grade active" data-rgrade="all">All Grades Combined</button>
+        <button class="tk-grade" data-rgrade="6">Grade 6 Only</button>
+        <button class="tk-grade" data-rgrade="7">Grade 7 Only</button>
+        <button class="tk-grade" data-rgrade="8">Grade 8 Only</button>
+      </div>
+      <div class="tk-grade-filters" id="tkRelayGender">
+        <button class="tk-grade active" data-rgender="all">All Genders</button>
+        <button class="tk-grade" data-rgender="female">Girls</button>
+        <button class="tk-grade" data-rgender="male">Boys</button>
+        <button class="tk-grade" data-rgender="unknown">Unspecified</button>
+      </div>
+    </div>
+    <div id="tkRelayResults"></div>
+  </section>
+
+  <!-- ── Qualifying standards — Standards view only ── -->
+  <section class="tk-view-panel tk-section-s" id="panelStandards" hidden>
+    <div class="tk-panel-header">
+      <h2>🎯 Qualifying Standards</h2>
+      <p class="tk-panel-desc">Set time standards for each event. Athletes who meet them are highlighted in the Leaderboard.</p>
+      <p class="tk-panel-desc-sm">Sprints (50–200M): enter seconds (e.g. <code>7.50</code>). Middle distance (400M+): enter seconds too (e.g. <code>70.0</code> for 1:10).</p>
+    </div>
+    <div id="tkStandardsForm"></div>
+    <hr class="tk-divider" />
+    <div id="tkQualifierList"></div>
+  </section>
+
+  <!-- ── Head-to-head compare — Compare view only ── -->
+  <section class="tk-view-panel tk-section-c" id="panelCompare" hidden>
+    <div class="tk-panel-header">
+      <h2>⚔️ Head-to-Head Comparison</h2>
+      <p class="tk-panel-desc">Compare two athletes across all events.</p>
+    </div>
+    <div class="tk-compare-pickers">
+      <div class="tk-compare-picker">
+        <label>Athlete A</label>
+        <select id="tkCmpA"><option value="">Select…</option></select>
+      </div>
+      <div class="tk-compare-vs">VS</div>
+      <div class="tk-compare-picker">
+        <label>Athlete B</label>
+        <select id="tkCmpB"><option value="">Select…</option></select>
+      </div>
+    </div>
+    <div id="tkCompareResult"></div>
+    <div class="tk-chart-wrap" id="tkCompareChartWrap" style="margin-top:.8rem;max-width:900px;margin-left:auto;margin-right:auto" hidden>
+      <h3 id="tkCompareChartTitle">Progress Comparison</h3>
+      <div class="tk-compare-event-tabs" id="tkCmpEventTabs"></div>
+      <canvas id="tkChartCompare" width="860" height="300"></canvas>
+    </div>
+  </section>
+
+  <!-- ── Calendar view only ── -->
+  <section class="tk-view-panel tk-section-cal" id="panelCalendar" hidden>
+    <div class="tk-panel-header">
+      <h2>🗓️ Race Calendar</h2>
+      <p class="tk-panel-desc">Daily event schedule inferred from sheet dates and recorded marks across all track events.</p>
+    </div>
+    <div class="tk-cal-today" id="tkCalToday">Loading calendar summary…</div>
+    <div class="tk-cal-shell">
+      <div class="tk-cal-toolbar">
+        <button id="tkCalPrev" class="tk-cal-nav" type="button" aria-label="Previous month">‹</button>
+        <h3 id="tkCalMonth">Month</h3>
+        <button id="tkCalNext" class="tk-cal-nav" type="button" aria-label="Next month">›</button>
+      </div>
+      <div class="tk-cal-grid" id="tkCalGrid"></div>
+    </div>
+    <div class="tk-cal-legend" id="tkCalLegend"></div>
+  </section>
+
+  <!-- ── Athlete modal ── -->
+  <div class="tk-athlete-modal" id="tkModal" hidden>
+    <div class="tk-modal-content" id="tkModalContent"></div>
+    <button class="tk-modal-close" id="tkModalClose">&times;</button>
+  </div>
+
+  <!-- ── Loading overlay ── -->
+  <div class="tk-loading" id="tkLoading">
+    <div class="tk-spinner"></div>
+    <p>Fetching live data from Google Sheets…</p>
+  </div>
+
+  <footer class="tk-footer">
+    <p>Data sourced live from the <a href="https://docs.google.com/spreadsheets/d/1nbdgawiSOXC5fw18NYjsA4W_h0E0vNibUTQ4A4aSchg" target="_blank" rel="noopener">official timing spreadsheet</a>. Refresh to see the latest updates.</p>
+  </footer>
+
+  <script src="track-ls.js"></script>
+</body>
+</html>
