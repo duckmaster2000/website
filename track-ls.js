@@ -11,10 +11,11 @@ const SHEETS = [
   { key: '200 M',  label: '200 M' },
   { key: '400 M',  label: '400 M' },
   { key: '800 M',  label: '800 M' },
-  { key: '1200 M (7th and 8th ONLY)', label: '1200 M' }
+  { key: '1200 M (4th and 5th ONLY)', label: '1200 M' }
 ];
 
-const GRADE_COLORS = { 6: '#85e89d', 7: '#b8a8ff', 8: '#7ee8ff' };
+const LS_GRADES = [4, 5];
+const GRADE_COLORS = { 4: '#85e89d', 5: '#7ee8ff' };
 const STD_COLORS   = { conference: '#cd7f32', regionals: '#c0c0c0', state: '#ffd700' };
 const CHART_HIT_RADIUS = 9;
 // Weather pulls pinned to the provided athletic field location.
@@ -680,7 +681,7 @@ function renderTable(athletes, sheetData) {
 
   // Top-3 per grade
   const top3ByGrade = {};
-  [6, 7, 8].forEach((g) => {
+  LS_GRADES.forEach((g) => {
     const grp = timedAthletes(sorted.filter((a) => a.grade === g)).sort((a, b) => a.best - b.best);
     top3ByGrade[g] = new Set(grp.slice(0, 3).map((a) => a.name));
   });
@@ -749,7 +750,7 @@ async function renderEventPulse(athletes, sheetData) {
     return;
   }
 
-  const gradeSummary = [6, 7, 8].map((grade) => {
+  const gradeSummary = LS_GRADES.map((grade) => {
     const group = timed.filter((a) => a.grade === grade);
     if (!group.length) return null;
     const avg = group.reduce((sum, a) => sum + a.best, 0) / group.length;
@@ -1137,7 +1138,7 @@ async function renderRelayView() {
     </article>`;
   };
 
-  const gradeBuckets = relayGrade === 'all' ? [6, 7, 8] : [parseInt(relayGrade, 10)];
+  const gradeBuckets = relayGrade === 'all' ? LS_GRADES : [parseInt(relayGrade, 10)];
   const genderBuckets = relayGender === 'all' ? ['female', 'male', 'unknown'] : [relayGender];
 
   const sections = gradeBuckets.map((grade) => {
@@ -1665,7 +1666,7 @@ function drawGradeChart(athletes) {
   const ctx = canvas.getContext('2d');
   const W = canvas.width, H = canvas.height;
   ctx.clearRect(0, 0, W, H);
-  const grades = [6, 7, 8];
+  const grades = LS_GRADES;
   const gradeData = grades.map((g) => {
     const timed = athletes.filter((a) => a.grade === g && a.best !== null);
     if (timed.length === 0) return { grade: g, avg: 0, best: 0, count: 0 };
@@ -1760,7 +1761,7 @@ function drawPie(athletes) {
   const ctx = canvas.getContext('2d');
   const W = canvas.width, H = canvas.height;
   ctx.clearRect(0, 0, W, H);
-  const grades = [6, 7, 8];
+  const grades = LS_GRADES;
   const slices = grades.map((g) => { const grp = athletes.filter((a) => a.grade === g); return { grade: g, timed: grp.filter((a) => a.best !== null).length, total: grp.length }; });
   const totalAll = athletes.length || 1;
   const cx = W * 0.35, cy = H * 0.5, r = Math.min(cx - 20, cy - 20, 110);
