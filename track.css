@@ -839,6 +839,29 @@ main,section,nav{scroll-margin-top:72px}
   margin-bottom:.85rem;
 }
 
+.tk-cal-filter{
+  display:flex;
+  align-items:center;
+  gap:.55rem;
+  margin-bottom:.75rem;
+}
+
+.tk-cal-filter label{
+  font-size:.72rem;
+  text-transform:uppercase;
+  letter-spacing:.05em;
+  color:#82a8ca;
+}
+
+.tk-cal-filter select{
+  border:1px solid rgba(114,191,255,.22);
+  background:rgba(9,22,40,.84);
+  color:#dcecff;
+  border-radius:8px;
+  font-size:.8rem;
+  padding:.34rem .45rem;
+}
+
 .tk-cal-today strong{
   font-family:'Orbitron',sans-serif;
   color:#7ee8ff;
@@ -915,6 +938,11 @@ main,section,nav{scroll-margin-top:72px}
 
 .tk-cal-day.has-events{background:rgba(17,38,64,.38)}
 
+.tk-cal-day.tk-cal-athlete-hit{
+  box-shadow:inset 0 0 0 1px rgba(127,230,178,.45);
+  background:linear-gradient(180deg,rgba(21,56,52,.45),rgba(11,31,30,.36));
+}
+
 .tk-cal-daynum{
   font-weight:700;
   font-size:.82rem;
@@ -954,7 +982,33 @@ button.tk-cal-chip:hover{filter:brightness(1.08)}
   color:#90badf;
 }
 
+.tk-cal-athlete-line{
+  margin-top:.26rem;
+  font-size:.65rem;
+  color:#d6ffe8;
+  display:flex;
+  align-items:center;
+  gap:.26rem;
+}
+
+.tk-cal-athlete-dot{
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  background:#8ff0ba;
+  flex:0 0 7px;
+}
+
+.tk-cal-athlete-summary{
+  display:inline-block;
+  margin-left:.45rem;
+  font-size:.7rem;
+  color:#d1f9e4;
+}
+
 .tk-cal-marks.tk-cal-none{color:#6d88a8}
+.tk-cal-athlete-line.tk-cal-none,
+.tk-cal-athlete-summary.tk-cal-none{color:#7e9dbb}
 
 .tk-cal-day-empty{background:rgba(6,12,24,.12);min-height:108px}
 

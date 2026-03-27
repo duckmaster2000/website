@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Track Login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="track-login.css" />
+</head>
+<body>
+  <main class="tk-login-shell">
+    <a class="tk-login-back" href="index.html">&larr; Back Home</a>
+    <section class="tk-login-card">
+      <h1 id="tkLoginTitle">Track Login</h1>
+      <p class="tk-login-sub" id="tkLoginSub">Sign in with your exact first and last name as listed in the timing sheets.</p>
+
+      <form id="tkLoginForm" novalidate>
+        <label class="tk-login-label" for="tkLoginEmail">Email</label>
+        <input id="tkLoginEmail" type="email" autocomplete="email" required placeholder="you@example.com" />
+
+        <label class="tk-login-label" for="tkLoginPassword">Password</label>
+        <input id="tkLoginPassword" type="password" autocomplete="current-password" required minlength="4" placeholder="Enter your password" />
+
+        <label class="tk-login-label" for="tkLoginName">First + Last Name (exact)</label>
+        <input id="tkLoginName" type="text" required placeholder="Derek Li" />
+
+        <button id="tkLoginSubmit" type="submit">Log In</button>
+      </form>
+
+      <p id="tkLoginError" class="tk-login-error" hidden></p>
+      <p id="tkLoginInfo" class="tk-login-info" hidden></p>
+      <p class="tk-login-note">This is a website-only gate for personalized stats and is not a secure backend account system.</p>
+    </section>
+  </main>
+  <script src="track-login.js"></script>
+</body>
+</html>

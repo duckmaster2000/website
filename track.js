@@ -3,6 +3,8 @@
 const SPREADSHEET_ID = '1otSAiM7Y8u5l0_ZxjA9snO2VV2XYGOOwWCAWFq-epR4';
 const PINS_KEY      = 'tk_pins_v1';
 const STANDARDS_KEY = 'tk_standards_v1';
+const AUTH_KEY      = 'tk_auth_v1';
+const LOGIN_ROUTE   = 'track-login.html?target=track.html&mode=ms';
 const EXCHANGE_TIME = 0.2; // seconds per baton exchange
 
 const SHEETS = [
@@ -51,6 +53,9 @@ let timelineSheetData = null;
 let timelinePlaying = false;
 let calendarMonthCursor = null;
 let calendarBounds = { min: null, max: null };
+let calendarAthlete = '';
+let preferredAthlete = '';
+let preferredAthleteApplied = false;
 const weatherMonthCache = new Map();
 
 /* ── DOM refs ── */
@@ -85,6 +90,7 @@ const el = {
   calPrev:       $('tkCalPrev'),
   calNext:       $('tkCalNext'),
   calMonth:      $('tkCalMonth'),
+  calAthlete:    $('tkCalAthlete'),
   calGrid:       $('tkCalGrid'),
   calLegend:     $('tkCalLegend'),
   modal:         $('tkModal'),
@@ -115,6 +121,33 @@ const el = {
 /* ── Chart interactivity (hover + click stats) ── */
 const chartHotspots = new Map();
 let chartTooltipEl = null;
+
+function redirectToLogin() {
+  window.location.href = LOGIN_ROUTE;
+}
+
+function loadAuthContext() {
+  const params = new URLSearchParams(window.location.search);
+  const requestedAthlete = params.get('athlete') ? decodeURIComponent(params.get('athlete')).trim() : '';
+  let authName = '';
+  try {
+    const raw = localStorage.getItem(AUTH_KEY);
+    if (raw) {
+      const auth = JSON.parse(raw);
+      if (auth && typeof auth.name === 'string' && typeof auth.email === 'string' && typeof auth.password === 'string') {
+        authName = auth.name.trim();
+      }
+    }
+  } catch (_) {}
+
+  if (!authName) {
+    redirectToLogin();
+    return false;
+  }
+  preferredAthlete = requestedAthlete || authName;
+  calendarAthlete = preferredAthlete;
+  return true;
+}
 
 function ensureChartTooltip() {
   if (chartTooltipEl) return chartTooltipEl;
@@ -893,6 +926,8 @@ function renderWatchlist(athletes) {
 
 async function buildCalendarDataset() {
   const dayMap = new Map();
+  const athleteDayMap = new Map();
+  const athleteNames = new Set();
   const now = new Date();
   const fallbackYear = now.getFullYear();
   const fallbackMonth = now.getMonth();
@@ -901,6 +936,7 @@ async function buildCalendarDataset() {
     const data = await fetchSheet(sheet.key);
     if (!data) continue;
     const athletes = processData(data);
+    athletes.forEach((athlete) => athleteNames.add(athlete.name));
     data.dateCols.forEach((dc) => {
       const parsed = parseSheetDateLabel(dc, fallbackYear, fallbackMonth);
       if (!parsed) return;
@@ -916,16 +952,44 @@ async function buildCalendarDataset() {
       }
       const row = dayMap.get(key);
       row.rawLabels.add(dc);
-      const marks = athletes.reduce((count, athlete) => count + (athlete.times[dc] != null ? 1 : 0), 0);
+      const athleteRuns = [];
+      const marks = athletes.reduce((count, athlete) => {
+        const t = athlete.times[dc];
+        if (t == null) return count;
+        athleteRuns.push({
+          name: athlete.name,
+          grade: athlete.grade,
+          time: t,
+          eventKey: sheet.key,
+          eventLabel: sheet.label
+        });
+        return count + 1;
+      }, 0);
       if (marks > 0) {
         row.events.push({ key: sheet.key, label: sheet.label, marks, colorClass: eventColorClass(sheet.key) });
         row.totalMarks += marks;
+      }
+      if (athleteRuns.length > 0) {
+        if (!athleteDayMap.has(key)) athleteDayMap.set(key, new Map());
+        const dayRuns = athleteDayMap.get(key);
+        athleteRuns.forEach((run) => {
+          if (!dayRuns.has(run.name)) dayRuns.set(run.name, []);
+          dayRuns.get(run.name).push(run);
+        });
       }
     });
   }
 
   const days = [...dayMap.values()].sort((a, b) => a.date - b.date);
-  return { dayMap, days };
+  return { dayMap, athleteDayMap, athleteNames: [...athleteNames].sort((a, b) => a.localeCompare(b)), days };
+}
+
+function renderCalendarAthleteFilter(athleteNames) {
+  if (!el.calAthlete) return;
+  if (calendarAthlete && !athleteNames.includes(calendarAthlete)) calendarAthlete = '';
+  const options = ['<option value="">All athletes</option>']
+    .concat(athleteNames.map((name) => `<option value="${encodeURIComponent(name)}"${name === calendarAthlete ? ' selected' : ''}>${name}</option>`));
+  el.calAthlete.innerHTML = options.join('');
 }
 
 async function renderCalendarView() {
@@ -933,6 +997,7 @@ async function renderCalendarView() {
   el.calGrid.innerHTML = '<p class="tk-empty-msg">Loading calendar…</p>';
   const dataset = await buildCalendarDataset();
   const days = dataset.days;
+  renderCalendarAthleteFilter(dataset.athleteNames);
 
   if (!days.length) {
     el.calGrid.innerHTML = '<p class="tk-empty-msg">No date columns found in the sheets yet.</p>';
@@ -966,11 +1031,17 @@ async function renderCalendarView() {
     ? `${Math.round(todayWeather.tempF)}°F · ${Math.round(todayWeather.windMph)} mph wind`
     : 'Weather unavailable';
   const todayRow = dataset.dayMap.get(todayKey);
+  const todayAthleteRuns = calendarAthlete ? (dataset.athleteDayMap.get(todayKey)?.get(calendarAthlete) || []) : [];
+  const todayAthleteLine = calendarAthlete
+    ? `<span class="tk-cal-athlete-summary${todayAthleteRuns.length ? '' : ' tk-cal-none'}">${todayAthleteRuns.length
+      ? `${calendarAthlete} — ${todayAthleteRuns.slice(0, 2).map((run) => `${run.eventLabel} ${formatTime(run.time)}`).join(' • ')}${todayAthleteRuns.length > 2 ? ` +${todayAthleteRuns.length - 2} more` : ''}`
+      : `${calendarAthlete} — no recorded mark today`}</span>`
+    : '';
   if (!todayRow || !todayRow.events.length) {
-    el.calToday.innerHTML = `<strong>Today</strong> ${today.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} — No time trials <span class="tk-cal-weather">${weatherLine}</span> <span class="tk-cal-risk ${todayRisk.level}">${todayRisk.label}</span>`;
+    el.calToday.innerHTML = `<strong>Today</strong> ${today.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} — No time trials <span class="tk-cal-weather">${weatherLine}</span> <span class="tk-cal-risk ${todayRisk.level}">${todayRisk.label}</span>${todayAthleteLine}`;
   } else {
     const labels = todayRow.events.map((e) => e.label).join(', ');
-    el.calToday.innerHTML = `<strong>Today</strong> ${today.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} — ${labels} <span class="tk-cal-weather">${weatherLine}</span> <span class="tk-cal-risk ${todayRisk.level}">${todayRisk.label}</span>`;
+    el.calToday.innerHTML = `<strong>Today</strong> ${today.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} — ${labels} <span class="tk-cal-weather">${weatherLine}</span> <span class="tk-cal-risk ${todayRisk.level}">${todayRisk.label}</span>${todayAthleteLine}`;
   }
 
   const startWeekday = monthStart.getDay();
@@ -988,6 +1059,7 @@ async function renderCalendarView() {
     const entry = dataset.dayMap.get(key);
     const weather = weatherMap.get(iso) || null;
     const risk = weatherRiskLabel(weather);
+    const athleteRuns = calendarAthlete ? (dataset.athleteDayMap.get(key)?.get(calendarAthlete) || []) : [];
     const chips = (entry?.events || [])
       .sort((a, b) => b.marks - a.marks)
       .slice(0, 3)
@@ -998,13 +1070,19 @@ async function renderCalendarView() {
     const weatherLineDay = weather && weather.tempF != null && weather.windMph != null
       ? `<div class="tk-cal-weather">${Math.round(weather.tempF)}°F · ${Math.round(weather.windMph)}mph</div>`
       : '<div class="tk-cal-weather tk-cal-none">No weather</div>';
+    const athleteLine = calendarAthlete
+      ? (athleteRuns.length
+        ? `<div class="tk-cal-athlete-line"><span class="tk-cal-athlete-dot"></span>${athleteRuns.slice(0, 2).map((run) => `${run.eventLabel} ${formatTime(run.time)}`).join(' • ')}${athleteRuns.length > 2 ? ` +${athleteRuns.length - 2} more` : ''}</div>`
+        : '<div class="tk-cal-athlete-line tk-cal-none">No mark for selected athlete</div>')
+      : '';
     const riskLine = `<div class="tk-cal-risk ${risk.level}">${risk.label}</div>`;
     const cls = [
       'tk-cal-day',
       key === todayKey ? 'today' : '',
-      entry?.events?.length ? 'has-events' : ''
+      entry?.events?.length ? 'has-events' : '',
+      calendarAthlete && athleteRuns.length ? 'tk-cal-athlete-hit' : ''
     ].filter(Boolean).join(' ');
-    cells.push(`<div class="${cls}"><div class="tk-cal-daynum">${day}</div><div class="tk-cal-events">${chips || ''}${more}</div>${marksLine}${weatherLineDay}${riskLine}</div>`);
+    cells.push(`<div class="${cls}"><div class="tk-cal-daynum">${day}</div><div class="tk-cal-events">${chips || ''}${more}</div>${athleteLine}${marksLine}${weatherLineDay}${riskLine}</div>`);
   }
 
   while ((cells.length % 7) !== 0) cells.push('<div class="tk-cal-day tk-cal-day-empty"></div>');
@@ -2160,6 +2238,13 @@ async function render() {
     drawHistogram(filtered);
     drawPie(allAthletes);
     populateAthleteSelect(filtered);
+    if (!preferredAthleteApplied && preferredAthlete && el.athleteSelect) {
+      const found = Array.from(el.athleteSelect.options).some((opt) => opt.value === preferredAthlete);
+      if (found) {
+        el.athleteSelect.value = preferredAthlete;
+        preferredAthleteApplied = true;
+      }
+    }
     drawProgress(filtered, data);
     renderTimelineReplay(filtered, data);
     await renderEventPulse(filtered, data);
@@ -2302,6 +2387,11 @@ function bindEvents() {
     await renderCalendarView();
   });
 
+  el.calAthlete?.addEventListener('change', async () => {
+    calendarAthlete = el.calAthlete.value ? decodeURIComponent(el.calAthlete.value) : '';
+    await renderCalendarView();
+  });
+
   // Modal close
   el.modalClose.addEventListener('click', () => { el.modal.hidden = true; });
   el.modal.addEventListener('click', (e) => { if (e.target === el.modal) el.modal.hidden = true; });
@@ -2360,6 +2450,7 @@ function bindEvents() {
 /* ── Boot ── */
 async function boot() {
   if (!el.tabs) return;
+  if (!loadAuthContext()) return;
 
   loadPins();
   loadStandards();
