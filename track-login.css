@@ -60,7 +60,8 @@ h1 {
   margin-top: 0.25rem;
 }
 
-#tkLoginForm input {
+#tkLoginForm input,
+#tkLoginForm select {
   border: 1px solid rgba(116, 190, 255, 0.28);
   border-radius: 8px;
   background: rgba(7, 17, 32, 0.92);
@@ -70,7 +71,8 @@ h1 {
   outline: none;
 }
 
-#tkLoginForm input:focus {
+#tkLoginForm input:focus,
+#tkLoginForm select:focus {
   border-color: #7de4ff;
   box-shadow: 0 0 0 2px rgba(125, 228, 255, 0.14);
 }

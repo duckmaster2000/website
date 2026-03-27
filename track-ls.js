@@ -92,6 +92,9 @@ const el = {
   calNext:       $('tkCalNext'),
   calMonth:      $('tkCalMonth'),
   calAthlete:    $('tkCalAthlete'),
+  userBar:       $('tkUserBar'),
+  viewingAs:     $('tkViewingAs'),
+  switchAthlete: $('tkSwitchAthlete'),
   calGrid:       $('tkCalGrid'),
   calLegend:     $('tkCalLegend'),
   modal:         $('tkModal'),
@@ -147,7 +150,15 @@ function loadAuthContext() {
   }
   preferredAthlete = requestedAthlete || authName;
   calendarAthlete = preferredAthlete;
+  refreshUserBadge();
   return true;
+}
+
+function refreshUserBadge() {
+  if (!el.userBar || !el.viewingAs) return;
+  const active = calendarAthlete || preferredAthlete || 'All athletes';
+  el.viewingAs.textContent = `Viewing as: ${active}`;
+  el.userBar.hidden = false;
 }
 
 function ensureChartTooltip() {
@@ -722,6 +733,7 @@ function renderTable(athletes, sheetData) {
   let rank = 0;
   el.tableBody.innerHTML = sorted.map((a) => {
     if (a.best != null) rank++;
+    const isFocusAthlete = preferredAthlete && a.name === preferredAthlete;
     const gradeClass = `tk-grade-${a.grade}`;
     const isTop3     = top3ByGrade[a.grade]?.has(a.name);
     const stdLabel   = getStandardLabel(currentSheet, a.best);
@@ -733,10 +745,11 @@ function renderTable(athletes, sheetData) {
     const timeCells = dateCols.map((dc) => {
       const t   = a.times[dc];
       const isPr = t !== null && t === a.best;
-      return `<td>${t !== null ? (isPr ? `<span class="tk-pr">${formatTime(t)}</span>` : formatTime(t)) : ''}</td>`;
+      const timeContent = t !== null ? (isPr ? `<span class="tk-pr">${formatTime(t)}</span>` : formatTime(t)) : '';
+      return `<td class="${isFocusAthlete && t !== null ? 'tk-focus-time' : ''}">${timeContent}</td>`;
     }).join('');
 
-    return `<tr>
+    return `<tr class="${isFocusAthlete ? 'tk-focus-athlete-row' : ''}">
       <td>${a.best != null ? rank : ''}</td>
       <td><span class="tk-clickable" data-athlete="${encodeURIComponent(a.name)}">${a.name}</span>${starBadge}${stdBadge}</td>
       <td class="${gradeClass}">${a.grade}</td>
@@ -991,6 +1004,7 @@ function renderCalendarAthleteFilter(athleteNames) {
   const options = ['<option value="">All athletes</option>']
     .concat(athleteNames.map((name) => `<option value="${encodeURIComponent(name)}"${name === calendarAthlete ? ' selected' : ''}>${name}</option>`));
   el.calAthlete.innerHTML = options.join('');
+  refreshUserBadge();
 }
 
 async function renderCalendarView() {
@@ -1132,14 +1146,15 @@ async function renderAthletesView() {
   </tr>`;
 
   const tbody = athletes.map((a) => {
+    const isFocusAthlete = preferredAthlete && a.name === preferredAthlete;
     const gradeClass = `tk-grade-${a.grade}`;
     const eventCells = SHEETS.map((s) => {
       const t = a.events[s.key];
       const stdLabel = getStandardLabel(s.key, t);
       const badge = stdLabel ? `<span class="tk-std-badge tk-std-${stdLabel}">${stdLabel[0].toUpperCase()}</span>` : '';
-      return `<td>${t != null ? formatTime(t) + badge : ''}</td>`;
+      return `<td class="${isFocusAthlete && t != null ? 'tk-focus-time' : ''}">${t != null ? formatTime(t) + badge : ''}</td>`;
     }).join('');
-    return `<tr>
+    return `<tr class="${isFocusAthlete ? 'tk-focus-athlete-row' : ''}">
       <td><span class="tk-clickable" data-athlete="${encodeURIComponent(a.name)}">${a.name}</span></td>
       <td class="${gradeClass}">${a.grade}</td>
       ${eventCells}
@@ -2390,7 +2405,21 @@ function bindEvents() {
 
   el.calAthlete?.addEventListener('change', async () => {
     calendarAthlete = el.calAthlete.value ? decodeURIComponent(el.calAthlete.value) : '';
+    if (calendarAthlete) preferredAthlete = calendarAthlete;
+    refreshUserBadge();
     await renderCalendarView();
+  });
+
+  el.switchAthlete?.addEventListener('click', () => {
+    if (currentView !== 'calendar') switchView('calendar');
+    window.setTimeout(() => {
+      document.getElementById('panelCalendar')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (!el.calAthlete) return;
+      el.calAthlete.focus();
+      if (typeof el.calAthlete.showPicker === 'function') {
+        try { el.calAthlete.showPicker(); } catch (_) {}
+      }
+    }, 180);
   });
 
   // Modal close

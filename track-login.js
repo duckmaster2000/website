@@ -110,11 +110,34 @@ async function boot() {
 
   let knownNames = null;
 
+  submitEl.disabled = true;
+  submitEl.textContent = 'Loading names...';
+  try {
+    knownNames = await fetchAthleteNames(config);
+    const sortedNames = [...knownNames.values()].sort((a, b) => a.localeCompare(b));
+    if (!sortedNames.length) {
+      showError('No athlete names were found yet. Try again later.');
+      nameEl.innerHTML = '<option value="">No names found</option>';
+      return;
+    }
+    nameEl.innerHTML = ['<option value="">Select your name...</option>']
+      .concat(sortedNames.map((name) => `<option value="${encodeURIComponent(name)}">${name}</option>`))
+      .join('');
+    submitEl.disabled = false;
+    submitEl.textContent = 'Log In';
+  } catch (_) {
+    showError('Unable to load athlete roster right now. Refresh and try again.');
+    nameEl.innerHTML = '<option value="">Unable to load names</option>';
+    submitEl.disabled = true;
+    submitEl.textContent = 'Log In';
+    return;
+  }
+
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     const email = normalizeSpaces(emailEl.value);
     const password = passEl.value;
-    const inputName = normalizeSpaces(nameEl.value);
+    const selectedName = nameEl.value ? decodeURIComponent(nameEl.value) : '';
 
     if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
       showError('Enter a valid email address.');
@@ -124,8 +147,8 @@ async function boot() {
       showError('Password must be at least 4 characters.');
       return;
     }
-    if (!/^[A-Za-z][A-Za-z'\-]*\s+[A-Za-z][A-Za-z'\-]*$/.test(inputName)) {
-      showError('Name must be exactly first name and last name, like Derek Li.');
+    if (!selectedName) {
+      showError('Please select your name from the roster list.');
       return;
     }
 
@@ -133,11 +156,10 @@ async function boot() {
     submitEl.textContent = 'Checking records...';
 
     try {
-      if (!knownNames) knownNames = await fetchAthleteNames(config);
-      const normalizedLookup = inputName.toLowerCase();
-      const canonicalName = knownNames.get(normalizedLookup);
+      const normalizedLookup = selectedName.toLowerCase();
+      const canonicalName = knownNames.get(normalizedLookup) || selectedName;
       if (!canonicalName) {
-        showError('That exact first+last name was not found in track records. Please match the website spelling exactly.');
+        showError('Selected name is not available in the timing sheets.');
         return;
       }
 

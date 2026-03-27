@@ -59,6 +59,36 @@ main,section,nav{scroll-margin-top:72px}
   font-size:.88rem;
   color:#7a99c2;
 }
+
+.tk-userbar{
+  margin-top:.6rem;
+  display:inline-flex;
+  align-items:center;
+  gap:.5rem;
+  padding:.32rem .48rem;
+  border:1px solid rgba(121,197,255,.22);
+  border-radius:999px;
+  background:rgba(8,22,42,.58);
+}
+
+.tk-viewing-as{
+  font-size:.72rem;
+  color:#c8e6ff;
+}
+
+.tk-switch-athlete{
+  appearance:none;
+  border:1px solid rgba(126,232,255,.35);
+  border-radius:999px;
+  background:rgba(22,58,92,.62);
+  color:#ddf3ff;
+  font-size:.7rem;
+  font-weight:700;
+  padding:.2rem .5rem;
+  cursor:pointer;
+}
+
+.tk-switch-athlete:hover{filter:brightness(1.08)}
 .tk-back{
   position:absolute;
   top:1rem;left:1rem;
@@ -334,6 +364,7 @@ main,section,nav{scroll-margin-top:72px}
 }
 #tkTable tbody tr{transition:background .15s}
 #tkTable tbody tr:hover{background:rgba(110,198,255,.06)}
+#tkTable tbody tr.tk-focus-athlete-row{background:rgba(114,220,255,.08)}
 #tkTable tbody tr.tk-pr-row td:nth-child(n+4){position:relative}
 .tk-pr{
   background:rgba(126,232,255,.13);
@@ -358,6 +389,15 @@ main,section,nav{scroll-margin-top:72px}
   vertical-align:middle;
 }
 .tk-clickable{cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px}
+
+.tk-focus-time{
+  font-weight:600;
+  color:#ecf7ff;
+  background:rgba(135,224,255,.12);
+  border-radius:4px;
+}
+
+.tk-ath-table tbody tr.tk-focus-athlete-row{background:rgba(114,220,255,.08)}
 
 /* ── Modal ── */
 .tk-athlete-modal{

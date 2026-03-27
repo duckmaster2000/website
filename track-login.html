@@ -14,7 +14,7 @@
     <a class="tk-login-back" href="index.html">&larr; Back Home</a>
     <section class="tk-login-card">
       <h1 id="tkLoginTitle">Track Login</h1>
-      <p class="tk-login-sub" id="tkLoginSub">Sign in with your exact first and last name as listed in the timing sheets.</p>
+      <p class="tk-login-sub" id="tkLoginSub">Sign in, then pick your name from the official timing-sheet roster.</p>
 
       <form id="tkLoginForm" novalidate>
         <label class="tk-login-label" for="tkLoginEmail">Email</label>
@@ -23,8 +23,10 @@
         <label class="tk-login-label" for="tkLoginPassword">Password</label>
         <input id="tkLoginPassword" type="password" autocomplete="current-password" required minlength="4" placeholder="Enter your password" />
 
-        <label class="tk-login-label" for="tkLoginName">First + Last Name (exact)</label>
-        <input id="tkLoginName" type="text" required placeholder="Derek Li" />
+        <label class="tk-login-label" for="tkLoginName">Select Your Name</label>
+        <select id="tkLoginName" required>
+          <option value="">Loading names...</option>
+        </select>
 
         <button id="tkLoginSubmit" type="submit">Log In</button>
       </form>
