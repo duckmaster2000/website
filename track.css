@@ -89,6 +89,42 @@ main,section,nav{scroll-margin-top:72px}
 }
 
 .tk-switch-athlete:hover{filter:brightness(1.08)}
+
+.tk-admin-inline{
+  margin-top:.5rem;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:.45rem;
+}
+
+.tk-admin-toggle{
+  font-size:.72rem;
+  padding:.26rem .62rem;
+}
+
+.tk-admin-inline-body{
+  width:min(1120px,96vw);
+  border:1px solid rgba(126,232,255,.25);
+  border-radius:12px;
+  background:rgba(7,18,35,.78);
+  padding:.55rem;
+}
+
+.tk-admin-inline-note{
+  margin:0 0 .45rem;
+  font-size:.74rem;
+  color:#a5c8e8;
+  text-align:left;
+}
+
+#tkAdminFrame{
+  width:100%;
+  min-height:420px;
+  border:1px solid rgba(121,197,255,.22);
+  border-radius:10px;
+  background:#071225;
+}
 .tk-back{
   position:absolute;
   top:1rem;left:1rem;

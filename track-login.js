@@ -40,7 +40,12 @@ function parseGvizJson(raw) {
 }
 
 function normalizeSpaces(v) {
-  return v.replace(/\s+/g, ' ').trim();
+  return String(v || '')
+    .normalize('NFKC')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/\u00A0/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function normalizeAthleteKey(name) {
@@ -78,7 +83,7 @@ async function fetchAthleteNames(config) {
       const last = row.c?.[lastIdx]?.v ? String(row.c[lastIdx].v).trim() : '';
       if (!first || !last) return;
       const full = normalizeSpaces(`${first} ${last}`);
-      allNames.set(full.toLowerCase(), full);
+      allNames.set(normalizeAthleteKey(full), full);
     });
   }));
   return allNames;
@@ -181,7 +186,7 @@ async function boot() {
     submitEl.textContent = 'Checking records...';
 
     try {
-      const normalizedLookup = selectedName.toLowerCase();
+      const normalizedLookup = normalizeAthleteKey(selectedName);
       const canonicalName = knownNames.get(normalizedLookup) || selectedName;
       if (!canonicalName) {
         showError('Selected name is not available in the timing sheets.');

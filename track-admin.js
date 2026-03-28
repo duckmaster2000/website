@@ -17,7 +17,12 @@ const MODE_CONFIG = {
 };
 
 function normalizeSpaces(v) {
-  return String(v || '').replace(/\s+/g, ' ').trim();
+  return String(v || '')
+    .normalize('NFKC')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/\u00A0/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function keyForName(name) {

@@ -6,6 +6,7 @@ const STANDARDS_KEY = 'tk_ls_standards_v1';
 const AUTH_KEY      = 'tk_ls_auth_v1';
 const GENDER_OVERRIDES_KEY = 'tk_gender_overrides_v1';
 const LOGIN_ROUTE   = 'track-login.html?target=track-ls.html&mode=ls';
+const ADMIN_PANEL_URL = 'track-admin.html?mode=ls';
 const EXCHANGE_TIME = 0.2; // seconds per baton exchange
 
 const SHEETS = [
@@ -97,6 +98,9 @@ const el = {
   userBar:       $('tkUserBar'),
   viewingAs:     $('tkViewingAs'),
   switchAthlete: $('tkSwitchAthlete'),
+  adminToggle:   $('tkAdminToggle'),
+  adminBody:     $('tkAdminBody'),
+  adminFrame:    $('tkAdminFrame'),
   calGrid:       $('tkCalGrid'),
   calLegend:     $('tkCalLegend'),
   modal:         $('tkModal'),
@@ -159,7 +163,13 @@ function loadAuthContext() {
 }
 
 function normalizeAthleteKey(name) {
-  return String(name || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  return String(name || '')
+    .normalize('NFKC')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/\u00A0/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
 }
 
 function loadGenderOverrides() {
@@ -2455,6 +2465,16 @@ function bindEvents() {
         try { el.calAthlete.showPicker(); } catch (_) {}
       }
     }, 180);
+  });
+
+  el.adminToggle?.addEventListener('click', () => {
+    if (!el.adminBody) return;
+    const nextOpen = el.adminBody.hidden;
+    el.adminBody.hidden = !nextOpen;
+    if (nextOpen && el.adminFrame && !el.adminFrame.getAttribute('src')) {
+      el.adminFrame.setAttribute('src', ADMIN_PANEL_URL);
+    }
+    if (el.adminToggle) el.adminToggle.textContent = nextOpen ? 'Hide Admin Panel' : 'Open Admin Panel';
   });
 
   // Modal close
