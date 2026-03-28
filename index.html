@@ -106,6 +106,40 @@
       <a class="contact" href="mailto:hicalebliu@gmail.com">Contact me at hicalebliu@gmail.com</a>
     </section>
 
+    <section class="panel suggestion-panel">
+      <h2>Suggestion Box</h2>
+      <p class="suggestion-sub">Share an idea, bug report, or feature request. You can send it straight to email, or prepare it for AI review.</p>
+      <form id="suggestForm" class="suggest-form" novalidate>
+        <div class="suggest-row">
+          <label for="suggestName">Your Name</label>
+          <input id="suggestName" type="text" placeholder="Derek Li" maxlength="80" />
+        </div>
+        <div class="suggest-row">
+          <label for="suggestEmail">Your Email (optional)</label>
+          <input id="suggestEmail" type="email" placeholder="you@example.com" maxlength="120" />
+        </div>
+        <div class="suggest-row">
+          <label for="suggestTopic">Topic</label>
+          <select id="suggestTopic">
+            <option value="Feature request">Feature request</option>
+            <option value="Bug report">Bug report</option>
+            <option value="Design feedback">Design feedback</option>
+            <option value="Track dashboard">Track dashboard</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="suggest-row">
+          <label for="suggestText">Suggestion</label>
+          <textarea id="suggestText" rows="6" placeholder="Write your suggestion here..." required></textarea>
+        </div>
+        <div class="suggest-actions">
+          <button id="suggestSendEmail" type="button">Send To Email</button>
+          <button id="suggestAiPrep" type="button">Prepare For AI Review</button>
+        </div>
+      </form>
+      <p id="suggestStatus" class="suggest-status" aria-live="polite"></p>
+    </section>
+
     <footer class="footer">
       <a href="https://www.digits.net" target="_blank" rel="noopener noreferrer">
         <img
