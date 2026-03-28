@@ -619,6 +619,19 @@ main,section,nav{scroll-margin-top:72px}
 /* ── Relay view ── */
 .tk-relay-controls{margin-bottom:1rem}
 .tk-relay-controls{display:flex;flex-direction:column;gap:.55rem}
+.tk-admin-link{
+  display:inline-block;
+  align-self:flex-start;
+  text-decoration:none;
+  font-size:.74rem;
+  font-weight:700;
+  color:#9fe4ff;
+  border:1px solid rgba(126,232,255,.3);
+  border-radius:999px;
+  padding:.32rem .62rem;
+  background:rgba(16,38,64,.65);
+}
+.tk-admin-link:hover{filter:brightness(1.1)}
 .tk-relay-card{
   background:rgba(14,28,52,.85);border:1px solid rgba(100,180,255,.1);
   border-radius:8px;padding:1rem 1.2rem;margin-bottom:.85rem;

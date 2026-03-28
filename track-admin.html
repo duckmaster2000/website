@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Track Gender Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="track-admin.css" />
+</head>
+<body>
+  <main class="ta-shell">
+    <section class="ta-card" id="taGateCard">
+      <h1>Relay Gender Admin</h1>
+      <p class="ta-sub" id="taModeLabel">Mode: --</p>
+      <p class="ta-note">Enter the admin password to access gender assignment tools.</p>
+      <form id="taGateForm">
+        <label for="taPassword">Admin Password</label>
+        <input id="taPassword" type="password" autocomplete="current-password" required placeholder="Password" />
+        <button type="submit">Unlock Admin</button>
+      </form>
+      <p id="taGateError" class="ta-error" hidden></p>
+      <p class="ta-linkrow"><a id="taBackLink" href="index.html">Back</a></p>
+    </section>
+
+    <section class="ta-card" id="taAdminCard" hidden>
+      <div class="ta-head-row">
+        <h1>Relay Gender Admin</h1>
+        <a id="taDashboardLink" href="index.html">Open Dashboard</a>
+      </div>
+      <p class="ta-sub" id="taAdminMode">Mode: --</p>
+      <div class="ta-tools">
+        <label><input id="taShowUnknownOnly" type="checkbox" checked /> Show only unresolved athletes</label>
+        <button id="taReloadBtn" type="button">Reload Roster</button>
+      </div>
+      <p id="taSummary" class="ta-summary">Loading...</p>
+      <div class="ta-table-wrap" id="taTableWrap"></div>
+      <p class="ta-foot">Changes are saved in local storage and used immediately by relay generation after refreshing the track page.</p>
+    </section>
+  </main>
+  <script src="track-admin.js"></script>
+</body>
+</html>

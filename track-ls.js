@@ -4,6 +4,7 @@ const SPREADSHEET_ID = '1nbdgawiSOXC5fw18NYjsA4W_h0E0vNibUTQ4A4aSchg';
 const PINS_KEY      = 'tk_ls_pins_v1';
 const STANDARDS_KEY = 'tk_ls_standards_v1';
 const AUTH_KEY      = 'tk_ls_auth_v1';
+const GENDER_OVERRIDES_KEY = 'tk_gender_overrides_v1';
 const LOGIN_ROUTE   = 'track-login.html?target=track-ls.html&mode=ls';
 const EXCHANGE_TIME = 0.2; // seconds per baton exchange
 
@@ -57,6 +58,7 @@ let calendarBounds = { min: null, max: null };
 let calendarAthlete = '';
 let preferredAthlete = '';
 let preferredAthleteApplied = false;
+let genderOverrides = {};
 const weatherMonthCache = new Map();
 
 /* ── DOM refs ── */
@@ -140,6 +142,8 @@ function loadAuthContext() {
       const auth = JSON.parse(raw);
       if (auth && typeof auth.name === 'string' && typeof auth.email === 'string' && typeof auth.password === 'string') {
         authName = auth.name.trim();
+        const authGender = normalizeGenderValue(auth.gender);
+        if (authGender !== 'unknown') relayGender = authGender;
       }
     }
   } catch (_) {}
@@ -152,6 +156,25 @@ function loadAuthContext() {
   calendarAthlete = preferredAthlete;
   refreshUserBadge();
   return true;
+}
+
+function normalizeAthleteKey(name) {
+  return String(name || '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function loadGenderOverrides() {
+  try {
+    const raw = localStorage.getItem(GENDER_OVERRIDES_KEY);
+    genderOverrides = raw ? (JSON.parse(raw) || {}) : {};
+  } catch (_) {
+    genderOverrides = {};
+  }
+}
+
+function resolveAthleteGender(name, fallbackGender) {
+  const override = genderOverrides[normalizeAthleteKey(name)];
+  const normalized = normalizeGenderValue(override || fallbackGender);
+  return normalized;
 }
 
 function refreshUserBadge() {
@@ -506,8 +529,13 @@ function weatherRiskLabel(weather) {
   if (!weather) return { label: 'No weather data', level: 'unknown' };
   const tempF = weather.tempF;
   const wind = weather.windMph;
-  if (tempF >= 90 || wind >= 16) return { label: 'Likely Canceled', level: 'high' };
-  if (tempF >= 84 || wind >= 11) return { label: 'Caution', level: 'medium' };
+  const precip = weather.precipMm ?? 0;
+  const code = weather.weatherCode;
+  const severeCodes = new Set([65, 67, 75, 82, 86, 95, 96, 99]);
+  const cautionCodes = new Set([61, 63, 71, 73, 80, 81, 85]);
+
+  if (tempF >= 95 || wind >= 20 || precip >= 8 || severeCodes.has(code)) return { label: 'Likely Canceled', level: 'high' };
+  if (tempF >= 88 || wind >= 13 || precip >= 3 || cautionCodes.has(code)) return { label: 'Caution', level: 'medium' };
   return { label: 'Good Conditions', level: 'low' };
 }
 
@@ -638,7 +666,8 @@ function processData(sheetData) {
     const firstName = row['First Name'] || '';
     const grade     = row['Grade'] != null ? Math.round(row['Grade']) : 0;
     const rawGender = row['Gender'] ?? row['gender'] ?? row['Sex'] ?? row['sex'] ?? row['M/F'] ?? row['m/f'] ?? null;
-    const gender    = normalizeGenderValue(rawGender);
+    const name = `${firstName} ${lastName}`;
+    const gender    = resolveAthleteGender(name, rawGender);
     const times = {};
     let best = null, bestDate = null, first = null, firstDate = null, last = null, lastDate = null;
     sheetData.dateCols.forEach((dc) => {
@@ -651,7 +680,7 @@ function processData(sheetData) {
       }
     });
     const improvement = (first !== null && last !== null && firstDate !== lastDate) ? first - last : null;
-    return { lastName, firstName, grade, gender, times, best, bestDate, first, last, improvement, name: `${firstName} ${lastName}` };
+    return { lastName, firstName, grade, gender, times, best, bestDate, first, last, improvement, name };
   });
 }
 
@@ -2277,6 +2306,12 @@ async function render() {
 
 /* ── Event bindings ── */
 function bindEvents() {
+  if (el.relayGender && relayGender !== 'all') {
+    el.relayGender.querySelectorAll('.tk-grade').forEach((b) => {
+      b.classList.toggle('active', b.dataset.rgender === relayGender);
+    });
+  }
+
   // View navigation
   el.views.addEventListener('click', (e) => {
     const btn = e.target.closest('.tk-view');
@@ -2482,6 +2517,7 @@ async function boot() {
   if (!el.tabs) return;
   if (!loadAuthContext()) return;
 
+  loadGenderOverrides();
   loadPins();
   loadStandards();
   bindEvents();

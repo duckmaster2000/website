@@ -16,6 +16,7 @@ const TARGET_CONFIG = {
     sheets: ['50 M', '100 M', '200 M', '400 M', '800 M', '1200 M (4th and 5th ONLY)']
   }
 };
+const GENDER_OVERRIDES_KEY = 'tk_gender_overrides_v1';
 
 function parseParams() {
   const params = new URLSearchParams(window.location.search);
@@ -40,6 +41,10 @@ function parseGvizJson(raw) {
 
 function normalizeSpaces(v) {
   return v.replace(/\s+/g, ' ').trim();
+}
+
+function normalizeAthleteKey(name) {
+  return normalizeSpaces(String(name || '')).toLowerCase();
 }
 
 function titleCaseName(name) {
@@ -95,6 +100,20 @@ function showInfo(msg) {
   info.hidden = false;
 }
 
+function saveGenderOverride(name, gender) {
+  const key = normalizeAthleteKey(name);
+  if (!key || !gender) return;
+  let map = {};
+  try {
+    const raw = localStorage.getItem(GENDER_OVERRIDES_KEY);
+    if (raw) map = JSON.parse(raw) || {};
+  } catch (_) {
+    map = {};
+  }
+  map[key] = gender;
+  localStorage.setItem(GENDER_OVERRIDES_KEY, JSON.stringify(map));
+}
+
 async function boot() {
   const config = parseParams();
   const titleEl = document.getElementById('tkLoginTitle');
@@ -103,6 +122,7 @@ async function boot() {
   const emailEl = document.getElementById('tkLoginEmail');
   const passEl = document.getElementById('tkLoginPassword');
   const nameEl = document.getElementById('tkLoginName');
+  const genderEl = document.getElementById('tkLoginGender');
   const submitEl = document.getElementById('tkLoginSubmit');
 
   titleEl.textContent = config.title;
@@ -138,6 +158,7 @@ async function boot() {
     const email = normalizeSpaces(emailEl.value);
     const password = passEl.value;
     const selectedName = nameEl.value ? decodeURIComponent(nameEl.value) : '';
+    const selectedGender = genderEl.value;
 
     if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
       showError('Enter a valid email address.');
@@ -149,6 +170,10 @@ async function boot() {
     }
     if (!selectedName) {
       showError('Please select your name from the roster list.');
+      return;
+    }
+    if (selectedGender !== 'female' && selectedGender !== 'male') {
+      showError('Please choose your gender.');
       return;
     }
 
@@ -168,11 +193,13 @@ async function boot() {
         email,
         password,
         name: canonicalName,
+        gender: selectedGender,
         username,
         target: config.target,
         mode: config === TARGET_CONFIG.ls ? 'ls' : 'ms',
         loginAt: new Date().toISOString()
       };
+      saveGenderOverride(canonicalName, selectedGender);
       localStorage.setItem(config.authKey, JSON.stringify(auth));
       showInfo(`Welcome ${canonicalName}. Username created: ${username}. Redirecting...`);
       window.setTimeout(() => {
