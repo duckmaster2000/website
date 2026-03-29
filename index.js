@@ -11,6 +11,7 @@ const el = {
   status: document.getElementById('achStatus'),
   suggestName: document.getElementById('suggestName'),
   suggestEmail: document.getElementById('suggestEmail'),
+  suggestAnonymous: document.getElementById('suggestAnonymous'),
   suggestTopic: document.getElementById('suggestTopic'),
   suggestText: document.getElementById('suggestText'),
   suggestSendEmail: document.getElementById('suggestSendEmail'),
@@ -136,11 +137,12 @@ function setSuggestStatus(msg, isError = false) {
 }
 
 function collectSuggestion() {
-  const name = (el.suggestName?.value || '').trim();
-  const email = (el.suggestEmail?.value || '').trim();
+  const anonymous = Boolean(el.suggestAnonymous?.checked);
+  const name = anonymous ? 'Anonymous' : (el.suggestName?.value || '').trim();
+  const email = anonymous ? 'hicalebliu@gmail.com' : (el.suggestEmail?.value || '').trim();
   const topic = (el.suggestTopic?.value || 'Suggestion').trim();
   const text = (el.suggestText?.value || '').trim();
-  return { name, email, topic, text };
+  return { name, email, topic, text, anonymous };
 }
 
 function buildSuggestionBody(data) {
@@ -176,6 +178,12 @@ function sendSuggestionEmail() {
   if (el.suggestHelp) {
     el.suggestHelp.innerHTML = `<a href="${gmailUrl}" target="_blank" rel="noopener noreferrer">Open Gmail draft</a> · <a href="${mailtoUrl}">Try local mail app</a>`;
   }
+}
+
+function syncAnonymousInputs() {
+  const anonymous = Boolean(el.suggestAnonymous?.checked);
+  if (el.suggestName) el.suggestName.disabled = anonymous;
+  if (el.suggestEmail) el.suggestEmail.disabled = anonymous;
 }
 
 function bindEvents() {
@@ -226,11 +234,16 @@ function bindEvents() {
   if (el.suggestSendEmail) {
     el.suggestSendEmail.addEventListener('click', sendSuggestionEmail);
   }
+
+  if (el.suggestAnonymous) {
+    el.suggestAnonymous.addEventListener('change', syncAnonymousInputs);
+  }
 }
 
 function boot() {
   loadAchievements();
   bindEvents();
+  syncAnonymousInputs();
   setEditState(false);
 }
 
