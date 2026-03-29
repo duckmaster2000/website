@@ -1211,8 +1211,12 @@ async function renderAthletesView() {
   SHEETS.forEach((sheet) => {
     const athletes = processData(allData[sheet.key]);
     athletes.forEach((a) => {
-      if (!athleteMap[a.name]) athleteMap[a.name] = { name: a.name, grade: a.grade, events: {} };
-      athleteMap[a.name].events[sheet.key] = a.best;
+      const mergeKey = `${normalizeAthleteKey(a.name)}|${a.grade}`;
+      if (!athleteMap[mergeKey]) athleteMap[mergeKey] = { name: a.name, grade: a.grade, events: {} };
+      const existing = athleteMap[mergeKey].events[sheet.key];
+      if (existing == null || (a.best != null && a.best < existing)) {
+        athleteMap[mergeKey].events[sheet.key] = a.best;
+      }
     });
   });
 
