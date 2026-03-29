@@ -333,8 +333,7 @@ a {
   margin-top: 0.25rem;
 }
 
-#suggestSendEmail,
-#suggestAiPrep {
+#suggestSendEmail {
   border: 1px solid rgba(117, 225, 255, 0.62);
   border-radius: 10px;
   background: linear-gradient(180deg, rgba(31, 72, 116, 0.95), rgba(18, 48, 80, 0.92));
@@ -345,8 +344,7 @@ a {
   font-weight: 700;
 }
 
-#suggestSendEmail:hover,
-#suggestAiPrep:hover {
+#suggestSendEmail:hover {
   border-color: rgba(154, 245, 122, 0.74);
   box-shadow: 0 0 16px rgba(60, 242, 255, 0.24);
 }

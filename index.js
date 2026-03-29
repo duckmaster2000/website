@@ -1,5 +1,4 @@
 const ACH_STORAGE_KEY = 'caleb_home_achievements_v1';
-const SUGGEST_API_URL = '/api/suggestions';
 
 // Change this passcode any time to keep edit access private.
 const ACH_EDIT_PASSCODE = '1ydzpU1y!';
@@ -15,7 +14,6 @@ const el = {
   suggestTopic: document.getElementById('suggestTopic'),
   suggestText: document.getElementById('suggestText'),
   suggestSendEmail: document.getElementById('suggestSendEmail'),
-  suggestAiPrep: document.getElementById('suggestAiPrep'),
   suggestStatus: document.getElementById('suggestStatus')
 };
 
@@ -153,81 +151,17 @@ function buildSuggestionBody(data) {
   ].join('\n');
 }
 
-async function submitSuggestionToBackend(mode, data) {
-  const response = await fetch(SUGGEST_API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      mode,
-      name: data.name,
-      email: data.email,
-      topic: data.topic,
-      text: data.text
-    })
-  });
-
-  let payload = null;
-  try { payload = await response.json(); } catch (_e) {}
-  if (!response.ok || !payload?.ok) {
-    throw new Error(payload?.error || 'backend_error');
-  }
-  return payload;
-}
-
-async function sendSuggestionEmail() {
+function sendSuggestionEmail() {
   const data = collectSuggestion();
   if (!data.text) {
     setSuggestStatus('Please write a suggestion first.', true);
     return;
   }
-
-  try {
-    const result = await submitSuggestionToBackend('email', data);
-    setSuggestStatus(result.message || 'Suggestion sent successfully.');
-    return;
-  } catch (_e) {
-    // Fallback to client email flow below when backend is unavailable.
-  }
-
+  const recipients = 'hicalebliu@gmail.com,31calebl@students.harker.org';
   const subject = encodeURIComponent(`[Website Suggestion] ${data.topic}`);
   const body = encodeURIComponent(buildSuggestionBody(data));
-  window.location.href = `mailto:hicalebliu@gmail.com?subject=${subject}&body=${body}`;
-  setSuggestStatus('Backend unavailable, opening your email app instead...');
-}
-
-async function prepareAiSuggestion() {
-  const data = collectSuggestion();
-  if (!data.text) {
-    setSuggestStatus('Please write a suggestion first.', true);
-    return;
-  }
-
-  try {
-    const result = await submitSuggestionToBackend('ai', data);
-    setSuggestStatus(result.message || 'Suggestion submitted for AI triage.');
-    return;
-  } catch (_e) {
-    // Fallback to prompt-copy flow below.
-  }
-
-  const prompt = [
-    'Please review this website suggestion and propose practical code changes:',
-    '',
-    buildSuggestionBody(data),
-    '',
-    'Return: 1) summary, 2) feasibility, 3) concrete implementation steps.'
-  ].join('\n');
-
-  try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(prompt);
-      setSuggestStatus('AI-ready prompt copied. Paste it into your AI assistant.');
-    } else {
-      setSuggestStatus('Clipboard unavailable. Copy your suggestion manually.', true);
-    }
-  } catch (_e) {
-    setSuggestStatus('Could not copy prompt. Copy your suggestion manually.', true);
-  }
+  window.location.href = `mailto:${recipients}?subject=${subject}&body=${body}`;
+  setSuggestStatus('Opening your email app with both recipients...');
 }
 
 function bindEvents() {
@@ -277,10 +211,6 @@ function bindEvents() {
 
   if (el.suggestSendEmail) {
     el.suggestSendEmail.addEventListener('click', sendSuggestionEmail);
-  }
-
-  if (el.suggestAiPrep) {
-    el.suggestAiPrep.addEventListener('click', prepareAiSuggestion);
   }
 }
 
