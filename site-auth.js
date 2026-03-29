@@ -3,7 +3,7 @@ const SiteAuth = (() => {
   const SITE_SESSION_KEY = 'site_session_v1';
   const COOKIE_CONSENT_KEY = 'site_cookie_consent_v1';
   const SESSION_TTL_MS = 14 * 24 * 60 * 60 * 1000;
-  const PUBLIC_PAGES = new Set(['site-login.html', 'site-register.html', 'cookie-policy.html', 'cookies.html', 'privacy-policy.html', 'terms.html']);
+  const PUBLIC_PAGES = new Set(['site-login.html', 'site-register.html', 'privacy-policy.html', 'terms.html']);
 
   function getCookie(name) {
     const pairs = document.cookie ? document.cookie.split(';') : [];
@@ -182,8 +182,16 @@ const SiteAuth = (() => {
     localStorage.removeItem('tk_ls_auth_v1');
   }
 
+  function getCookieConsentValue() {
+    const ls = String(localStorage.getItem(COOKIE_CONSENT_KEY) || '').trim().toLowerCase();
+    if (ls === 'accepted' || ls === 'rejected' || ls === 'necessary') return ls;
+    const ck = String(getCookie('site_cookie_consent') || '').trim().toLowerCase();
+    if (ck === 'accepted' || ck === 'rejected' || ck === 'necessary') return ck;
+    return '';
+  }
+
   function hasCookieConsent() {
-    return localStorage.getItem(COOKIE_CONSENT_KEY) === 'accepted' || getCookie('site_cookie_consent') === 'accepted';
+    return !!getCookieConsentValue();
   }
 
   function setCookieConsentAccepted() {
@@ -193,14 +201,21 @@ const SiteAuth = (() => {
     if (banner) banner.remove();
   }
 
-  function setCookieConsentDeclined() {
-    localStorage.setItem(COOKIE_CONSENT_KEY, 'declined');
-    document.cookie = 'site_cookie_consent=declined; Max-Age=31536000; Path=/; SameSite=Lax';
+  function setCookieConsentNecessaryOnly() {
+    localStorage.setItem(COOKIE_CONSENT_KEY, 'necessary');
+    document.cookie = 'site_cookie_consent=necessary; Max-Age=31536000; Path=/; SameSite=Lax';
     const banner = document.getElementById('siteCookieBanner');
     if (banner) banner.remove();
-    if (!PUBLIC_PAGES.has(pageName())) {
-      window.location.href = 'cookie-policy.html';
-    }
+  }
+
+  function setCookieConsentRejectedAll() {
+    localStorage.removeItem('caleb_home_achievements_v1');
+    localStorage.removeItem('caleb_citations_page_v1');
+    clearSession();
+    localStorage.setItem(COOKIE_CONSENT_KEY, 'rejected');
+    document.cookie = 'site_cookie_consent=rejected; Max-Age=31536000; Path=/; SameSite=Lax';
+    const banner = document.getElementById('siteCookieBanner');
+    if (banner) banner.remove();
   }
 
   function ensureCookieBanner() {
@@ -223,31 +238,7 @@ const SiteAuth = (() => {
     banner.style.flexWrap = 'wrap';
     banner.style.alignItems = 'center';
     banner.style.gap = '10px';
-    banner.innerHTML = '<span style="font-size:13px;line-height:1.35;flex:1;min-width:240px">This site uses cookies/local storage for login sessions and saved preferences. Please review our policies and choose Accept or Decline.</span>';
-
-    const viewBtn = document.createElement('a');
-    viewBtn.href = 'cookie-policy.html';
-    viewBtn.textContent = 'Cookie Policy';
-    viewBtn.style.border = '1px solid rgba(117,225,255,0.62)';
-    viewBtn.style.background = 'rgba(11,32,58,0.92)';
-    viewBtn.style.color = '#e7f4ff';
-    viewBtn.style.borderRadius = '8px';
-    viewBtn.style.padding = '8px 10px';
-    viewBtn.style.textDecoration = 'none';
-    viewBtn.style.fontWeight = '700';
-    banner.appendChild(viewBtn);
-
-    const privacyBtn = document.createElement('a');
-    privacyBtn.href = 'privacy-policy.html';
-    privacyBtn.textContent = 'Privacy Policy';
-    privacyBtn.style.border = '1px solid rgba(117,225,255,0.62)';
-    privacyBtn.style.background = 'rgba(11,32,58,0.92)';
-    privacyBtn.style.color = '#e7f4ff';
-    privacyBtn.style.borderRadius = '8px';
-    privacyBtn.style.padding = '8px 10px';
-    privacyBtn.style.textDecoration = 'none';
-    privacyBtn.style.fontWeight = '700';
-    banner.appendChild(privacyBtn);
+    banner.innerHTML = '<span style="font-size:13px;line-height:1.35;flex:1;min-width:240px">This site uses cookies and local storage for required functionality and optional analytics/preferences. Choose your cookie settings below.</span>';
 
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -264,7 +255,7 @@ const SiteAuth = (() => {
 
     const declineBtn = document.createElement('button');
     declineBtn.type = 'button';
-    declineBtn.textContent = 'Decline';
+    declineBtn.textContent = 'Reject All Cookies';
     declineBtn.style.border = '1px solid rgba(255,170,170,0.62)';
     declineBtn.style.background = 'rgba(85,30,30,0.88)';
     declineBtn.style.color = '#ffe8e8';
@@ -272,8 +263,21 @@ const SiteAuth = (() => {
     declineBtn.style.padding = '8px 10px';
     declineBtn.style.cursor = 'pointer';
     declineBtn.style.fontWeight = '700';
-    declineBtn.addEventListener('click', setCookieConsentDeclined);
+    declineBtn.addEventListener('click', setCookieConsentRejectedAll);
     banner.appendChild(declineBtn);
+
+    const necessaryBtn = document.createElement('button');
+    necessaryBtn.type = 'button';
+    necessaryBtn.textContent = 'Accept All Necessary Cookies';
+    necessaryBtn.style.border = '1px solid rgba(200,220,255,0.62)';
+    necessaryBtn.style.background = 'rgba(42,58,76,0.92)';
+    necessaryBtn.style.color = '#eef5ff';
+    necessaryBtn.style.borderRadius = '8px';
+    necessaryBtn.style.padding = '8px 10px';
+    necessaryBtn.style.cursor = 'pointer';
+    necessaryBtn.style.fontWeight = '700';
+    necessaryBtn.addEventListener('click', setCookieConsentNecessaryOnly);
+    banner.appendChild(necessaryBtn);
 
     document.body.appendChild(banner);
   }
@@ -366,8 +370,10 @@ const SiteAuth = (() => {
     clearSession,
     logout,
     hasCookieConsent,
+    getCookieConsentValue,
     setCookieConsentAccepted,
-    setCookieConsentDeclined,
+    setCookieConsentNecessaryOnly,
+    setCookieConsentRejectedAll,
     ensureCookieBanner,
     requireAuth,
     mountAuthWidget,
