@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cookie Details</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Audiowide&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="bg-grid" aria-hidden="true"></div>
+  <main class="container">
+    <header class="panel hero">
+      <a class="contact" href="index.html">&larr; Back Home</a>
+      <h1>Cookie Details</h1>
+      <p>This page shows what cookie-like storage this site currently uses and what is optional/not currently used.</p>
+    </header>
+
+    <section class="panel">
+      <h2>1) Must-Haves (Strictly Necessary)</h2>
+      <ul class="clean-list" id="cookieMustList"></ul>
+    </section>
+
+    <section class="panel">
+      <h2>2) Should-Haves (Performance &amp; Analytics)</h2>
+      <ul class="clean-list" id="cookieShouldList"></ul>
+    </section>
+
+    <section class="panel">
+      <h2>3) May-Needs (Functionality &amp; Personalization)</h2>
+      <ul class="clean-list" id="cookieMayList"></ul>
+    </section>
+
+    <section class="panel">
+      <h2>Current Browser Cookies</h2>
+      <p id="cookieRaw" class="suggest-status">Loading...</p>
+      <h2 style="margin-top:0.85rem">Related Local Storage Keys</h2>
+      <p id="cookieStorage" class="suggest-status">Loading...</p>
+    </section>
+  </main>
+
+  <script src="cookies.js"></script>
+  <script src="site-auth.js"></script>
+</body>
+</html>
