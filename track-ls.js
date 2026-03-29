@@ -144,10 +144,23 @@ function loadAuthContext() {
     const raw = localStorage.getItem(AUTH_KEY);
     if (raw) {
       const auth = JSON.parse(raw);
-      if (auth && typeof auth.name === 'string' && typeof auth.email === 'string' && typeof auth.password === 'string') {
-        authName = auth.name.trim();
-        const authGender = normalizeGenderValue(auth.gender);
-        if (authGender !== 'unknown') relayGender = authGender;
+      const hasIdentity = auth && typeof auth.name === 'string' && typeof auth.email === 'string';
+      const hasCredential = typeof auth.password === 'string' || typeof auth.sessionToken === 'string';
+      if (hasIdentity && hasCredential) {
+        if (typeof auth.expiresAt === 'string') {
+          const exp = Date.parse(auth.expiresAt);
+          if (!Number.isFinite(exp) || exp <= Date.now()) {
+            localStorage.removeItem(AUTH_KEY);
+          } else {
+            authName = auth.name.trim();
+          }
+        } else {
+          authName = auth.name.trim();
+        }
+        if (authName) {
+          const authGender = normalizeGenderValue(auth.gender);
+          if (authGender !== 'unknown') relayGender = authGender;
+        }
       }
     }
   } catch (_) {}

@@ -14,14 +14,14 @@
     <a class="tk-login-back" href="index.html">&larr; Back Home</a>
     <section class="tk-login-card">
       <h1 id="tkLoginTitle">Track Login</h1>
-      <p class="tk-login-sub" id="tkLoginSub">Sign in, then pick your name from the official timing-sheet roster.</p>
+      <p class="tk-login-sub" id="tkLoginSub">Use your email + password. New emails are auto-registered, then verified with a one-time code.</p>
 
       <form id="tkLoginForm" novalidate>
         <label class="tk-login-label" for="tkLoginEmail">Email</label>
         <input id="tkLoginEmail" type="email" autocomplete="email" required placeholder="you@example.com" />
 
         <label class="tk-login-label" for="tkLoginPassword">Password</label>
-        <input id="tkLoginPassword" type="password" autocomplete="current-password" required minlength="4" placeholder="Enter your password" />
+        <input id="tkLoginPassword" type="password" autocomplete="current-password" required minlength="6" placeholder="Enter your password" />
 
         <label class="tk-login-label" for="tkLoginName">Select Your Name</label>
         <select id="tkLoginName" required>
@@ -34,6 +34,11 @@
           <option value="female">Girl</option>
           <option value="male">Boy</option>
         </select>
+
+        <div id="tkVerifyWrap" hidden>
+          <label class="tk-login-label" for="tkLoginCode">Verification Code</label>
+          <input id="tkLoginCode" type="text" inputmode="numeric" maxlength="6" placeholder="6-digit code" />
+        </div>
 
         <button id="tkLoginSubmit" type="submit">Log In</button>
       </form>
