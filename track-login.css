@@ -93,6 +93,22 @@ h1 {
   border-color: rgba(154, 245, 122, 0.62);
 }
 
+.tk-login-secondary {
+  margin-top: 0.35rem;
+  border: 1px solid rgba(158, 196, 231, 0.38);
+  border-radius: 9px;
+  background: rgba(9, 28, 52, 0.9);
+  color: #d7e8fb;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 0.62rem 0.78rem;
+}
+
+.tk-login-secondary:hover {
+  border-color: rgba(125, 228, 255, 0.6);
+}
+
 .tk-login-error,
 .tk-login-info {
   margin: 0.7rem 0 0;

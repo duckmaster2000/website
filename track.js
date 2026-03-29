@@ -137,32 +137,34 @@ function loadAuthContext() {
   const params = new URLSearchParams(window.location.search);
   const requestedAthlete = params.get('athlete') ? decodeURIComponent(params.get('athlete')).trim() : '';
   let authName = '';
+  let isAnonymousTrack = false;
   try {
     const raw = localStorage.getItem(AUTH_KEY);
     if (raw) {
       const auth = JSON.parse(raw);
-      const hasIdentity = auth && typeof auth.name === 'string' && typeof auth.email === 'string';
+      const hasIdentity = auth && typeof auth.email === 'string' && (typeof auth.name === 'string' || auth.anonymousTrack === true);
       const hasCredential = typeof auth.password === 'string' || typeof auth.sessionToken === 'string';
       if (hasIdentity && hasCredential) {
+        isAnonymousTrack = auth.anonymousTrack === true;
         if (typeof auth.expiresAt === 'string') {
           const exp = Date.parse(auth.expiresAt);
           if (!Number.isFinite(exp) || exp <= Date.now()) {
             localStorage.removeItem(AUTH_KEY);
           } else {
-            authName = auth.name.trim();
+            authName = typeof auth.name === 'string' ? auth.name.trim() : '';
           }
         } else {
-          authName = auth.name.trim();
+          authName = typeof auth.name === 'string' ? auth.name.trim() : '';
         }
       }
     }
   } catch (_) {}
 
-  if (!authName) {
+  if (!isAnonymousTrack && !authName) {
     redirectToLogin();
     return false;
   }
-  preferredAthlete = requestedAthlete || authName;
+  preferredAthlete = requestedAthlete || (isAnonymousTrack ? '' : authName);
   calendarAthlete = preferredAthlete;
   refreshUserBadge();
   return true;

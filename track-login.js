@@ -113,14 +113,15 @@ function saveGenderOverride(name, gender) {
   localStorage.setItem(GENDER_OVERRIDES_KEY, JSON.stringify(map));
 }
 
-function createTrackSession(config, accountSession, athleteName, gender) {
+function createTrackSession(config, accountSession, athleteName, gender, options = {}) {
   const trackSession = {
     email: accountSession.email,
     username: accountSession.username,
     fullName: accountSession.fullName,
     birthday: accountSession.birthday,
-    name: athleteName,
-    gender,
+    name: athleteName || '',
+    gender: gender || 'unknown',
+    anonymousTrack: !!options.anonymousTrack,
     target: config.target,
     mode: config === TARGET_CONFIG.ls ? 'ls' : 'ms',
     sessionToken: randomToken(24),
@@ -149,6 +150,7 @@ async function boot() {
   const nameEl = document.getElementById('tkLoginName');
   const genderEl = document.getElementById('tkLoginGender');
   const submitEl = document.getElementById('tkLoginSubmit');
+  const anonEl = document.getElementById('tkLoginAnon');
 
   titleEl.textContent = config.title;
   subEl.textContent = config.subtitle;
@@ -210,6 +212,18 @@ async function boot() {
       showError('Unable to continue right now. Please try again.');
     } finally {
       submitEl.disabled = false;
+    }
+  });
+
+  anonEl?.addEventListener('click', () => {
+    try {
+      createTrackSession(config, accountSession, '', 'unknown', { anonymousTrack: true });
+      showInfo('Continuing anonymously. Redirecting...');
+      window.setTimeout(() => {
+        window.location.href = config.target;
+      }, 220);
+    } catch (_) {
+      showError('Unable to continue anonymously right now. Please try again.');
     }
   });
 }
