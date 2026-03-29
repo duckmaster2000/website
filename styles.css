@@ -356,6 +356,19 @@ a {
   font-size: 0.9rem;
 }
 
+.suggest-help {
+  min-height: 1rem;
+  margin: 0.28rem 0 0;
+  color: #a8c6e2;
+  font-size: 0.82rem;
+}
+
+.suggest-help a {
+  color: #9af57a;
+  text-decoration: none;
+  font-weight: 700;
+}
+
 .footer {
   text-align: center;
 }

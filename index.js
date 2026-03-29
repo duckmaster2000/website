@@ -14,7 +14,8 @@ const el = {
   suggestTopic: document.getElementById('suggestTopic'),
   suggestText: document.getElementById('suggestText'),
   suggestSendEmail: document.getElementById('suggestSendEmail'),
-  suggestStatus: document.getElementById('suggestStatus')
+  suggestStatus: document.getElementById('suggestStatus'),
+  suggestHelp: document.getElementById('suggestHelp')
 };
 
 let editUnlocked = false;
@@ -131,6 +132,7 @@ function setSuggestStatus(msg, isError = false) {
   if (!el.suggestStatus) return;
   el.suggestStatus.textContent = msg;
   el.suggestStatus.style.color = isError ? '#ffd1d1' : '#d7ecff';
+  if (el.suggestHelp) el.suggestHelp.innerHTML = '';
 }
 
 function collectSuggestion() {
@@ -160,8 +162,25 @@ function sendSuggestionEmail() {
   const recipients = 'hicalebliu@gmail.com,31calebl@students.harker.org';
   const subject = encodeURIComponent(`[Website Suggestion] ${data.topic}`);
   const body = encodeURIComponent(buildSuggestionBody(data));
-  window.location.href = `mailto:${recipients}?subject=${subject}&body=${body}`;
-  setSuggestStatus('Opening your email app with both recipients...');
+  const mailtoUrl = `mailto:${recipients}?subject=${subject}&body=${body}`;
+  const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipients)}&su=${subject}&body=${body}`;
+
+  let popupOpened = false;
+  try {
+    const win = window.open(mailtoUrl, '_blank');
+    popupOpened = !!win;
+  } catch (_e) {
+    popupOpened = false;
+  }
+
+  if (!popupOpened) {
+    window.location.href = mailtoUrl;
+  }
+
+  setSuggestStatus('Tried opening your mail app. If nothing opened, use one of these:');
+  if (el.suggestHelp) {
+    el.suggestHelp.innerHTML = `<a href="${mailtoUrl}">Try mail app again</a> · <a href="${gmailUrl}" target="_blank" rel="noopener noreferrer">Open Gmail draft</a>`;
+  }
 }
 
 function bindEvents() {
