@@ -1,0 +1,221 @@
+:root {
+  --bg: #040915;
+  --bg-2: #0c1c32;
+  --panel: rgba(8, 22, 45, 0.72);
+  --panel-border: rgba(113, 196, 255, 0.32);
+  --text: #e7f4ff;
+  --muted: #95b8d3;
+  --accent: #3cf2ff;
+  --accent-2: #9af57a;
+  --shadow: 0 14px 34px rgba(0, 0, 0, 0.38);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--text);
+  font-family: "Space Grotesk", "Segoe UI", sans-serif;
+  background:
+    radial-gradient(1300px 800px at 15% -10%, rgba(60, 242, 255, 0.18), transparent 55%),
+    radial-gradient(900px 700px at 90% 5%, rgba(154, 245, 122, 0.14), transparent 50%),
+    linear-gradient(150deg, var(--bg), var(--bg-2));
+}
+
+.bg-grid {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(117, 201, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(117, 201, 255, 0.08) 1px, transparent 1px);
+  background-size: 34px 34px;
+  mask-image: radial-gradient(circle at 50% 30%, rgba(0, 0, 0, 0.92), transparent 78%);
+  opacity: 0.6;
+}
+
+.container {
+  width: min(900px, 92vw);
+  margin: 0 auto;
+  padding: 2.2rem 0 3rem;
+  position: relative;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 20px;
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow);
+  padding: 1.25rem 1.2rem;
+  margin-bottom: 1rem;
+}
+
+.hero {
+  position: relative;
+  background:
+    radial-gradient(650px 220px at 5% 0%, rgba(60, 242, 255, 0.13), transparent 62%),
+    radial-gradient(750px 260px at 100% 100%, rgba(154, 245, 122, 0.11), transparent 60%),
+    rgba(10, 27, 51, 0.76);
+}
+
+.eyebrow {
+  margin: 0 0 0.75rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.2em;
+  color: var(--accent);
+}
+
+h1,
+h2 {
+  font-family: "Audiowide", sans-serif;
+  margin: 0 0 0.5rem;
+}
+
+p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.back {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  text-decoration: none;
+  font-weight: 700;
+  color: #c2ebff;
+}
+
+.back:hover { color: var(--accent-2); }
+
+.toolbar {
+  margin-top: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+#ctUnlockBtn,
+#ctCitationAddBtn,
+#ctThanksAddBtn,
+.item-delete {
+  border: 1px solid rgba(117, 225, 255, 0.62);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(31, 72, 116, 0.95), rgba(18, 48, 80, 0.92));
+  color: var(--text);
+  font-family: "Space Grotesk", "Segoe UI", sans-serif;
+  cursor: pointer;
+}
+
+#ctUnlockBtn,
+.item-delete {
+  padding: 0.42rem 0.72rem;
+}
+
+#ctCitationAddBtn,
+#ctThanksAddBtn {
+  width: 44px;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+#ctUnlockBtn:hover,
+#ctCitationAddBtn:hover,
+#ctThanksAddBtn:hover,
+.item-delete:hover {
+  border-color: rgba(154, 245, 122, 0.74);
+  box-shadow: 0 0 16px rgba(60, 242, 255, 0.24);
+}
+
+#ctStatus {
+  font-size: 0.9rem;
+  color: #d9ecff;
+  font-weight: 600;
+}
+
+.sub {
+  margin-bottom: 0.55rem;
+  color: #bad5ec;
+}
+
+.add-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.45rem;
+  margin-bottom: 0.7rem;
+}
+
+#ctCitationInput,
+#ctThanksInput {
+  width: 100%;
+  border: 1px solid rgba(144, 214, 255, 0.52);
+  border-radius: 10px;
+  padding: 0.56rem 0.66rem;
+  background: rgba(13, 36, 64, 0.9);
+  color: var(--text);
+  font-size: 1rem;
+}
+
+#ctCitationInput:disabled,
+#ctThanksInput:disabled,
+#ctCitationAddBtn:disabled,
+#ctThanksAddBtn:disabled {
+  opacity: 0.62;
+}
+
+.item-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  border: 1px solid rgba(125, 208, 255, 0.46);
+  border-radius: 12px;
+  background: rgba(17, 41, 69, 0.8);
+  padding: 0.44rem 0.55rem;
+}
+
+.item input[type="checkbox"] { transform: scale(1.12); }
+
+.item-text {
+  flex: 1;
+  color: #dff1ff;
+}
+
+.item.done .item-text {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.item-delete {
+  font-size: 0.82rem;
+  padding: 0.25rem 0.45rem;
+}
+
+.item-delete[hidden] { display: none; }
+
+.empty {
+  list-style: none;
+  border: 1px dashed rgba(130, 203, 255, 0.45);
+  border-radius: 12px;
+  padding: 0.55rem 0.7rem;
+  color: #b5d5ef;
+  font-size: 0.92rem;
+}
+
+@media (max-width: 620px) {
+  .container { width: 94vw; }
+  .back {
+    position: static;
+    display: inline-block;
+    margin-bottom: 0.65rem;
+  }
+}

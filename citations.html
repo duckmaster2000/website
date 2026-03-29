@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Citations + Thank You</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Audiowide&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="citations.css" />
+</head>
+<body>
+  <div class="bg-grid" aria-hidden="true"></div>
+  <main class="container">
+    <header class="panel hero">
+      <a class="back" href="index.html">&larr; Back Home</a>
+      <p class="eyebrow">CREDITS</p>
+      <h1>Citations + Thank You</h1>
+      <p>Track sources, tools, and people who helped. Unlock edit mode to add, check off, or remove entries.</p>
+      <div class="toolbar">
+        <button id="ctUnlockBtn" type="button">Unlock Edit</button>
+        <span id="ctStatus">View mode</span>
+      </div>
+    </header>
+
+    <section class="panel list-panel">
+      <h2>Citations</h2>
+      <p class="sub">Books, websites, videos, tutorials, or datasets you used.</p>
+      <div class="add-row">
+        <input id="ctCitationInput" type="text" placeholder="Add a citation..." aria-label="Add citation" disabled />
+        <button id="ctCitationAddBtn" type="button" aria-label="Add citation" disabled>+</button>
+      </div>
+      <ul id="ctCitationList" class="item-list" aria-live="polite"></ul>
+    </section>
+
+    <section class="panel list-panel">
+      <h2>People Who Helped Me</h2>
+      <p class="sub">Teachers, friends, classmates, and mentors.</p>
+      <div class="add-row">
+        <input id="ctThanksInput" type="text" placeholder="Add a thank-you note..." aria-label="Add thank you" disabled />
+        <button id="ctThanksAddBtn" type="button" aria-label="Add thank you" disabled>+</button>
+      </div>
+      <ul id="ctThanksList" class="item-list" aria-live="polite"></ul>
+    </section>
+  </main>
+
+  <script src="anti-inspect.js"></script>
+  <script src="citations.js"></script>
+</body>
+</html>
