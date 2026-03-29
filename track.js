@@ -4,9 +4,9 @@ const SPREADSHEET_ID = '1otSAiM7Y8u5l0_ZxjA9snO2VV2XYGOOwWCAWFq-epR4';
 const PINS_KEY      = 'tk_pins_v1';
 const STANDARDS_KEY = 'tk_standards_v1';
 const AUTH_KEY      = 'tk_auth_v1';
-const GENDER_OVERRIDES_KEY = 'tk_gender_overrides_v1';
 const LOGIN_ROUTE   = 'track-login.html?target=track.html&mode=ms';
-const ADMIN_PANEL_URL = 'track-admin.html?mode=ms';
+const GENDER_ROSTER_SHEET_ID = '15R6fvIM3Fg2AJqltAYDlxZ-hSq69MPRU0g0D3yf1A5I';
+const GENDER_ROSTER_GID = '0';
 const EXCHANGE_TIME = 0.2; // seconds per baton exchange
 
 const SHEETS = [
@@ -58,7 +58,8 @@ let calendarBounds = { min: null, max: null };
 let calendarAthlete = '';
 let preferredAthlete = '';
 let preferredAthleteApplied = false;
-let genderOverrides = {};
+let rosterGenderByName = new Map();
+let rosterGenderByNameGrade = new Map();
 const weatherMonthCache = new Map();
 
 /* ── DOM refs ── */
@@ -97,9 +98,6 @@ const el = {
   userBar:       $('tkUserBar'),
   viewingAs:     $('tkViewingAs'),
   switchAthlete: $('tkSwitchAthlete'),
-  adminToggle:   $('tkAdminToggle'),
-  adminBody:     $('tkAdminBody'),
-  adminFrame:    $('tkAdminFrame'),
   calGrid:       $('tkCalGrid'),
   calLegend:     $('tkCalLegend'),
   modal:         $('tkModal'),
@@ -156,10 +154,6 @@ function loadAuthContext() {
         } else {
           authName = auth.name.trim();
         }
-        if (authName) {
-          const authGender = normalizeGenderValue(auth.gender);
-          if (authGender !== 'unknown') relayGender = authGender;
-        }
       }
     }
   } catch (_) {}
@@ -184,19 +178,60 @@ function normalizeAthleteKey(name) {
     .toLowerCase();
 }
 
-function loadGenderOverrides() {
+function normalizeSpaces(v) {
+  return String(v || '')
+    .normalize('NFKC')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/\u00A0/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function athleteGradeKey(name, grade) {
+  return `${normalizeAthleteKey(name)}|${String(grade ?? '')}`;
+}
+
+async function loadRosterGenderMap() {
   try {
-    const raw = localStorage.getItem(GENDER_OVERRIDES_KEY);
-    genderOverrides = raw ? (JSON.parse(raw) || {}) : {};
+    const url = `https://docs.google.com/spreadsheets/d/${GENDER_ROSTER_SHEET_ID}/gviz/tq?tqx=out:json&gid=${encodeURIComponent(GENDER_ROSTER_GID)}`;
+    const resp = await fetch(url);
+    const text = await resp.text();
+    const jsonStart = text.indexOf('{');
+    const jsonEnd = text.lastIndexOf('}');
+    if (jsonStart < 0 || jsonEnd < 0) return;
+
+    const data = JSON.parse(text.substring(jsonStart, jsonEnd + 1));
+    const rows = data.table?.rows || [];
+    const byName = new Map();
+    const byNameGrade = new Map();
+
+    rows.forEach((r) => {
+      const cells = r.c || [];
+      const lastName = normalizeSpaces(cells[0]?.v || '');
+      const firstName = normalizeSpaces(cells[1]?.v || '');
+      const grade = cells[2]?.v != null ? Math.round(Number(cells[2].v)) : null;
+      const gender = normalizeGenderValue(cells[3]?.v);
+      if (!firstName || !lastName || gender === 'unknown') return;
+      const fullName = normalizeSpaces(`${firstName} ${lastName}`);
+      const nameKey = normalizeAthleteKey(fullName);
+      byName.set(nameKey, gender);
+      if (grade != null && Number.isFinite(grade)) byNameGrade.set(athleteGradeKey(fullName, grade), gender);
+    });
+
+    rosterGenderByName = byName;
+    rosterGenderByNameGrade = byNameGrade;
   } catch (_) {
-    genderOverrides = {};
+    rosterGenderByName = new Map();
+    rosterGenderByNameGrade = new Map();
   }
 }
 
-function resolveAthleteGender(name, fallbackGender) {
-  const override = genderOverrides[normalizeAthleteKey(name)];
-  const normalized = normalizeGenderValue(override || fallbackGender);
-  return normalized;
+function resolveAthleteGender(name, grade, fallbackGender) {
+  const byGrade = rosterGenderByNameGrade.get(athleteGradeKey(name, grade));
+  if (byGrade) return byGrade;
+  const byName = rosterGenderByName.get(normalizeAthleteKey(name));
+  if (byName) return byName;
+  return normalizeGenderValue(fallbackGender);
 }
 
 function refreshUserBadge() {
@@ -689,7 +724,7 @@ function processData(sheetData) {
     const grade     = row['Grade'] != null ? Math.round(row['Grade']) : 0;
     const rawGender = row['Gender'] ?? row['gender'] ?? row['Sex'] ?? row['sex'] ?? row['M/F'] ?? row['m/f'] ?? null;
     const name = `${firstName} ${lastName}`;
-    const gender    = resolveAthleteGender(name, rawGender);
+    const gender    = resolveAthleteGender(name, grade, rawGender);
     const times = {};
     let best = null, bestDate = null, first = null, firstDate = null, last = null, lastDate = null;
     sheetData.dateCols.forEach((dc) => {
@@ -2479,16 +2514,6 @@ function bindEvents() {
     }, 180);
   });
 
-  el.adminToggle?.addEventListener('click', () => {
-    if (!el.adminBody) return;
-    const nextOpen = el.adminBody.hidden;
-    el.adminBody.hidden = !nextOpen;
-    if (nextOpen && el.adminFrame && !el.adminFrame.getAttribute('src')) {
-      el.adminFrame.setAttribute('src', ADMIN_PANEL_URL);
-    }
-    if (el.adminToggle) el.adminToggle.textContent = nextOpen ? 'Hide Admin Panel' : 'Open Admin Panel';
-  });
-
   // Modal close
   el.modalClose.addEventListener('click', () => { el.modal.hidden = true; });
   el.modal.addEventListener('click', (e) => { if (e.target === el.modal) el.modal.hidden = true; });
@@ -2549,7 +2574,7 @@ async function boot() {
   if (!el.tabs) return;
   if (!loadAuthContext()) return;
 
-  loadGenderOverrides();
+  await loadRosterGenderMap();
   loadPins();
   loadStandards();
   bindEvents();

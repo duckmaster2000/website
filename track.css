@@ -89,42 +89,6 @@ main,section,nav{scroll-margin-top:72px}
 }
 
 .tk-switch-athlete:hover{filter:brightness(1.08)}
-
-.tk-admin-inline{
-  margin-top:.5rem;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  gap:.45rem;
-}
-
-.tk-admin-toggle{
-  font-size:.72rem;
-  padding:.26rem .62rem;
-}
-
-.tk-admin-inline-body{
-  width:min(1120px,96vw);
-  border:1px solid rgba(126,232,255,.25);
-  border-radius:12px;
-  background:rgba(7,18,35,.78);
-  padding:.55rem;
-}
-
-.tk-admin-inline-note{
-  margin:0 0 .45rem;
-  font-size:.74rem;
-  color:#a5c8e8;
-  text-align:left;
-}
-
-#tkAdminFrame{
-  width:100%;
-  min-height:420px;
-  border:1px solid rgba(121,197,255,.22);
-  border-radius:10px;
-  background:#071225;
-}
 .tk-back{
   position:absolute;
   top:1rem;left:1rem;
@@ -655,19 +619,6 @@ main,section,nav{scroll-margin-top:72px}
 /* ── Relay view ── */
 .tk-relay-controls{margin-bottom:1rem}
 .tk-relay-controls{display:flex;flex-direction:column;gap:.55rem}
-.tk-admin-link{
-  display:inline-block;
-  align-self:flex-start;
-  text-decoration:none;
-  font-size:.74rem;
-  font-weight:700;
-  color:#9fe4ff;
-  border:1px solid rgba(126,232,255,.3);
-  border-radius:999px;
-  padding:.32rem .62rem;
-  background:rgba(16,38,64,.65);
-}
-.tk-admin-link:hover{filter:brightness(1.1)}
 .tk-relay-card{
   background:rgba(14,28,52,.85);border:1px solid rgba(100,180,255,.1);
   border-radius:8px;padding:1rem 1.2rem;margin-bottom:.85rem;
