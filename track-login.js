@@ -150,47 +150,56 @@ async function boot() {
   const nameEl = document.getElementById('tkLoginName');
   const genderEl = document.getElementById('tkLoginGender');
   const submitEl = document.getElementById('tkLoginSubmit');
-  const anonEl = document.getElementById('tkLoginAnon');
+  const anonModeEl = document.getElementById('tkAnonMode');
 
   titleEl.textContent = config.title;
   subEl.textContent = config.subtitle;
 
   let knownNames = null;
 
-  submitEl.disabled = true;
-  submitEl.textContent = 'Loading names...';
-  try {
-    knownNames = await fetchAthleteNames(config);
-    const sortedNames = [...knownNames.values()].sort((a, b) => a.localeCompare(b));
-    if (!sortedNames.length) {
-      showError('No athlete names were found yet. Try again later.');
-      nameEl.innerHTML = '<option value="">No names found</option>';
-      return;
-    }
-    nameEl.innerHTML = ['<option value="">Select your name...</option>']
-      .concat(sortedNames.map((name) => `<option value="${encodeURIComponent(name)}">${name}</option>`))
-      .join('');
-    submitEl.disabled = false;
-    submitEl.textContent = 'Continue To Dashboard';
-  } catch (_) {
-    showError('Unable to load athlete roster right now. Refresh and try again.');
-    nameEl.innerHTML = '<option value="">Unable to load names</option>';
-    submitEl.disabled = true;
-    submitEl.textContent = 'Continue To Dashboard';
-    return;
-  }
+  const updateAnonModeUi = () => {
+    const anonOn = !!anonModeEl?.checked;
+    nameEl.disabled = anonOn;
+    genderEl.disabled = anonOn;
+    submitEl.textContent = anonOn ? 'Continue Anonymously' : 'Continue To Dashboard';
+  };
+
+  const continueAnonymous = () => {
+    createTrackSession(config, accountSession, '', 'unknown', { anonymousTrack: true });
+    showInfo('Continuing anonymously. Redirecting...');
+    window.setTimeout(() => {
+      window.location.href = config.target;
+    }, 220);
+  };
+
+  anonModeEl?.addEventListener('change', updateAnonModeUi);
+  updateAnonModeUi();
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
+
+    if (anonModeEl?.checked) {
+      try {
+        continueAnonymous();
+      } catch (_) {
+        showError('Unable to continue anonymously right now. Please try again.');
+      }
+      return;
+    }
+
     const selectedName = nameEl.value ? decodeURIComponent(nameEl.value) : '';
     const selectedGender = genderEl.value;
 
     if (!selectedName) {
-      showError('Please select your name from the roster list.');
+      showError('Please select your name from the roster list, or choose anonymous mode.');
       return;
     }
     if (selectedGender !== 'female' && selectedGender !== 'male') {
       showError('Please choose your gender.');
+      return;
+    }
+    if (!knownNames || !knownNames.size) {
+      showError('Roster is unavailable right now. Please try again later or continue anonymously.');
       return;
     }
 
@@ -212,20 +221,33 @@ async function boot() {
       showError('Unable to continue right now. Please try again.');
     } finally {
       submitEl.disabled = false;
+      updateAnonModeUi();
     }
   });
 
-  anonEl?.addEventListener('click', () => {
-    try {
-      createTrackSession(config, accountSession, '', 'unknown', { anonymousTrack: true });
-      showInfo('Continuing anonymously. Redirecting...');
-      window.setTimeout(() => {
-        window.location.href = config.target;
-      }, 220);
-    } catch (_) {
-      showError('Unable to continue anonymously right now. Please try again.');
+  submitEl.disabled = true;
+  submitEl.textContent = 'Loading names...';
+  try {
+    knownNames = await fetchAthleteNames(config);
+    const sortedNames = [...knownNames.values()].sort((a, b) => a.localeCompare(b));
+    if (!sortedNames.length) {
+      showError('No athlete names were found yet. You can still continue anonymously.');
+      nameEl.innerHTML = '<option value="">No names found</option>';
+      submitEl.disabled = false;
+      updateAnonModeUi();
+      return;
     }
-  });
+    nameEl.innerHTML = ['<option value="">Select your name...</option>']
+      .concat(sortedNames.map((name) => `<option value="${encodeURIComponent(name)}">${name}</option>`))
+      .join('');
+    submitEl.disabled = false;
+    updateAnonModeUi();
+  } catch (_) {
+    showError('Unable to load athlete roster right now. You can still continue anonymously.');
+    nameEl.innerHTML = '<option value="">Unable to load names</option>';
+    submitEl.disabled = false;
+    updateAnonModeUi();
+  }
 }
 
 boot();

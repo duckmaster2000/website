@@ -93,20 +93,24 @@ h1 {
   border-color: rgba(154, 245, 122, 0.62);
 }
 
-.tk-login-secondary {
-  margin-top: 0.35rem;
-  border: 1px solid rgba(158, 196, 231, 0.38);
+.tk-login-anon-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 0.45rem;
+  border: 1px solid rgba(116, 190, 255, 0.22);
   border-radius: 9px;
-  background: rgba(9, 28, 52, 0.9);
-  color: #d7e8fb;
-  font-weight: 600;
-  font-size: 0.9rem;
+  background: rgba(10, 26, 46, 0.9);
+  color: #cfe4fb;
+  padding: 0.6rem 0.68rem;
+  font-size: 0.86rem;
   cursor: pointer;
-  padding: 0.62rem 0.78rem;
 }
 
-.tk-login-secondary:hover {
-  border-color: rgba(125, 228, 255, 0.6);
+.tk-login-anon-toggle input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
 }
 
 .tk-login-error,
