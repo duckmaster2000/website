@@ -159,27 +159,22 @@ function sendSuggestionEmail() {
     setSuggestStatus('Please write a suggestion first.', true);
     return;
   }
-  const recipients = 'hicalebliu@gmail.com,31calebl@students.harker.org';
-  const subject = encodeURIComponent(`[Website Suggestion] ${data.topic}`);
-  const body = encodeURIComponent(buildSuggestionBody(data));
-  const mailtoUrl = `mailto:${recipients}?subject=${subject}&body=${body}`;
-  const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipients)}&su=${subject}&body=${body}`;
+  const recipients = ['hicalebliu@gmail.com', '31calebl@students.harker.org'];
+  const recipientsText = recipients.join(',');
+  const subjectRaw = `[Website Suggestion] ${data.topic}`;
+  const bodyRaw = buildSuggestionBody(data);
+  const mailtoUrl = `mailto:${recipientsText}?subject=${encodeURIComponent(subjectRaw)}&body=${encodeURIComponent(bodyRaw)}`;
+  const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipientsText)}&su=${encodeURIComponent(subjectRaw)}&body=${encodeURIComponent(bodyRaw)}`;
 
-  let popupOpened = false;
   try {
-    const win = window.open(mailtoUrl, '_blank');
-    popupOpened = !!win;
-  } catch (_e) {
-    popupOpened = false;
+    window.open(gmailUrl, '_blank', 'noopener,noreferrer');
+  } catch (_) {
+    window.location.href = gmailUrl;
   }
 
-  if (!popupOpened) {
-    window.location.href = mailtoUrl;
-  }
-
-  setSuggestStatus('Tried opening your mail app. If nothing opened, use one of these:');
+  setSuggestStatus('Opened a Gmail draft with both recipients. If Gmail did not open, use:');
   if (el.suggestHelp) {
-    el.suggestHelp.innerHTML = `<a href="${mailtoUrl}">Try mail app again</a> · <a href="${gmailUrl}" target="_blank" rel="noopener noreferrer">Open Gmail draft</a>`;
+    el.suggestHelp.innerHTML = `<a href="${gmailUrl}" target="_blank" rel="noopener noreferrer">Open Gmail draft</a> · <a href="${mailtoUrl}">Try local mail app</a>`;
   }
 }
 
