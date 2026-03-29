@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Website Register</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="site-auth.css" />
+</head>
+<body>
+  <main class="sa-shell">
+    <a class="sa-back" href="index.html">&larr; Back Home</a>
+    <section class="sa-card">
+      <h1>Create Account</h1>
+      <p class="sa-sub">Register once for the website. Then you can log in with email or username and access track pages with your saved session.</p>
+
+      <form id="saForm" novalidate>
+        <label class="sa-label" for="saFullName">Full Name</label>
+        <input id="saFullName" type="text" autocomplete="name" required maxlength="120" placeholder="Your full name" />
+
+        <label class="sa-label" for="saBirthday">Birthday</label>
+        <input id="saBirthday" type="date" required />
+
+        <label class="sa-label" for="saUsername">Username</label>
+        <input id="saUsername" type="text" autocomplete="username" required maxlength="40" placeholder="Choose a username" />
+
+        <label class="sa-label" for="saEmail">Email Address</label>
+        <input id="saEmail" type="email" autocomplete="email" required maxlength="140" placeholder="you@example.com" />
+
+        <label class="sa-label" for="saPassword">Password</label>
+        <input id="saPassword" type="password" autocomplete="new-password" required minlength="6" placeholder="Create password" />
+
+        <label class="sa-label" for="saPassword2">Confirm Password</label>
+        <input id="saPassword2" type="password" autocomplete="new-password" required minlength="6" placeholder="Re-enter password" />
+
+        <button id="saSubmit" type="submit">Register</button>
+      </form>
+
+      <p id="saError" class="sa-error" hidden></p>
+      <p id="saInfo" class="sa-info" hidden></p>
+      <p class="sa-alt">Already registered? <a id="saGoLogin" href="site-login.html">Go to login</a>.</p>
+    </section>
+  </main>
+
+  <script src="site-auth.js"></script>
+  <script src="site-register.js"></script>
+</body>
+</html>

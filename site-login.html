@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Website Login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="site-auth.css" />
+</head>
+<body>
+  <main class="sa-shell">
+    <a class="sa-back" href="index.html">&larr; Back Home</a>
+    <section class="sa-card">
+      <h1>Website Login</h1>
+      <p class="sa-sub">Log in with your email or username. If your email is not registered yet, you will be sent to registration.</p>
+
+      <form id="saForm" novalidate>
+        <label class="sa-label" for="saLogin">Email or Username</label>
+        <input id="saLogin" type="text" autocomplete="username" required placeholder="you@example.com or your username" />
+
+        <label class="sa-label" for="saPassword">Password</label>
+        <input id="saPassword" type="password" autocomplete="current-password" required minlength="6" placeholder="Enter your password" />
+
+        <button id="saSubmit" type="submit">Log In</button>
+      </form>
+
+      <p id="saError" class="sa-error" hidden></p>
+      <p id="saInfo" class="sa-info" hidden></p>
+      <p class="sa-alt">Need an account? <a id="saGoRegister" href="site-register.html">Register here</a>.</p>
+    </section>
+  </main>
+
+  <script src="site-auth.js"></script>
+  <script src="site-login.js"></script>
+</body>
+</html>

@@ -1,0 +1,127 @@
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: 'Inter', system-ui, sans-serif;
+  color: #d6e4ff;
+  background:
+    radial-gradient(70vw 70vw at -10% 0%, rgba(66, 196, 255, 0.2), transparent 70%),
+    radial-gradient(65vw 65vw at 110% 100%, rgba(138, 212, 112, 0.18), transparent 68%),
+    linear-gradient(150deg, #040a16, #0a1b34);
+}
+
+.sa-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 1.2rem;
+}
+
+.sa-card {
+  width: min(540px, 94vw);
+  border-radius: 16px;
+  border: 1px solid rgba(104, 182, 255, 0.28);
+  background: rgba(9, 22, 42, 0.9);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+  padding: 1.2rem 1.2rem 1.1rem;
+}
+
+.sa-back {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  color: #8ed8ff;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+h1 {
+  margin: 0 0 0.45rem;
+  font-family: 'Orbitron', sans-serif;
+  font-size: clamp(1.2rem, 3vw, 1.8rem);
+  color: #9fe8ff;
+}
+
+.sa-sub {
+  margin: 0 0 1rem;
+  color: #a5b8d6;
+  font-size: 0.95rem;
+}
+
+#saForm {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.sa-label {
+  font-size: 0.8rem;
+  color: #9ec4e7;
+  margin-top: 0.25rem;
+}
+
+#saForm input,
+#saForm select {
+  border: 1px solid rgba(116, 190, 255, 0.28);
+  border-radius: 8px;
+  background: rgba(7, 17, 32, 0.92);
+  color: #e8f4ff;
+  font-size: 0.95rem;
+  padding: 0.62rem 0.65rem;
+  outline: none;
+}
+
+#saForm input:focus,
+#saForm select:focus {
+  border-color: #7de4ff;
+  box-shadow: 0 0 0 2px rgba(125, 228, 255, 0.14);
+}
+
+#saSubmit {
+  margin-top: 0.7rem;
+  border: 1px solid rgba(125, 228, 255, 0.48);
+  border-radius: 9px;
+  background: linear-gradient(165deg, rgba(54, 135, 184, 0.8), rgba(26, 82, 126, 0.8));
+  color: #f5fbff;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  padding: 0.68rem 0.8rem;
+}
+
+#saSubmit:hover { border-color: rgba(154, 245, 122, 0.62); }
+
+.sa-error,
+.sa-info {
+  margin: 0.7rem 0 0;
+  border-radius: 8px;
+  padding: 0.58rem 0.64rem;
+  font-size: 0.88rem;
+}
+
+.sa-error {
+  border: 1px solid rgba(255, 136, 136, 0.35);
+  background: rgba(90, 20, 20, 0.35);
+  color: #ffd0d0;
+}
+
+.sa-info {
+  border: 1px solid rgba(150, 232, 173, 0.35);
+  background: rgba(18, 70, 38, 0.3);
+  color: #d7ffe5;
+}
+
+.sa-alt {
+  margin: 0.9rem 0 0;
+  color: #89a6c8;
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.sa-alt a {
+  color: #9fe8ff;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.sa-alt a:hover { color: #bbff90; }
