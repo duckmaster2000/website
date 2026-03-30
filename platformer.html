@@ -15,7 +15,7 @@
       <div>
         <p class="eyebrow">ULTRA PLATFORMER</p>
         <h1>Astro Ruins Platformer</h1>
-        <p class="sub">WASD/Arrows move, Space jump, Shift dash, B open shop, R restart level.</p>
+        <p class="sub">WASD/Arrows move, Space jump, Shift dash, B open shop, R restart level. On mobile, use the touch controls under the game.</p>
       </div>
       <a class="home-link" href="index.html">Back Home</a>
     </header>
@@ -25,6 +25,7 @@
         <span>Level: <strong id="pfLevel">1</strong></span>
         <span>Health: <strong id="pfHealth">3</strong></span>
         <span>Lives: <strong id="pfLives">3</strong></span>
+        <span>Dashes: <strong id="pfDashes">2</strong></span>
         <span>Coins (run): <strong id="pfRunCoins">0</strong></span>
         <span>Wallet Coins: <strong id="pfWallet">0</strong></span>
       </div>
@@ -38,6 +39,16 @@
     <section class="panel game-panel">
       <canvas id="pfCanvas" width="960" height="540" aria-label="Platformer game canvas"></canvas>
       <div class="overlay" id="pfOverlay"></div>
+      <div class="touch-controls" aria-label="Mobile controls for platformer">
+        <div class="touch-row">
+          <button type="button" class="touch-btn" data-touch="left">Left</button>
+          <button type="button" class="touch-btn" data-touch="right">Right</button>
+        </div>
+        <div class="touch-row">
+          <button type="button" class="touch-btn" data-touch="jump">Jump</button>
+          <button type="button" class="touch-btn" data-touch="dash">Dash</button>
+        </div>
+      </div>
     </section>
 
     <section class="panel shop-panel" id="pfShop" hidden>

@@ -138,6 +138,35 @@ button {
   opacity: 1;
 }
 
+.touch-controls {
+  margin-top: 0.65rem;
+  display: none;
+  gap: 0.5rem;
+}
+
+.touch-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.touch-btn {
+  border: 1px solid rgba(131, 214, 255, 0.62);
+  border-radius: 10px;
+  background: rgba(24, 45, 72, 0.95);
+  color: var(--text);
+  padding: 0.62rem 0.7rem;
+  font-family: "Orbitron", sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  touch-action: manipulation;
+}
+
+.touch-btn.active {
+  background: rgba(58, 103, 154, 0.95);
+  border-color: rgba(163, 240, 255, 0.9);
+}
+
 .shop-head {
   display: flex;
   align-items: center;
@@ -185,5 +214,9 @@ button {
 
   .overlay {
     font-size: 1.2rem;
+  }
+
+  .touch-controls {
+    display: grid;
   }
 }
