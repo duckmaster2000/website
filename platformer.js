@@ -6,6 +6,7 @@ const TERMINAL_VY = 920;
 const BASE_MOVE = 282;
 const BASE_JUMP = 700;
 const BASE_DASH_FORCE = 620;
+const BASE_DASH_TIME = 0.15;
 const MAX_DASH_CHARGES = 2;
 const DASH_RECHARGE_SEC = 1.15;
 const BASE_MAX_HEALTH = 3;
@@ -62,6 +63,13 @@ const SHOP = [
     max: 8
   },
   {
+    key: 'dashDuration',
+    name: 'Pulse Injector',
+    desc: 'Dash duration +12% per level.',
+    baseCost: 50,
+    max: 7
+  },
+  {
     key: 'coinBoost',
     name: 'Coin Synthesizer',
     desc: 'Coin value +15% per level.',
@@ -81,8 +89,44 @@ const SHOP = [
     desc: 'Start runs with +1 life per level.',
     baseCost: 80,
     max: 4
+  },
+  {
+    key: 'neoVisor',
+    name: 'Neo Visor',
+    desc: 'Cosmetic visor. Passive: +3% move speed.',
+    baseCost: 95,
+    max: 1,
+    kind: 'cosmetic'
+  },
+  {
+    key: 'plasmaTrim',
+    name: 'Plasma Trim',
+    desc: 'Neon body trim. Passive: +4% jump power.',
+    baseCost: 110,
+    max: 1,
+    kind: 'cosmetic'
+  },
+  {
+    key: 'ionTrailSkin',
+    name: 'Ion Trail',
+    desc: 'Stylized trail effect. Passive: +4% coin value.',
+    baseCost: 130,
+    max: 1,
+    kind: 'cosmetic'
+  },
+  {
+    key: 'crownAntenna',
+    name: 'Crown Antenna',
+    desc: 'Signal crown accessory. Passive: +0.15s damage invulnerability.',
+    baseCost: 145,
+    max: 1,
+    kind: 'cosmetic'
   }
 ];
+
+function cosmeticOwned(key) {
+  return Number(game.meta.upgrades[key] || 0) > 0;
+}
 
 function mulberry32(seed) {
   let t = seed >>> 0;
@@ -319,7 +363,8 @@ function durationScale() {
 }
 
 function coinValue() {
-  return 1 + (game.meta.upgrades.coinBoost || 0) * 0.15;
+  const base = 1 + (game.meta.upgrades.coinBoost || 0) * 0.15;
+  return base * (cosmeticOwned('ionTrailSkin') ? 1.04 : 1);
 }
 
 function playerMaxHealth() {
@@ -327,11 +372,17 @@ function playerMaxHealth() {
 }
 
 function playerMoveSpeed() {
-  return BASE_MOVE * (1 + (game.meta.upgrades.moveSpeed || 0) * 0.08);
+  const base = BASE_MOVE * (1 + (game.meta.upgrades.moveSpeed || 0) * 0.08);
+  return base * (cosmeticOwned('neoVisor') ? 1.03 : 1);
 }
 
 function playerJumpPower() {
-  return BASE_JUMP * (1 + (game.meta.upgrades.jumpPower || 0) * 0.07);
+  const base = BASE_JUMP * (1 + (game.meta.upgrades.jumpPower || 0) * 0.07);
+  return base * (cosmeticOwned('plasmaTrim') ? 1.04 : 1);
+}
+
+function playerDashDuration() {
+  return BASE_DASH_TIME * (1 + (game.meta.upgrades.dashDuration || 0) * 0.12);
 }
 
 function playerStartLives() {
@@ -548,7 +599,7 @@ function emitParticles(x, y, count, color, speed = 150, life = 0.55, size = 3.5)
 }
 
 function gainCoin(amount = 1) {
-  const value = Math.max(1, Math.floor(amount * coinValue()));
+  const value = Math.max(0.01, amount * coinValue());
   game.runCoins += value;
   game.meta.wallet += value;
 }
@@ -563,7 +614,7 @@ function hurtPlayer(amount = 1) {
   }
 
   game.player.hp -= amount;
-  game.player.invuln = 1.0;
+  game.player.invuln = 1.0 + (cosmeticOwned('crownAntenna') ? 0.15 : 0);
   game.camera.shakeT = 0.2;
   game.camera.shakeMag = 9;
   emitParticles(game.player.x + game.player.w / 2, game.player.y + game.player.h / 2, 10, '#ff9f9f', 200, 0.45, 3.4);
@@ -678,7 +729,7 @@ function updatePlayer(dt) {
 
   if (KEYS.dash && p.dashCd <= 0 && p.dashCharges > 0) {
     p.dashCd = 0.9;
-    p.dashTime = 0.15;
+    p.dashTime = playerDashDuration();
     p.dashCharges -= 1;
     p.dashRecharge = DASH_RECHARGE_SEC;
     p.vx = p.facing * BASE_DASH_FORCE;
@@ -910,8 +961,8 @@ function updateHud(dt = 0) {
   el.health.textContent = `${Math.max(0, game.player.hp)} / ${game.player.maxHp}`;
   el.lives.textContent = game.player.lives;
   if (el.dashes) el.dashes.textContent = `${game.player.dashCharges}/${MAX_DASH_CHARGES}`;
-  el.runCoins.textContent = game.runCoins;
-  el.wallet.textContent = Math.floor(game.meta.wallet);
+  el.runCoins.textContent = Math.round(game.runCoins);
+  el.wallet.textContent = Math.round(game.meta.wallet);
   el.objective.textContent = `Coins ${game.collectedCoins}/${game.requiredCoins} required (${game.totalCoins} total) | Reach portal`;
   el.status.textContent = game.statusText;
 
@@ -920,6 +971,10 @@ function updateHud(dt = 0) {
   if (game.player.buffs.speed > 0) active.push(`Speed ${game.player.buffs.speed.toFixed(1)}s`);
   if (game.player.buffs.jump > 0) active.push(`Jump ${game.player.buffs.jump.toFixed(1)}s`);
   if (game.player.buffs.magnet > 0) active.push(`Magnet ${game.player.buffs.magnet.toFixed(1)}s`);
+  if (cosmeticOwned('neoVisor')) active.push('Neo Visor +3% Move');
+  if (cosmeticOwned('plasmaTrim')) active.push('Plasma Trim +4% Jump');
+  if (cosmeticOwned('ionTrailSkin')) active.push('Ion Trail +4% Coin');
+  if (cosmeticOwned('crownAntenna')) active.push('Crown Antenna +0.15s i-frames');
 
   el.buffs.innerHTML = active.map((txt) => `<span class="buff-chip">${txt}</span>`).join('');
 
@@ -1081,12 +1136,15 @@ function drawWorld(ctx) {
     ctx.fill();
   }
 
-  // Player.
+  // Player (square style + cosmetics).
   const p = game.player;
   for (const t of p.trail || []) {
     const a = t.life / 0.22;
-    ctx.fillStyle = `rgba(132, 255, 220, ${0.35 * a})`;
-    ctx.fillRect(t.x + 3, t.y + 4, p.w - 6, p.h - 8);
+    const trailColor = cosmeticOwned('ionTrailSkin')
+      ? `rgba(186, 161, 255, ${0.42 * a})`
+      : `rgba(132, 255, 220, ${0.35 * a})`;
+    ctx.fillStyle = trailColor;
+    ctx.fillRect(t.x + 4, t.y + 4, p.w - 8, p.h - 8);
   }
 
   ctx.save();
@@ -1094,21 +1152,54 @@ function drawWorld(ctx) {
     const blink = Math.sin(game.time * 24) > 0 ? 0.35 : 1;
     ctx.globalAlpha = blink;
   }
-  const runPhase = Math.sin(p.animT || 0);
-  ctx.fillStyle = p.buffs.shield > 0 ? '#8defff' : '#7bffc8';
-  ctx.fillRect(p.x + 4, p.y + 6, p.w - 8, p.h - 9);
-  ctx.fillStyle = '#b8ffe7';
-  ctx.fillRect(p.x + 7, p.y + 2, p.w - 14, 9);
-  ctx.fillStyle = '#0f2235';
-  const eyeX = p.facing > 0 ? p.x + p.w - 12 : p.x + 6;
-  ctx.fillRect(eyeX, p.y + 8, 5, 5);
-  ctx.fillStyle = '#2a4e65';
-  ctx.fillRect(p.x + 7, p.y + p.h - 7, 6, 4 + runPhase * 1.2);
-  ctx.fillRect(p.x + p.w - 13, p.y + p.h - 7, 6, 4 - runPhase * 1.2);
+
+  const bob = Math.sin((p.animT || 0) * 0.9) * (p.onGround ? 1.1 : 0.2);
+  const bodyColor = p.buffs.shield > 0 ? '#9cf5ff' : '#92ffce';
+  const trimColor = cosmeticOwned('plasmaTrim') ? '#ffba6e' : '#c9fff0';
+
+  // Core square body.
+  ctx.fillStyle = bodyColor;
+  ctx.fillRect(p.x + 2, p.y + 2 + bob, p.w - 4, p.h - 4);
+  ctx.strokeStyle = 'rgba(9, 35, 54, 0.92)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(p.x + 2, p.y + 2 + bob, p.w - 4, p.h - 4);
+  ctx.lineWidth = 1;
+
+  // Cool trim and paneling.
+  ctx.fillStyle = trimColor;
+  ctx.fillRect(p.x + 5, p.y + 5 + bob, p.w - 10, 3);
+  ctx.fillRect(p.x + 5, p.y + p.h - 8 + bob, p.w - 10, 3);
+  ctx.fillStyle = '#1f3d53';
+  ctx.fillRect(p.x + 6, p.y + 11 + bob, p.w - 12, p.h - 20);
+
+  // Face / visor.
+  if (cosmeticOwned('neoVisor')) {
+    const g = 0.65 + Math.sin(game.time * 9) * 0.35;
+    ctx.fillStyle = `rgba(103, 219, 255, ${0.55 + g * 0.3})`;
+    ctx.fillRect(p.x + 6, p.y + 11 + bob, p.w - 12, 6);
+  } else {
+    const eyeX = p.facing > 0 ? p.x + p.w - 12 : p.x + 7;
+    ctx.fillStyle = '#072437';
+    ctx.fillRect(eyeX, p.y + 11 + bob, 5, 5);
+  }
+
+  // Crown antenna cosmetic.
+  if (cosmeticOwned('crownAntenna')) {
+    ctx.strokeStyle = '#ffe18c';
+    ctx.beginPath();
+    ctx.moveTo(p.x + p.w / 2, p.y + 2 + bob);
+    ctx.lineTo(p.x + p.w / 2, p.y - 7 + bob);
+    ctx.stroke();
+    ctx.fillStyle = '#ffe18c';
+    ctx.beginPath();
+    ctx.arc(p.x + p.w / 2, p.y - 9 + bob, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   if (p.buffs.shield > 0) {
     ctx.strokeStyle = 'rgba(158, 254, 255, 0.75)';
     ctx.beginPath();
-    ctx.arc(p.x + p.w / 2, p.y + p.h / 2, 24, 0, Math.PI * 2);
+    ctx.arc(p.x + p.w / 2, p.y + p.h / 2 + bob, 24, 0, Math.PI * 2);
     ctx.stroke();
   }
   ctx.restore();
@@ -1167,11 +1258,15 @@ function buyUpgrade(key) {
   }
 
   renderShop();
-  setStatus(`${item.name} upgraded to Lv${game.meta.upgrades[key]}.`, 1.3);
+  if (item.kind === 'cosmetic') {
+    setStatus(`${item.name} cosmetic unlocked.`, 1.3);
+  } else {
+    setStatus(`${item.name} upgraded to Lv${game.meta.upgrades[key]}.`, 1.3);
+  }
 }
 
 function renderShop() {
-  el.wallet.textContent = Math.floor(game.meta.wallet);
+  el.wallet.textContent = Math.round(game.meta.wallet);
   el.shopList.innerHTML = SHOP.map((item) => {
     const lvl = game.meta.upgrades[item.key] || 0;
     const maxed = lvl >= item.max;
@@ -1181,11 +1276,11 @@ function renderShop() {
     return `
       <article class="shop-item">
         <div>
-          <strong>${item.name} (Lv ${lvl}/${item.max})</strong>
+          <strong>${item.name} (Lv ${lvl}/${item.max})${item.kind === 'cosmetic' ? ' • Cosmetic' : ''}</strong>
           <p>${item.desc}</p>
         </div>
         <button data-upgrade="${item.key}" ${disabled ? 'disabled' : ''}>
-          ${maxed ? 'MAX' : `Buy (${cost})`}
+          ${maxed ? 'MAX' : `${item.kind === 'cosmetic' ? 'Unlock' : 'Buy'} (${cost})`}
         </button>
       </article>
     `;
