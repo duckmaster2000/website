@@ -6,7 +6,6 @@ const TERMINAL_VY = 920;
 const BASE_MOVE = 282;
 const BASE_JUMP = 700;
 const BASE_DASH_FORCE = 620;
-const BASE_DASH_TIME = 0.15;
 const MAX_DASH_CHARGES = 2;
 const DASH_RECHARGE_SEC = 1.15;
 const BASE_MAX_HEALTH = 3;
@@ -36,7 +35,8 @@ const el = {
   status: document.getElementById('pfStatus'),
   buffs: document.getElementById('pfBuffs'),
   shop: document.getElementById('pfShop'),
-  shopList: document.getElementById('pfShopList'),
+  upgradeList: document.getElementById('pfUpgradeList'),
+  cosmeticList: document.getElementById('pfCosmeticList'),
   closeShop: document.getElementById('pfCloseShop')
 };
 
@@ -63,9 +63,9 @@ const SHOP = [
     max: 8
   },
   {
-    key: 'dashDuration',
-    name: 'Pulse Injector',
-    desc: 'Dash duration +12% per level.',
+    key: 'dashLength',
+    name: 'Vector Thruster',
+    desc: 'Dash length +12% per level.',
     baseCost: 50,
     max: 7
   },
@@ -121,11 +121,145 @@ const SHOP = [
     baseCost: 145,
     max: 1,
     kind: 'cosmetic'
+  },
+  {
+    key: 'reactorBoots',
+    name: 'Reactor Boots',
+    desc: 'Glow boots. Passive: +2.5% move speed.',
+    baseCost: 90,
+    max: 1,
+    kind: 'cosmetic'
+  },
+  {
+    key: 'jumpJets',
+    name: 'Jump Jets',
+    desc: 'Thruster fins. Passive: +3% jump power.',
+    baseCost: 98,
+    max: 1,
+    kind: 'cosmetic'
+  },
+  {
+    key: 'luckyCharm',
+    name: 'Lucky Charm',
+    desc: 'Sparkle charm. Passive: +3% coin value.',
+    baseCost: 102,
+    max: 1,
+    kind: 'cosmetic'
+  },
+  {
+    key: 'phaseCape',
+    name: 'Phase Cape',
+    desc: 'Holo cape. Passive: +0.08s invulnerability after hit.',
+    baseCost: 118,
+    max: 1,
+    kind: 'cosmetic'
+  },
+  {
+    key: 'fluxBattery',
+    name: 'Flux Battery',
+    desc: 'Back battery. Passive: +5% buff duration.',
+    baseCost: 124,
+    max: 1,
+    kind: 'cosmetic'
+  },
+  {
+    key: 'guardianShell',
+    name: 'Guardian Shell',
+    desc: 'Armor shell. Passive: +1 max health.',
+    baseCost: 165,
+    max: 1,
+    kind: 'cosmetic'
+  },
+  {
+    key: 'magnetHalo',
+    name: 'Magnet Halo',
+    desc: 'Orbiting ring. Passive: +12% coin magnet radius.',
+    baseCost: 132,
+    max: 1,
+    kind: 'cosmetic'
+  },
+  {
+    key: 'dashGlyph',
+    name: 'Dash Glyph',
+    desc: 'Arc glyph. Passive: +6% dash length.',
+    baseCost: 126,
+    max: 1,
+    kind: 'cosmetic'
+  },
+  {
+    key: 'starlightMask',
+    name: 'Starlight Mask',
+    desc: 'Faceplate glow. Passive: +2% move and +2% jump.',
+    baseCost: 140,
+    max: 1,
+    kind: 'cosmetic'
+  },
+  {
+    key: 'vaultKeychain',
+    name: 'Vault Keychain',
+    desc: 'Trophy keychain. Passive: +2% coin value.',
+    baseCost: 112,
+    max: 1,
+    kind: 'cosmetic'
+  },
+  {
+    key: 'prismOutline',
+    name: 'Prism Outline',
+    desc: 'Rainbow outline. Passive: +2% move speed.',
+    baseCost: 116,
+    max: 1,
+    kind: 'cosmetic'
+  },
+  {
+    key: 'echoEmitter',
+    name: 'Echo Emitter',
+    desc: 'Pulse emitter. Passive: +5% particle intensity.',
+    baseCost: 92,
+    max: 1,
+    kind: 'cosmetic'
   }
 ];
 
 function cosmeticOwned(key) {
   return Number(game.meta.upgrades[key] || 0) > 0;
+}
+
+function cosmeticBonuses() {
+  const b = {
+    moveMult: 1,
+    jumpMult: 1,
+    coinMult: 1,
+    dashMult: 1,
+    tempMult: 1,
+    invulnBonus: 0,
+    magnetMult: 1,
+    maxHpBonus: 0,
+    particleMult: 1
+  };
+
+  if (cosmeticOwned('neoVisor')) b.moveMult *= 1.03;
+  if (cosmeticOwned('reactorBoots')) b.moveMult *= 1.025;
+  if (cosmeticOwned('prismOutline')) b.moveMult *= 1.02;
+  if (cosmeticOwned('starlightMask')) b.moveMult *= 1.02;
+
+  if (cosmeticOwned('plasmaTrim')) b.jumpMult *= 1.04;
+  if (cosmeticOwned('jumpJets')) b.jumpMult *= 1.03;
+  if (cosmeticOwned('starlightMask')) b.jumpMult *= 1.02;
+
+  if (cosmeticOwned('ionTrailSkin')) b.coinMult *= 1.04;
+  if (cosmeticOwned('luckyCharm')) b.coinMult *= 1.03;
+  if (cosmeticOwned('vaultKeychain')) b.coinMult *= 1.02;
+
+  if (cosmeticOwned('crownAntenna')) b.invulnBonus += 0.15;
+  if (cosmeticOwned('phaseCape')) b.invulnBonus += 0.08;
+
+  if (cosmeticOwned('fluxBattery')) b.tempMult *= 1.05;
+  if (cosmeticOwned('magnetHalo')) b.magnetMult *= 1.12;
+  if (cosmeticOwned('dashGlyph')) b.dashMult *= 1.06;
+  if (cosmeticOwned('guardianShell')) b.maxHpBonus += 1;
+  if (cosmeticOwned('echoEmitter')) b.particleMult *= 1.05;
+
+  return b;
 }
 
 function mulberry32(seed) {
@@ -340,6 +474,10 @@ function loadMeta() {
     game.meta.wallet = Math.max(0, Number(parsed.wallet || 0));
     game.meta.unlockedLevel = clamp(Number(parsed.unlockedLevel || 1), 1, LEVELS.length);
     if (parsed.upgrades && typeof parsed.upgrades === 'object') {
+      // Save migration: preserve progress from older dashDuration upgrade key.
+      if (parsed.upgrades.dashLength == null && parsed.upgrades.dashDuration != null) {
+        parsed.upgrades.dashLength = parsed.upgrades.dashDuration;
+      }
       SHOP.forEach((item) => {
         game.meta.upgrades[item.key] = clamp(Number(parsed.upgrades[item.key] || 0), 0, item.max);
       });
@@ -359,30 +497,32 @@ function shopCost(item) {
 }
 
 function durationScale() {
-  return 1 + (game.meta.upgrades.tempDuration || 0) * 0.12;
+  const base = 1 + (game.meta.upgrades.tempDuration || 0) * 0.12;
+  return base * cosmeticBonuses().tempMult;
 }
 
 function coinValue() {
   const base = 1 + (game.meta.upgrades.coinBoost || 0) * 0.15;
-  return base * (cosmeticOwned('ionTrailSkin') ? 1.04 : 1);
+  return base * cosmeticBonuses().coinMult;
 }
 
 function playerMaxHealth() {
-  return BASE_MAX_HEALTH + (game.meta.upgrades.maxHealth || 0);
+  return BASE_MAX_HEALTH + (game.meta.upgrades.maxHealth || 0) + cosmeticBonuses().maxHpBonus;
 }
 
 function playerMoveSpeed() {
   const base = BASE_MOVE * (1 + (game.meta.upgrades.moveSpeed || 0) * 0.08);
-  return base * (cosmeticOwned('neoVisor') ? 1.03 : 1);
+  return base * cosmeticBonuses().moveMult;
 }
 
 function playerJumpPower() {
   const base = BASE_JUMP * (1 + (game.meta.upgrades.jumpPower || 0) * 0.07);
-  return base * (cosmeticOwned('plasmaTrim') ? 1.04 : 1);
+  return base * cosmeticBonuses().jumpMult;
 }
 
-function playerDashDuration() {
-  return BASE_DASH_TIME * (1 + (game.meta.upgrades.dashDuration || 0) * 0.12);
+function playerDashLengthMultiplier() {
+  const base = 1 + (game.meta.upgrades.dashLength || 0) * 0.12;
+  return base * cosmeticBonuses().dashMult;
 }
 
 function playerStartLives() {
@@ -582,7 +722,9 @@ function applyBuff(code) {
 }
 
 function emitParticles(x, y, count, color, speed = 150, life = 0.55, size = 3.5) {
-  for (let i = 0; i < count; i += 1) {
+  const pMult = cosmeticBonuses().particleMult;
+  const finalCount = Math.max(1, Math.round(count * pMult));
+  for (let i = 0; i < finalCount; i += 1) {
     const a = Math.random() * Math.PI * 2;
     const s = speed * (0.35 + Math.random() * 0.85);
     game.particles.push({
@@ -592,7 +734,7 @@ function emitParticles(x, y, count, color, speed = 150, life = 0.55, size = 3.5)
       vy: Math.sin(a) * s,
       life,
       maxLife: life,
-      size: size * (0.6 + Math.random() * 0.8),
+      size: size * pMult * (0.6 + Math.random() * 0.8),
       color
     });
   }
@@ -614,7 +756,7 @@ function hurtPlayer(amount = 1) {
   }
 
   game.player.hp -= amount;
-  game.player.invuln = 1.0 + (cosmeticOwned('crownAntenna') ? 0.15 : 0);
+  game.player.invuln = 1.0 + cosmeticBonuses().invulnBonus;
   game.camera.shakeT = 0.2;
   game.camera.shakeMag = 9;
   emitParticles(game.player.x + game.player.w / 2, game.player.y + game.player.h / 2, 10, '#ff9f9f', 200, 0.45, 3.4);
@@ -729,10 +871,10 @@ function updatePlayer(dt) {
 
   if (KEYS.dash && p.dashCd <= 0 && p.dashCharges > 0) {
     p.dashCd = 0.9;
-    p.dashTime = playerDashDuration();
+    p.dashTime = 0.15;
     p.dashCharges -= 1;
     p.dashRecharge = DASH_RECHARGE_SEC;
-    p.vx = p.facing * BASE_DASH_FORCE;
+    p.vx = p.facing * BASE_DASH_FORCE * playerDashLengthMultiplier();
     p.vy *= 0.35;
     emitParticles(p.x + p.w / 2, p.y + p.h / 2, 12, '#95ffe8', 260, 0.35, 3.3);
   }
@@ -805,7 +947,7 @@ function updatePlayer(dt) {
       const dx = px - cx;
       const dy = py - cy;
       const dist = Math.hypot(dx, dy);
-      if (dist < 180 && dist > 0.1) {
+      if (dist < 180 * cosmeticBonuses().magnetMult && dist > 0.1) {
         coin.x += (dx / dist) * 230 * dt;
         coin.y += (dy / dist) * 230 * dt;
       }
@@ -971,10 +1113,9 @@ function updateHud(dt = 0) {
   if (game.player.buffs.speed > 0) active.push(`Speed ${game.player.buffs.speed.toFixed(1)}s`);
   if (game.player.buffs.jump > 0) active.push(`Jump ${game.player.buffs.jump.toFixed(1)}s`);
   if (game.player.buffs.magnet > 0) active.push(`Magnet ${game.player.buffs.magnet.toFixed(1)}s`);
-  if (cosmeticOwned('neoVisor')) active.push('Neo Visor +3% Move');
-  if (cosmeticOwned('plasmaTrim')) active.push('Plasma Trim +4% Jump');
-  if (cosmeticOwned('ionTrailSkin')) active.push('Ion Trail +4% Coin');
-  if (cosmeticOwned('crownAntenna')) active.push('Crown Antenna +0.15s i-frames');
+  SHOP.filter((item) => item.kind === 'cosmetic' && cosmeticOwned(item.key))
+    .slice(0, 6)
+    .forEach((item) => active.push(`Cosmetic: ${item.name}`));
 
   el.buffs.innerHTML = active.map((txt) => `<span class="buff-chip">${txt}</span>`).join('');
 
@@ -1267,7 +1408,7 @@ function buyUpgrade(key) {
 
 function renderShop() {
   el.wallet.textContent = Math.round(game.meta.wallet);
-  el.shopList.innerHTML = SHOP.map((item) => {
+  const renderItems = (items) => items.map((item) => {
     const lvl = game.meta.upgrades[item.key] || 0;
     const maxed = lvl >= item.max;
     const cost = shopCost(item);
@@ -1285,6 +1426,13 @@ function renderShop() {
       </article>
     `;
   }).join('');
+
+  if (el.upgradeList) {
+    el.upgradeList.innerHTML = renderItems(SHOP.filter((item) => item.kind !== 'cosmetic'));
+  }
+  if (el.cosmeticList) {
+    el.cosmeticList.innerHTML = renderItems(SHOP.filter((item) => item.kind === 'cosmetic'));
+  }
 }
 
 function step(dt) {
@@ -1318,8 +1466,8 @@ function bindEvents() {
     el.closeShop.addEventListener('click', () => toggleShop(false));
   }
 
-  if (el.shopList) {
-    el.shopList.addEventListener('click', (event) => {
+  if (el.shop) {
+    el.shop.addEventListener('click', (event) => {
       const btn = event.target.closest('[data-upgrade]');
       if (!btn) return;
       buyUpgrade(btn.dataset.upgrade);

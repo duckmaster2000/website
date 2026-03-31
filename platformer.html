@@ -53,11 +53,20 @@
 
     <section class="panel shop-panel" id="pfShop" hidden>
       <div class="shop-head">
-        <h2>Permanent Upgrade Shop</h2>
+        <h2>Upgrade & Cosmetic Shop</h2>
         <button id="pfCloseShop" type="button">Close (B)</button>
       </div>
-      <p class="shop-sub">Spend wallet coins on permanent upgrades. These persist between runs.</p>
-      <div class="shop-list" id="pfShopList"></div>
+      <p class="shop-sub">Spend wallet coins on permanent upgrades and cosmetic unlocks with small passive bonuses.</p>
+      <div class="shop-sections">
+        <section class="shop-group">
+          <h3>Core Upgrades</h3>
+          <div class="shop-list square-scroll" id="pfUpgradeList"></div>
+        </section>
+        <section class="shop-group">
+          <h3>Cosmetics + Perks</h3>
+          <div class="shop-list square-scroll" id="pfCosmeticList"></div>
+        </section>
+      </div>
     </section>
   </main>
 

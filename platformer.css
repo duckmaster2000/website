@@ -174,31 +174,69 @@ button {
   gap: 0.8rem;
 }
 
-.shop-list {
+.shop-sections {
   margin-top: 0.6rem;
   display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.7rem;
+}
+
+.shop-group {
+  border: 1px solid rgba(131, 214, 255, 0.22);
+  border-radius: 12px;
+  background: rgba(10, 22, 37, 0.65);
+  padding: 0.58rem;
+  display: grid;
+  grid-template-rows: auto 1fr;
   gap: 0.5rem;
+  min-height: 380px;
+}
+
+.shop-group h3 {
+  margin: 0;
+  font-size: 0.88rem;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+}
+
+.shop-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 0.55rem;
+}
+
+.square-scroll {
+  max-height: 330px;
+  overflow-y: auto;
+  padding-right: 0.2rem;
 }
 
 .shop-item {
   border: 1px solid rgba(131, 214, 255, 0.26);
   border-radius: 12px;
   background: rgba(15, 27, 44, 0.8);
-  padding: 0.52rem;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 0.6rem;
-  align-items: center;
+  padding: 0.56rem;
+  display: flex;
+  flex-direction: column;
+  min-height: 160px;
 }
 
 .shop-item strong {
   display: block;
+  font-size: 0.86rem;
+  line-height: 1.25;
 }
 
 .shop-item p {
-  margin: 0.2rem 0 0;
+  margin: 0.35rem 0 0.65rem;
   color: var(--muted);
-  font-size: 0.86rem;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  flex: 1;
+}
+
+.shop-item button {
+  width: 100%;
 }
 
 .shop-item button[disabled] {
@@ -218,5 +256,13 @@ button {
 
   .touch-controls {
     display: grid;
+  }
+
+  .shop-sections {
+    grid-template-columns: 1fr;
+  }
+
+  .shop-group {
+    min-height: 300px;
   }
 }
