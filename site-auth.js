@@ -2,6 +2,7 @@ const SiteAuth = (() => {
   const SITE_USERS_KEY = 'site_users_v1';
   const SITE_SESSION_KEY = 'site_session_v1';
   const COOKIE_CONSENT_KEY = 'site_cookie_consent_v1';
+  const AUTH_API_ENDPOINT = '/api/auth';
   const SESSION_TTL_MS = 14 * 24 * 60 * 60 * 1000;
   const PUBLIC_PAGES = new Set(['site-login.html', 'site-register.html', 'privacy-policy.html', 'terms.html']);
 
@@ -42,6 +43,28 @@ const SiteAuth = (() => {
 
   function setDb(db) {
     localStorage.setItem(SITE_USERS_KEY, JSON.stringify(db));
+  }
+
+  async function postAuthApi(action, payload = {}) {
+    try {
+      const resp = await fetch(AUTH_API_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, ...payload })
+      });
+      if (!resp.ok) {
+        if (resp.status === 409) {
+          const conflict = await resp.json().catch(() => null);
+          if (conflict?.error === 'email_exists') throw new Error('Email already registered');
+          if (conflict?.error === 'username_exists') throw new Error('Username already taken');
+        }
+        return null;
+      }
+      const data = await resp.json();
+      return data && data.ok ? data : null;
+    } catch (_) {
+      return null;
+    }
   }
 
   function randomToken(bytes = 24) {
@@ -87,9 +110,24 @@ const SiteAuth = (() => {
     return getDb().users.find((u) => normalizeUsername(u.username) === un) || null;
   }
 
-  function findUserByLogin(login) {
+  async function findUserByLogin(login) {
     const raw = String(login || '').trim();
     if (!raw) return null;
+
+    const remote = await postAuthApi('findByLogin', { login: raw });
+    if (remote) {
+      const user = remote.user || null;
+      if (user) {
+        const db = getDb();
+        const idx = db.users.findIndex((u) => u.id === user.id);
+        if (idx >= 0) db.users[idx] = user;
+        else db.users.push(user);
+        setDb(db);
+      }
+      return user;
+    }
+
+    // Fallback: local-only mode when backend is unavailable.
     if (raw.includes('@')) return findUserByEmail(raw);
     return findUserByUsername(raw) || findUserByEmail(raw);
   }
@@ -122,6 +160,17 @@ const SiteAuth = (() => {
       lastLoginAt: null
     };
 
+    const remote = await postAuthApi('registerUser', { user });
+    if (remote && remote.user) {
+      const fromRemote = remote.user;
+      const db2 = getDb();
+      const idx2 = db2.users.findIndex((u) => u.id === fromRemote.id);
+      if (idx2 >= 0) db2.users[idx2] = fromRemote;
+      else db2.users.push(fromRemote);
+      setDb(db2);
+      return fromRemote;
+    }
+
     db.users.push(user);
     setDb(db);
     return user;
@@ -152,6 +201,12 @@ const SiteAuth = (() => {
       db.users[idx] = { ...db.users[idx], lastLoginAt: new Date().toISOString() };
       setDb(db);
     }
+
+    postAuthApi('touchLastLogin', {
+      userId: user.id,
+      lastLoginAt: new Date().toISOString()
+    });
+
     return session;
   }
 

@@ -65,7 +65,7 @@ async function boot() {
 
     submit.disabled = true;
     try {
-      const user = window.SiteAuth.findUserByLogin(login);
+      const user = await window.SiteAuth.findUserByLogin(login);
       if (!user) {
         if (login.includes('@')) {
           window.location.href = `site-register.html?next=${encodeURIComponent(cfg.next)}&email=${encodeURIComponent(login)}`;
