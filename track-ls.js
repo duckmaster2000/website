@@ -135,6 +135,7 @@ function redirectToLogin() {
 }
 
 function loadAuthContext() {
+  /*
   const params = new URLSearchParams(window.location.search);
   const requestedAthlete = params.get('athlete') ? decodeURIComponent(params.get('athlete')).trim() : '';
   let authName = '';
@@ -166,6 +167,15 @@ function loadAuthContext() {
     return false;
   }
   preferredAthlete = requestedAthlete || (isAnonymousTrack ? '' : authName);
+  calendarAthlete = preferredAthlete;
+  refreshUserBadge();
+  return true;
+  */
+
+  // LOGIN DISABLED: allow direct dashboard access without account auth.
+  const params = new URLSearchParams(window.location.search);
+  const requestedAthlete = params.get('athlete') ? decodeURIComponent(params.get('athlete')).trim() : '';
+  preferredAthlete = requestedAthlete;
   calendarAthlete = preferredAthlete;
   refreshUserBadge();
   return true;

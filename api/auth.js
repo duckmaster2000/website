@@ -225,6 +225,11 @@ async function touchLastLogin(userId, lastLoginAt) {
 }
 
 module.exports = async function handler(req, res) {
+  // LOGIN DISABLED: auth backend is parked for now.
+  // Existing implementation remains in this file for easy restore later.
+  return json(res, 503, { ok: false, error: 'auth_disabled_temporarily' });
+
+  /*
   if (req.method !== 'POST') {
     return json(res, 405, { ok: false, error: 'method_not_allowed' });
   }
@@ -293,4 +298,5 @@ module.exports = async function handler(req, res) {
   } catch (_err) {
     return json(res, 500, { ok: false, error: 'server_error' });
   }
+  */
 };
