@@ -72,6 +72,7 @@ async function boot() {
 
     submit.disabled = true;
     try {
+      await window.SiteAuth?.ensureGlobalAuthReady?.();
       const user = await window.SiteAuth.registerUser({ email, username, fullName, birthday, password });
       window.SiteAuth.createSession(user);
       showInfo('Registration complete. Redirecting...');
@@ -84,6 +85,8 @@ async function boot() {
         showError('That email is already registered. Please log in.');
       } else if (msg.includes('Username already taken')) {
         showError('That username is taken. Please choose another one.');
+      } else if (msg.includes('Global auth backend')) {
+        showError('Global auth backend is not active yet. Configure env vars and redeploy.');
       } else {
         showError('Registration failed. Please try again.');
       }

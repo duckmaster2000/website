@@ -32,6 +32,7 @@ async function boot() {
   const passEl = document.getElementById('saPassword');
   const registerLink = document.getElementById('saGoRegister');
   const submit = document.getElementById('saSubmit');
+  const backendStateEl = document.getElementById('saBackendState');
 
   if (registerLink) {
     registerLink.href = `site-register.html?next=${encodeURIComponent(cfg.next)}`;
@@ -41,6 +42,52 @@ async function boot() {
   if (existing) {
     window.location.href = cfg.next;
     return;
+  }
+
+  const authStatus = await window.SiteAuth?.getAuthStatus?.();
+  if (backendStateEl) {
+    if (authStatus?.globalAuth) {
+      backendStateEl.textContent = 'Global auth backend: active.';
+    } else {
+      backendStateEl.textContent = 'Global auth backend: not active. Password login may be unavailable on production until deployed with env vars.';
+    }
+  }
+
+  if (authStatus?.googleClientId && window.google?.accounts?.id) {
+    window.google.accounts.id.initialize({
+      client_id: authStatus.googleClientId,
+      callback: async (resp) => {
+        try {
+          if (!window.SiteAuth?.hasCookieConsent?.()) {
+            showError('Please accept cookies first to continue.');
+            window.SiteAuth?.ensureCookieBanner?.();
+            return;
+          }
+          if (!resp?.credential) {
+            showError('Google sign-in failed. Missing credential.');
+            return;
+          }
+          await window.SiteAuth.loginWithGoogleIdToken(resp.credential);
+          showInfo('Google login successful. Redirecting...');
+          window.setTimeout(() => {
+            window.location.href = cfg.next;
+          }, 220);
+        } catch (err) {
+          showError(String(err?.message || 'Google sign-in failed.'));
+        }
+      }
+    });
+
+    const btnWrap = document.getElementById('saGoogleBtn');
+    if (btnWrap) {
+      window.google.accounts.id.renderButton(btnWrap, {
+        theme: 'filled_black',
+        size: 'large',
+        shape: 'pill',
+        text: 'signin_with',
+        width: 280
+      });
+    }
   }
 
   form?.addEventListener('submit', async (event) => {
@@ -65,6 +112,7 @@ async function boot() {
 
     submit.disabled = true;
     try {
+      await window.SiteAuth?.ensureGlobalAuthReady?.();
       const user = await window.SiteAuth.findUserByLogin(login);
       if (!user) {
         if (login.includes('@')) {
@@ -86,8 +134,8 @@ async function boot() {
       window.setTimeout(() => {
         window.location.href = cfg.next;
       }, 250);
-    } catch (_) {
-      showError('Login failed. Please try again.');
+    } catch (err) {
+      showError(String(err?.message || 'Login failed. Please try again.'));
     } finally {
       submit.disabled = false;
     }

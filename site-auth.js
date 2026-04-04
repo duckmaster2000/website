@@ -5,6 +5,7 @@ const SiteAuth = (() => {
   const AUTH_API_ENDPOINT = '/api/auth';
   const SESSION_TTL_MS = 14 * 24 * 60 * 60 * 1000;
   const PUBLIC_PAGES = new Set(['site-login.html', 'site-register.html', 'privacy-policy.html', 'terms.html']);
+  let authStatusCache = null;
 
   function getCookie(name) {
     const pairs = document.cookie ? document.cookie.split(';') : [];
@@ -67,6 +68,25 @@ const SiteAuth = (() => {
     }
   }
 
+  function isLocalHost() {
+    const host = String(window.location.hostname || '').toLowerCase();
+    return host === 'localhost' || host === '127.0.0.1';
+  }
+
+  async function getAuthStatus(force = false) {
+    if (!force && authStatusCache) return authStatusCache;
+    const remote = await postAuthApi('status', {});
+    authStatusCache = remote || { ok: false, backend: false, globalAuth: false, googleClientId: '' };
+    return authStatusCache;
+  }
+
+  async function ensureGlobalAuthReady() {
+    const status = await getAuthStatus();
+    if (status?.globalAuth) return true;
+    if (isLocalHost()) return true;
+    throw new Error('Global auth backend is not active yet. Please deploy with Redis env vars.');
+  }
+
   function randomToken(bytes = 24) {
     const arr = new Uint8Array(bytes);
     crypto.getRandomValues(arr);
@@ -127,7 +147,11 @@ const SiteAuth = (() => {
       return user;
     }
 
-    // Fallback: local-only mode when backend is unavailable.
+    if (!isLocalHost()) {
+      throw new Error('Global auth backend unavailable.');
+    }
+
+    // Fallback: local-only mode for localhost development.
     if (raw.includes('@')) return findUserByEmail(raw);
     return findUserByUsername(raw) || findUserByEmail(raw);
   }
@@ -171,8 +195,27 @@ const SiteAuth = (() => {
       return fromRemote;
     }
 
+    if (!isLocalHost()) {
+      throw new Error('Global auth backend unavailable.');
+    }
+
     db.users.push(user);
     setDb(db);
+    return user;
+  }
+
+  async function loginWithGoogleIdToken(idToken) {
+    await ensureGlobalAuthReady();
+    const remote = await postAuthApi('googleLogin', { idToken });
+    if (!remote || !remote.user) throw new Error('Google sign-in failed.');
+
+    const user = remote.user;
+    const db = getDb();
+    const idx = db.users.findIndex((u) => u.id === user.id);
+    if (idx >= 0) db.users[idx] = user;
+    else db.users.push(user);
+    setDb(db);
+    createSession(user);
     return user;
   }
 
@@ -415,10 +458,13 @@ const SiteAuth = (() => {
     normalizeUsername,
     getDb,
     setDb,
+    getAuthStatus,
+    ensureGlobalAuthReady,
     findUserByLogin,
     findUserByEmail,
     findUserByUsername,
     registerUser,
+    loginWithGoogleIdToken,
     verifyPassword,
     createSession,
     getSession,

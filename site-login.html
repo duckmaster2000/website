@@ -26,6 +26,12 @@
         <button id="saSubmit" type="submit">Log In</button>
       </form>
 
+      <div class="sa-divider"><span>or</span></div>
+      <div id="saGoogleWrap" class="sa-google-wrap">
+        <div id="saGoogleBtn"></div>
+      </div>
+      <p id="saBackendState" class="sa-backend-state"></p>
+
       <p id="saError" class="sa-error" hidden></p>
       <p id="saInfo" class="sa-info" hidden></p>
       <p class="sa-alt">Need an account? <a id="saGoRegister" href="site-register.html">Register here</a>.</p>
@@ -33,6 +39,7 @@
   </main>
 
   <script src="site-auth.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="site-login.js"></script>
 </body>
 </html>

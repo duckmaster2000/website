@@ -125,3 +125,40 @@ h1 {
 }
 
 .sa-alt a:hover { color: #bbff90; }
+
+.sa-divider {
+  margin: 0.85rem 0 0.7rem;
+  position: relative;
+  text-align: center;
+  color: #89a6c8;
+  font-size: 0.8rem;
+}
+
+.sa-divider::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: rgba(116, 190, 255, 0.22);
+}
+
+.sa-divider span {
+  position: relative;
+  padding: 0 0.5rem;
+  background: rgba(9, 22, 42, 0.9);
+}
+
+.sa-google-wrap {
+  display: grid;
+  place-items: center;
+  margin-bottom: 0.3rem;
+}
+
+.sa-backend-state {
+  margin: 0.3rem 0 0;
+  color: #89a6c8;
+  font-size: 0.76rem;
+  text-align: center;
+}

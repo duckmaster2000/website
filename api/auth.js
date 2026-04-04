@@ -20,6 +20,10 @@ function hasRedisConfig() {
   return !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
 }
 
+function getGoogleClientId() {
+  return String(process.env.GOOGLE_OAUTH_CLIENT_ID || '').trim().replace(/^"(.*)"$/, '$1');
+}
+
 async function redisCommand(cmd) {
   const base = String(process.env.UPSTASH_REDIS_REST_URL || '').trim().replace(/^"(.*)"$/, '$1');
   const token = String(process.env.UPSTASH_REDIS_REST_TOKEN || '').trim().replace(/^"(.*)"$/, '$1');
@@ -49,6 +53,109 @@ function keyUsername(username) {
 
 function keyUserId(userId) {
   return `siteauth:user:id:${String(userId || '').trim()}`;
+}
+
+function randomToken(bytes = 12) {
+  const alphabet = 'abcdef0123456789';
+  let out = '';
+  for (let i = 0; i < bytes * 2; i += 1) {
+    out += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+  return out;
+}
+
+async function getByEmail(email) {
+  const raw = await redisCommand(['GET', keyEmail(email)]);
+  return raw ? JSON.parse(raw) : null;
+}
+
+async function getByUsername(username) {
+  const raw = await redisCommand(['GET', keyUsername(username)]);
+  return raw ? JSON.parse(raw) : null;
+}
+
+async function saveUser(user) {
+  const payload = JSON.stringify(user);
+  await redisCommand(['SET', keyUserId(user.id), payload]);
+  await redisCommand(['SET', keyEmail(user.email), payload]);
+  await redisCommand(['SET', keyUsername(user.usernameLower || user.username), payload]);
+}
+
+function slugifyUsername(v) {
+  const base = String(v || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 24);
+  return base || 'user';
+}
+
+async function allocateUniqueUsername(base) {
+  let candidate = slugifyUsername(base);
+  let attempt = 0;
+  while (attempt < 50) {
+    const exists = await getByUsername(candidate);
+    if (!exists) return candidate;
+    attempt += 1;
+    candidate = `${slugifyUsername(base).slice(0, 20)}_${attempt}`;
+  }
+  return `user_${randomToken(4)}`;
+}
+
+async function verifyGoogleIdToken(idToken) {
+  const token = String(idToken || '').trim();
+  if (!token) throw new Error('missing_google_token');
+
+  const resp = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(token)}`);
+  if (!resp.ok) throw new Error('invalid_google_token');
+  const data = await resp.json();
+
+  const googleClientId = getGoogleClientId();
+  if (googleClientId && data.aud !== googleClientId) throw new Error('google_audience_mismatch');
+  if (String(data.email_verified || '').toLowerCase() !== 'true') throw new Error('google_email_not_verified');
+
+  return {
+    sub: String(data.sub || ''),
+    email: normalizeEmail(data.email || ''),
+    name: String(data.name || '').trim()
+  };
+}
+
+async function findOrCreateGoogleUser(idToken) {
+  const profile = await verifyGoogleIdToken(idToken);
+  if (!profile.email) throw new Error('google_email_missing');
+
+  const existing = await getByEmail(profile.email);
+  if (existing) {
+    const updated = {
+      ...existing,
+      fullName: profile.name || existing.fullName || '',
+      googleSub: profile.sub || existing.googleSub || null,
+      authProvider: existing.authProvider || 'password',
+      lastLoginAt: new Date().toISOString()
+    };
+    await saveUser(updated);
+    return updated;
+  }
+
+  const emailLocal = profile.email.split('@')[0] || 'user';
+  const usernameLower = await allocateUniqueUsername(emailLocal);
+  const user = {
+    id: randomToken(10),
+    email: profile.email,
+    username: usernameLower,
+    usernameLower,
+    fullName: profile.name || '',
+    birthday: '',
+    salt: '',
+    passwordHash: '',
+    createdAt: new Date().toISOString(),
+    lastLoginAt: new Date().toISOString(),
+    authProvider: 'google',
+    googleSub: profile.sub || null
+  };
+  await saveUser(user);
+  return user;
 }
 
 async function findByLogin(login) {
@@ -97,10 +204,7 @@ async function registerUser(user) {
     lastLoginAt: user.lastLoginAt || null
   };
 
-  const payload = JSON.stringify(normalized);
-  await redisCommand(['SET', keyUserId(normalized.id), payload]);
-  await redisCommand(['SET', keyEmail(normalized.email), payload]);
-  await redisCommand(['SET', keyUsername(normalized.usernameLower), payload]);
+  await saveUser(normalized);
 
   return { ok: true, user: normalized };
 }
@@ -133,6 +237,15 @@ module.exports = async function handler(req, res) {
     const body = req.body && typeof req.body === 'object' ? req.body : JSON.parse(req.body || '{}');
     const action = String(body.action || '').trim();
 
+    if (action === 'status') {
+      return json(res, 200, {
+        ok: true,
+        backend: hasRedisConfig(),
+        globalAuth: hasRedisConfig(),
+        googleClientId: getGoogleClientId() || ''
+      });
+    }
+
     if (action === 'findByLogin') {
       const user = await findByLogin(body.login);
       return json(res, 200, { ok: true, user: user || null });
@@ -157,6 +270,15 @@ module.exports = async function handler(req, res) {
       const result = await touchLastLogin(body.userId, body.lastLoginAt);
       if (!result.ok) return json(res, 404, { ok: false, error: result.code });
       return json(res, 200, { ok: true });
+    }
+
+    if (action === 'googleLogin') {
+      try {
+        const user = await findOrCreateGoogleUser(body.idToken);
+        return json(res, 200, { ok: true, user });
+      } catch (err) {
+        return json(res, 400, { ok: false, error: String(err?.message || 'google_login_failed') });
+      }
     }
 
     return json(res, 400, { ok: false, error: 'unknown_action' });
