@@ -21,8 +21,8 @@ function hasRedisConfig() {
 }
 
 async function redisCommand(cmd) {
-  const base = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  const base = String(process.env.UPSTASH_REDIS_REST_URL || '').trim().replace(/^"(.*)"$/, '$1');
+  const token = String(process.env.UPSTASH_REDIS_REST_TOKEN || '').trim().replace(/^"(.*)"$/, '$1');
 
   const resp = await fetch(base, {
     method: 'POST',
@@ -30,10 +30,10 @@ async function redisCommand(cmd) {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ command: cmd })
+    body: JSON.stringify(cmd)
   });
 
-  if (!resp.ok) throw new Error('redis_http_error');
+  if (!resp.ok) throw new Error(`redis_http_error_${resp.status}`);
   const data = await resp.json();
   if (data.error) throw new Error(String(data.error));
   return data.result;
