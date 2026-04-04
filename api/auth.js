@@ -229,23 +229,31 @@ module.exports = async function handler(req, res) {
     return json(res, 405, { ok: false, error: 'method_not_allowed' });
   }
 
+  let body;
+  try {
+    body = req.body && typeof req.body === 'object' ? req.body : JSON.parse(req.body || '{}');
+  } catch (_) {
+    return json(res, 400, { ok: false, error: 'invalid_json' });
+  }
+
+  const action = String(body.action || '').trim();
+
+  // Status is always available — lets the frontend detect backend state
+  // even when Redis is not yet configured.
+  if (action === 'status') {
+    return json(res, 200, {
+      ok: true,
+      backend: hasRedisConfig(),
+      globalAuth: hasRedisConfig(),
+      googleClientId: getGoogleClientId() || ''
+    });
+  }
+
   if (!hasRedisConfig()) {
     return json(res, 501, { ok: false, error: 'auth_backend_not_configured' });
   }
 
   try {
-    const body = req.body && typeof req.body === 'object' ? req.body : JSON.parse(req.body || '{}');
-    const action = String(body.action || '').trim();
-
-    if (action === 'status') {
-      return json(res, 200, {
-        ok: true,
-        backend: hasRedisConfig(),
-        globalAuth: hasRedisConfig(),
-        googleClientId: getGoogleClientId() || ''
-      });
-    }
-
     if (action === 'findByLogin') {
       const user = await findByLogin(body.login);
       return json(res, 200, { ok: true, user: user || null });

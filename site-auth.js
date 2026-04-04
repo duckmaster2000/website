@@ -47,6 +47,7 @@ const SiteAuth = (() => {
   }
 
   async function postAuthApi(action, payload = {}) {
+    let conflictError = null;
     try {
       const resp = await fetch(AUTH_API_ENDPOINT, {
         method: 'POST',
@@ -56,14 +57,16 @@ const SiteAuth = (() => {
       if (!resp.ok) {
         if (resp.status === 409) {
           const conflict = await resp.json().catch(() => null);
-          if (conflict?.error === 'email_exists') throw new Error('Email already registered');
-          if (conflict?.error === 'username_exists') throw new Error('Username already taken');
+          if (conflict?.error === 'email_exists') conflictError = new Error('Email already registered');
+          else if (conflict?.error === 'username_exists') conflictError = new Error('Username already taken');
         }
+        if (conflictError) throw conflictError;
         return null;
       }
       const data = await resp.json();
       return data && data.ok ? data : null;
-    } catch (_) {
+    } catch (err) {
+      if (err === conflictError) throw err;
       return null;
     }
   }

@@ -53,40 +53,51 @@ async function boot() {
     }
   }
 
-  if (authStatus?.googleClientId && window.google?.accounts?.id) {
-    window.google.accounts.id.initialize({
-      client_id: authStatus.googleClientId,
-      callback: async (resp) => {
-        try {
-          if (!window.SiteAuth?.hasCookieConsent?.()) {
-            showError('Please accept cookies first to continue.');
-            window.SiteAuth?.ensureCookieBanner?.();
-            return;
+  const gcid = authStatus?.googleClientId;
+  if (gcid) {
+    const setupGoogleButton = () => {
+      if (!window.google?.accounts?.id) return;
+      window.google.accounts.id.initialize({
+        client_id: gcid,
+        callback: async (resp) => {
+          try {
+            if (!window.SiteAuth?.hasCookieConsent?.()) {
+              showError('Please accept cookies first to continue.');
+              window.SiteAuth?.ensureCookieBanner?.();
+              return;
+            }
+            if (!resp?.credential) {
+              showError('Google sign-in failed. Missing credential.');
+              return;
+            }
+            await window.SiteAuth.loginWithGoogleIdToken(resp.credential);
+            showInfo('Google login successful. Redirecting...');
+            window.setTimeout(() => {
+              window.location.href = cfg.next;
+            }, 220);
+          } catch (err) {
+            showError(String(err?.message || 'Google sign-in failed.'));
           }
-          if (!resp?.credential) {
-            showError('Google sign-in failed. Missing credential.');
-            return;
-          }
-          await window.SiteAuth.loginWithGoogleIdToken(resp.credential);
-          showInfo('Google login successful. Redirecting...');
-          window.setTimeout(() => {
-            window.location.href = cfg.next;
-          }, 220);
-        } catch (err) {
-          showError(String(err?.message || 'Google sign-in failed.'));
         }
-      }
-    });
-
-    const btnWrap = document.getElementById('saGoogleBtn');
-    if (btnWrap) {
-      window.google.accounts.id.renderButton(btnWrap, {
-        theme: 'filled_black',
-        size: 'large',
-        shape: 'pill',
-        text: 'signin_with',
-        width: 280
       });
+
+      const btnWrap = document.getElementById('saGoogleBtn');
+      if (btnWrap) {
+        window.google.accounts.id.renderButton(btnWrap, {
+          theme: 'filled_black',
+          size: 'large',
+          shape: 'pill',
+          text: 'signin_with',
+          width: 280
+        });
+      }
+    };
+
+    if (window.google?.accounts?.id) {
+      setupGoogleButton();
+    } else {
+      // GIS loads async — run setup once it's ready.
+      window.onGoogleLibraryLoad = setupGoogleButton;
     }
   }
 
