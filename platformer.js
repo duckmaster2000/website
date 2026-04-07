@@ -10,7 +10,7 @@ const MAX_DASH_CHARGES = 2;
 const DASH_RECHARGE_SEC = 1.15;
 const BASE_MAX_HEALTH = 3;
 const BASE_LIVES = 3;
-const LEVEL_COUNT = 100;
+const LEVEL_COUNT = 180;
 const MAP_W = 68;
 const MAP_H = 15;
 
@@ -33,6 +33,15 @@ const el = {
   wallet: document.getElementById('pfWallet'),
   objective: document.getElementById('pfObjective'),
   status: document.getElementById('pfStatus'),
+  modeLabel: document.getElementById('pfModeLabel'),
+  modePills: document.getElementById('pfModePills'),
+  modeDesc: document.getElementById('pfModeDesc'),
+  diffScale: document.getElementById('pfDiffScale'),
+  diffScaleVal: document.getElementById('pfDiffScaleVal'),
+  coinReqScale: document.getElementById('pfCoinReqScale'),
+  coinReqScaleVal: document.getElementById('pfCoinReqScaleVal'),
+  resetModeProgress: document.getElementById('pfResetModeProgress'),
+  resetAllProgress: document.getElementById('pfResetAllProgress'),
   buffs: document.getElementById('pfBuffs'),
   shop: document.getElementById('pfShop'),
   upgradeList: document.getElementById('pfUpgradeList'),
@@ -220,6 +229,39 @@ const SHOP = [
   }
 ];
 
+const MODE_INFO = {
+  level: {
+    name: 'Level',
+    objective: 'Finish every sector in order.',
+    difficultyMult: 1,
+    lifeMult: 1
+  },
+  endless: {
+    name: 'Endless',
+    objective: 'Push as many floors as possible.',
+    difficultyMult: 1.12,
+    lifeMult: 1
+  },
+  hardcore: {
+    name: 'Hardcore',
+    objective: 'Campaign with one life and brutal hazards.',
+    difficultyMult: 1.28,
+    lifeMult: 0.5
+  },
+  chaos: {
+    name: 'Chaos',
+    objective: 'Dense enemies, extra traps, bigger risk.',
+    difficultyMult: 1.45,
+    lifeMult: 0.85
+  },
+  rush: {
+    name: 'Rush',
+    objective: 'Fast clear pressure with tighter coin goals.',
+    difficultyMult: 1.2,
+    lifeMult: 0.9
+  }
+};
+
 function cosmeticOwned(key) {
   return Number(game.meta.upgrades[key] || 0) > 0;
 }
@@ -272,8 +314,10 @@ function mulberry32(seed) {
   };
 }
 
-function buildProceduralLevel(seed, levelNumber) {
+function buildProceduralLevel(seed, levelNumber, difficultyMult = 1) {
   const rng = mulberry32(9137 + seed * 131);
+  const levelScale = 1 + levelNumber * 0.011;
+  const danger = clamp(levelScale * difficultyMult, 1, 4.6);
   const grid = Array.from({ length: MAP_H }, () => Array.from({ length: MAP_W }, () => '.'));
 
   for (let x = 0; x < MAP_W; x += 1) {
@@ -294,35 +338,36 @@ function buildProceduralLevel(seed, levelNumber) {
   const segments = [];
 
   while (x < MAP_W - 6) {
-    const len = 3 + Math.floor(rng() * 5);
+    const lenMax = danger >= 2.4 ? 5 : 6;
+    const len = 2 + Math.floor(rng() * lenMax);
     const endX = Math.min(MAP_W - 3, x + len);
 
     for (let px = x; px <= endX; px += 1) {
       grid[y][px] = '#';
       markSafe(px, y);
-      if (rng() < 0.46 && y - 1 > 1) grid[y - 1][px] = 'C';
+      if (rng() < clamp(0.44 - danger * 0.05, 0.14, 0.44) && y - 1 > 1) grid[y - 1][px] = 'C';
     }
 
-    if (rng() < 0.26 && endX - x >= 2 && y - 1 > 2) {
+    if (rng() < clamp(0.3 + danger * 0.06, 0.3, 0.76) && endX - x >= 2 && y - 1 > 2) {
       const ex = x + 1 + Math.floor(rng() * (endX - x - 1));
       const enemy = rng() < 0.34 ? 'R' : (rng() < 0.5 ? 'B' : 'G');
       grid[y - 1][ex] = enemy;
     }
 
-    if (rng() < 0.18 && endX - x >= 2 && y - 1 > 2) {
+    if (rng() < clamp(0.2 - danger * 0.03, 0.07, 0.2) && endX - x >= 2 && y - 1 > 2) {
       const px = x + 1 + Math.floor(rng() * (endX - x - 1));
       const pwr = ['H', 'J', 'V', 'M'][Math.floor(rng() * 4)];
       grid[y - 1][px] = pwr;
     }
 
-    if (rng() < 0.26 && endX - x >= 3 && y - 1 > 2) {
+    if (rng() < clamp(0.3 + danger * 0.08, 0.3, 0.88) && endX - x >= 3 && y - 1 > 2) {
       const hx = x + 1 + Math.floor(rng() * (endX - x - 2));
       if (!safeSet.has(`${hx},${y}`)) grid[y][hx] = '^';
     }
 
     segments.push({ x0: x, x1: endX, y });
 
-    const gap = 2 + Math.floor(rng() * 3);
+    const gap = 2 + Math.floor(rng() * (2 + Math.min(3, Math.floor(danger))));
     const rise = Math.floor(rng() * 5) - 2;
     const boundedRise = clamp(rise, -2, 2);
     x = endX + gap;
@@ -352,10 +397,10 @@ function buildProceduralLevel(seed, levelNumber) {
   grid[ey][ex] = 'E';
 
   // Add low-floor danger pools away from spawn/exit.
-  const lavaBands = 1 + Math.floor(rng() * 3);
+  const lavaBands = 2 + Math.floor(rng() * (2 + Math.min(3, Math.floor(danger))));
   for (let i = 0; i < lavaBands; i += 1) {
     const lx = 6 + Math.floor(rng() * (MAP_W - 16));
-    const lw = 2 + Math.floor(rng() * 5);
+    const lw = 2 + Math.floor(rng() * (3 + Math.min(4, Math.floor(danger))));
     for (let j = 0; j < lw; j += 1) {
       const cx = lx + j;
       if (cx <= 1 || cx >= MAP_W - 1) continue;
@@ -371,7 +416,8 @@ function buildProceduralLevel(seed, levelNumber) {
       if (grid[ry][rx] === 'C') coinCount += 1;
     }
   }
-  while (coinCount < 14) {
+  const minimumCoins = clamp(14 - Math.floor(danger * 2), 7, 14);
+  while (coinCount < minimumCoins) {
     const seg = segments[Math.floor(rng() * segments.length)] || first;
     const cx = clamp(seg.x0 + Math.floor(rng() * Math.max(1, seg.x1 - seg.x0 + 1)), 1, MAP_W - 2);
     const cy = clamp(seg.y - 1, 1, MAP_H - 3);
@@ -382,7 +428,7 @@ function buildProceduralLevel(seed, levelNumber) {
   }
 
   const map = grid.map((row) => row.join(''));
-  const pct = clamp(0.34 + ((seed % 9) * 0.013), 0.34, 0.5);
+  const pct = clamp(0.39 + ((seed % 9) * 0.014) + danger * 0.014, 0.42, 0.66);
   return {
     name: `Sector ${String(levelNumber).padStart(3, '0')}`,
     requiredCoinPct: pct,
@@ -400,7 +446,7 @@ function buildUniqueLevels(total) {
     let sig = '';
 
     while (attempt < 40) {
-      built = buildProceduralLevel(i + attempt * total, i + 1);
+      built = buildProceduralLevel(i + attempt * total, i + 1, 1);
       sig = built.map.join('\n');
       if (!signatures.has(sig)) break;
       attempt += 1;
@@ -417,6 +463,8 @@ const LEVELS = buildUniqueLevels(LEVEL_COUNT);
 
 const game = {
   ctx: null,
+  mode: 'level',
+  activeLevelDef: null,
   levelIndex: 0,
   worldW: 0,
   worldH: 0,
@@ -446,6 +494,19 @@ const game = {
   meta: {
     wallet: 0,
     unlockedLevel: 1,
+    mode: 'level',
+    endlessSeed: 7321,
+    progressByMode: {
+      level: 1,
+      endless: 1,
+      hardcore: 1,
+      chaos: 1,
+      rush: 1
+    },
+    settings: {
+      difficultyScale: 1,
+      coinRequirementScale: 1
+    },
     upgrades: {
       maxHealth: 0,
       moveSpeed: 0,
@@ -473,6 +534,25 @@ function loadMeta() {
     if (!parsed || typeof parsed !== 'object') return;
     game.meta.wallet = Math.max(0, Number(parsed.wallet || 0));
     game.meta.unlockedLevel = clamp(Number(parsed.unlockedLevel || 1), 1, LEVELS.length);
+    game.meta.mode = MODE_INFO[parsed.mode] ? parsed.mode : 'level';
+    game.mode = game.meta.mode;
+    game.meta.endlessSeed = Math.max(1000, Number(parsed.endlessSeed || game.meta.endlessSeed || 7321));
+
+    const defaultProgress = game.meta.progressByMode;
+    if (parsed.progressByMode && typeof parsed.progressByMode === 'object') {
+      Object.keys(defaultProgress).forEach((modeKey) => {
+        const maxLevel = modeKey === 'endless' ? 9999 : LEVELS.length;
+        defaultProgress[modeKey] = clamp(Number(parsed.progressByMode[modeKey] || defaultProgress[modeKey]), 1, maxLevel);
+      });
+    } else {
+      defaultProgress.level = clamp(Number(parsed.currentLevel || 1), 1, LEVELS.length);
+    }
+
+    if (parsed.settings && typeof parsed.settings === 'object') {
+      game.meta.settings.difficultyScale = clamp(Number(parsed.settings.difficultyScale || 1), 0.7, 1.8);
+      game.meta.settings.coinRequirementScale = clamp(Number(parsed.settings.coinRequirementScale || 1), 0.7, 1.6);
+    }
+
     if (parsed.upgrades && typeof parsed.upgrades === 'object') {
       // Save migration: preserve progress from older dashDuration upgrade key.
       if (parsed.upgrades.dashLength == null && parsed.upgrades.dashDuration != null) {
@@ -529,6 +609,113 @@ function playerStartLives() {
   return BASE_LIVES + (game.meta.upgrades.extraLife || 0);
 }
 
+function currentModeInfo() {
+  return MODE_INFO[game.mode] || MODE_INFO.level;
+}
+
+function modeDifficultyMultiplier(levelNumber) {
+  const modeMult = currentModeInfo().difficultyMult;
+  const ramp = 1 + (Math.max(1, levelNumber) - 1) * 0.008;
+  return modeMult * ramp * (game.meta.settings?.difficultyScale || 1);
+}
+
+function livesForCurrentMode() {
+  const info = currentModeInfo();
+  const baseLives = playerStartLives();
+  return Math.max(1, Math.round(baseLives * info.lifeMult));
+}
+
+function saveModeProgress(levelIndex) {
+  const maxIdx = game.mode === 'endless' ? 9998 : (LEVELS.length - 1);
+  const idx = clamp(Number(levelIndex || 0), 0, maxIdx);
+  game.meta.mode = game.mode;
+  if (!game.meta.progressByMode || typeof game.meta.progressByMode !== 'object') {
+    game.meta.progressByMode = { level: 1, endless: 1, hardcore: 1, chaos: 1, rush: 1 };
+  }
+  game.meta.progressByMode[game.mode] = idx + 1;
+  saveMeta();
+}
+
+function levelCountForMode() {
+  return game.mode === 'endless' ? 9999 : LEVELS.length;
+}
+
+function getModeLevelDef(levelIndex) {
+  if (game.mode === 'endless') {
+    const floor = Math.max(1, levelIndex + 1);
+    const difficulty = modeDifficultyMultiplier(floor + 30);
+    const built = buildProceduralLevel(game.meta.endlessSeed + floor * 23, floor, difficulty);
+    built.name = `Endless Floor ${String(floor).padStart(3, '0')}`;
+    return built;
+  }
+
+  const def = LEVELS[clamp(levelIndex, 0, LEVELS.length - 1)];
+  const pctBonus = game.mode === 'rush' ? 0.1 : (game.mode === 'chaos' ? 0.06 : (game.mode === 'hardcore' ? 0.04 : 0));
+  const coinScale = game.meta.settings?.coinRequirementScale || 1;
+  return {
+    ...def,
+    requiredCoinPct: clamp(((def.requiredCoinPct || 0.4) + pctBonus) * coinScale, 0.35, 0.84),
+    name: `${currentModeInfo().name} ${String(levelIndex + 1).padStart(3, '0')}`
+  };
+}
+
+function applyModeVisualState() {
+  if (el.modeLabel) el.modeLabel.textContent = currentModeInfo().name;
+  if (el.modeDesc) el.modeDesc.textContent = currentModeInfo().objective;
+  if (!el.modePills) return;
+  el.modePills.querySelectorAll('.mode-pill').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.mode === game.mode);
+  });
+}
+
+function renderSettingsPanel() {
+  const diffScale = game.meta.settings?.difficultyScale || 1;
+  const coinScale = game.meta.settings?.coinRequirementScale || 1;
+
+  if (el.diffScale) el.diffScale.value = String(Math.round(diffScale * 100));
+  if (el.diffScaleVal) el.diffScaleVal.textContent = `${Math.round(diffScale * 100)}%`;
+  if (el.coinReqScale) el.coinReqScale.value = String(Math.round(coinScale * 100));
+  if (el.coinReqScaleVal) el.coinReqScaleVal.textContent = `${Math.round(coinScale * 100)}%`;
+  if (el.modeDesc) el.modeDesc.textContent = currentModeInfo().objective;
+}
+
+function resetCurrentModeProgress() {
+  if (!game.meta.progressByMode || typeof game.meta.progressByMode !== 'object') return;
+  game.meta.progressByMode[game.mode] = 1;
+  if (game.mode === 'level') game.meta.unlockedLevel = Math.max(1, game.meta.unlockedLevel);
+  saveMeta();
+  setStatus(`${currentModeInfo().name} progress reset.`, 2.2);
+  parseLevel(0, getModeLevelDef(0));
+}
+
+function resetAllModeProgress() {
+  game.meta.progressByMode = {
+    level: 1,
+    endless: 1,
+    hardcore: 1,
+    chaos: 1,
+    rush: 1
+  };
+  game.meta.unlockedLevel = 1;
+  saveMeta();
+  setStatus('All mode progress reset.', 2.2);
+  parseLevel(0, getModeLevelDef(0));
+}
+
+function switchMode(modeKey) {
+  if (!MODE_INFO[modeKey]) return;
+  if (game.mode === modeKey && game.player) return;
+
+  game.mode = modeKey;
+  applyModeVisualState();
+  renderSettingsPanel();
+  setStatus(`${currentModeInfo().name} mode active. ${currentModeInfo().objective}`, 2.8);
+
+  const maxIdx = modeKey === 'endless' ? 9998 : (LEVELS.length - 1);
+  const startLevel = clamp(Number(game.meta.progressByMode?.[modeKey] || 1) - 1, 0, maxIdx);
+  parseLevel(startLevel, getModeLevelDef(startLevel));
+}
+
 function showOverlay(text, duration = 1.4) {
   game.overlayText = text;
   game.overlayTimer = duration;
@@ -556,6 +743,10 @@ function clearLevel() {
 }
 
 function addEnemy(type, x, y) {
+  const diff = modeDifficultyMultiplier(game.levelIndex + 1);
+  const hpBoost = diff >= 1.35 ? 1 : 0;
+  const speedBoost = 1 + Math.min(0.55, (diff - 1) * 0.28);
+
   if (type === 'walker') {
     game.enemies.push({
       type,
@@ -563,10 +754,10 @@ function addEnemy(type, x, y) {
       y,
       w: 28,
       h: 28,
-      vx: 90,
+      vx: 90 * speedBoost,
       minX: x - 160,
       maxX: x + 160,
-      hp: 2,
+      hp: 2 + hpBoost,
       hurtCd: 0
     });
   } else if (type === 'flyer') {
@@ -579,8 +770,8 @@ function addEnemy(type, x, y) {
       baseY: y,
       phase: Math.random() * Math.PI * 2,
       dir: Math.random() < 0.5 ? -1 : 1,
-      speed: 70,
-      hp: 2,
+      speed: 70 * speedBoost,
+      hp: 2 + hpBoost,
       hurtCd: 0
     });
   } else if (type === 'shooter') {
@@ -590,18 +781,20 @@ function addEnemy(type, x, y) {
       y,
       w: 30,
       h: 30,
-      fireCd: 1.1,
-      hp: 3,
+      fireCd: clamp(1.1 - (diff - 1) * 0.18, 0.58, 1.1),
+      hp: 3 + hpBoost,
       hurtCd: 0
     });
   }
 }
 
-function parseLevel(index) {
+function parseLevel(index, customDef = null) {
   clearLevel();
-  game.levelIndex = index;
+  const maxIdx = game.mode === 'endless' ? 9998 : (LEVELS.length - 1);
+  game.levelIndex = clamp(index, 0, maxIdx);
 
-  const def = LEVELS[index];
+  const def = customDef || getModeLevelDef(game.levelIndex);
+  game.activeLevelDef = def;
   const rows = def.map;
   game.worldW = rows[0].length * TILE;
   game.worldH = rows.length * TILE;
@@ -656,7 +849,7 @@ function parseLevel(index) {
     dashRecharge: 0,
     hp: playerMaxHealth(),
     maxHp: playerMaxHealth(),
-    lives: playerStartLives(),
+    lives: livesForCurrentMode(),
     invuln: 0,
     buffs: {
       shield: 0,
@@ -666,7 +859,8 @@ function parseLevel(index) {
     }
   };
 
-  setStatus(`Level ${index + 1}: ${def.name}`, 2.5);
+  saveModeProgress(game.levelIndex);
+  setStatus(`${currentModeInfo().name} ${game.levelIndex + 1}: ${def.name}`, 2.5);
   showOverlay(def.name, 1.4);
 }
 
@@ -747,6 +941,7 @@ function gainCoin(amount = 1) {
 }
 
 function hurtPlayer(amount = 1) {
+  const scaledDamage = Math.max(1, Math.ceil(amount * clamp(currentModeInfo().difficultyMult * 0.92, 1, 2.2)));
   if (game.player.invuln > 0) return;
   if (game.player.buffs.shield > 0) {
     game.player.buffs.shield = Math.max(0, game.player.buffs.shield - 2.4);
@@ -755,7 +950,7 @@ function hurtPlayer(amount = 1) {
     return;
   }
 
-  game.player.hp -= amount;
+  game.player.hp -= scaledDamage;
   game.player.invuln = 1.0 + cosmeticBonuses().invulnBonus;
   game.camera.shakeT = 0.2;
   game.camera.shakeMag = 9;
@@ -789,11 +984,11 @@ function respawnPlayer() {
 }
 
 function restartLevel() {
-  parseLevel(game.levelIndex);
+  parseLevel(game.levelIndex, getModeLevelDef(game.levelIndex));
 }
 
 function nextLevel() {
-  if (game.levelIndex + 1 >= LEVELS.length) {
+  if (game.mode !== 'endless' && game.levelIndex + 1 >= LEVELS.length) {
     game.state = 'victory';
     showOverlay('Campaign Cleared', 2.8);
     setStatus('You beat all levels. Replay for more wallet coins.', 4);
@@ -801,12 +996,12 @@ function nextLevel() {
   }
 
   const next = game.levelIndex + 1;
-  if (next + 1 > game.meta.unlockedLevel) {
+  if (game.mode !== 'endless' && next + 1 > game.meta.unlockedLevel) {
     game.meta.unlockedLevel = next + 1;
     saveMeta();
   }
 
-  parseLevel(next);
+  parseLevel(next, getModeLevelDef(next));
 }
 
 function updatePlayer(dt) {
@@ -1099,14 +1294,20 @@ function updateCamera(dt) {
 
 function updateHud(dt = 0) {
   if (!game.player) return;
-  el.level.textContent = `${game.levelIndex + 1} / ${LEVELS.length}`;
+  if (game.mode === 'endless') {
+    el.level.textContent = `Floor ${game.levelIndex + 1}`;
+  } else {
+    el.level.textContent = `${game.levelIndex + 1} / ${levelCountForMode()}`;
+  }
   el.health.textContent = `${Math.max(0, game.player.hp)} / ${game.player.maxHp}`;
   el.lives.textContent = game.player.lives;
   if (el.dashes) el.dashes.textContent = `${game.player.dashCharges}/${MAX_DASH_CHARGES}`;
   el.runCoins.textContent = Math.round(game.runCoins);
   el.wallet.textContent = Math.round(game.meta.wallet);
-  el.objective.textContent = `Coins ${game.collectedCoins}/${game.requiredCoins} required (${game.totalCoins} total) | Reach portal`;
+  const modeObj = currentModeInfo().objective;
+  el.objective.textContent = `Coins ${game.collectedCoins}/${game.requiredCoins} required (${game.totalCoins} total) | ${modeObj}`;
   el.status.textContent = game.statusText;
+  applyModeVisualState();
 
   const active = [];
   if (game.player.buffs.shield > 0) active.push(`Shield ${game.player.buffs.shield.toFixed(1)}s`);
@@ -1462,6 +1663,44 @@ function bindEvents() {
   window.addEventListener('keydown', handleInputDown);
   window.addEventListener('keyup', handleInputUp);
 
+  if (el.modePills) {
+    el.modePills.addEventListener('click', (event) => {
+      const btn = event.target.closest('[data-mode]');
+      if (!btn) return;
+      switchMode(btn.dataset.mode);
+    });
+  }
+
+  if (el.diffScale) {
+    el.diffScale.addEventListener('input', () => {
+      const pct = clamp(Number(el.diffScale.value || 100), 70, 180);
+      game.meta.settings.difficultyScale = pct / 100;
+      if (el.diffScaleVal) el.diffScaleVal.textContent = `${pct}%`;
+      saveMeta();
+    });
+  }
+
+  if (el.coinReqScale) {
+    el.coinReqScale.addEventListener('input', () => {
+      const pct = clamp(Number(el.coinReqScale.value || 100), 70, 160);
+      game.meta.settings.coinRequirementScale = pct / 100;
+      if (el.coinReqScaleVal) el.coinReqScaleVal.textContent = `${pct}%`;
+      saveMeta();
+    });
+  }
+
+  if (el.resetModeProgress) {
+    el.resetModeProgress.addEventListener('click', () => {
+      resetCurrentModeProgress();
+    });
+  }
+
+  if (el.resetAllProgress) {
+    el.resetAllProgress.addEventListener('click', () => {
+      resetAllModeProgress();
+    });
+  }
+
   if (el.closeShop) {
     el.closeShop.addEventListener('click', () => toggleShop(false));
   }
@@ -1512,8 +1751,16 @@ function boot() {
 
   game.ctx = el.canvas.getContext('2d');
   loadMeta();
+  applyModeVisualState();
+  renderSettingsPanel();
   bindEvents();
-  parseLevel(0);
+
+  const startMode = MODE_INFO[game.meta.mode] ? game.meta.mode : 'level';
+  game.mode = startMode;
+  const maxIdx = startMode === 'endless' ? 9998 : (LEVELS.length - 1);
+  const startLevel = clamp(Number(game.meta.progressByMode?.[startMode] || 1) - 1, 0, maxIdx);
+  parseLevel(startLevel, getModeLevelDef(startLevel));
+
   updateCamera(0);
   renderShop();
   updateHud(0);

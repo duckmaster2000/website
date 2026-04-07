@@ -10,8 +10,9 @@
   <link rel="stylesheet" href="platformer.css" />
 </head>
 <body>
+  <div class="bg-noise" aria-hidden="true"></div>
   <main class="wrap">
-    <header class="panel topbar">
+    <header class="panel topbar hero">
       <div>
         <p class="eyebrow">ULTRA PLATFORMER</p>
         <h1>Astro Ruins Platformer</h1>
@@ -33,7 +34,40 @@
         <span>Objective: <strong id="pfObjective">Collect coins and reach the portal.</strong></span>
         <span>Status: <strong id="pfStatus">Ready</strong></span>
       </div>
+      <div class="hud-row mode-row">
+        <span>Mode: <strong id="pfModeLabel">Level</strong></span>
+        <div class="mode-pills" id="pfModePills">
+          <button type="button" class="mode-pill active" data-mode="level">Level</button>
+          <button type="button" class="mode-pill" data-mode="endless">Endless</button>
+          <button type="button" class="mode-pill" data-mode="hardcore">Hardcore</button>
+          <button type="button" class="mode-pill" data-mode="chaos">Chaos</button>
+          <button type="button" class="mode-pill" data-mode="rush">Rush</button>
+        </div>
+      </div>
       <div class="buffs" id="pfBuffs"></div>
+    </section>
+
+    <section class="panel settings-panel" id="pfSettingsPanel">
+      <div class="settings-head">
+        <h2>Gameplay Settings</h2>
+        <span id="pfModeDesc" class="settings-mode-desc">Finish every sector in order.</span>
+      </div>
+      <div class="settings-grid">
+        <label class="setting-item" for="pfDiffScale">
+          <span>Difficulty Scale</span>
+          <input id="pfDiffScale" type="range" min="70" max="180" step="5" value="100" />
+          <strong id="pfDiffScaleVal">100%</strong>
+        </label>
+        <label class="setting-item" for="pfCoinReqScale">
+          <span>Coin Requirement Scale</span>
+          <input id="pfCoinReqScale" type="range" min="70" max="160" step="5" value="100" />
+          <strong id="pfCoinReqScaleVal">100%</strong>
+        </label>
+      </div>
+      <div class="settings-actions">
+        <button id="pfResetModeProgress" type="button">Reset Current Mode Progress</button>
+        <button id="pfResetAllProgress" type="button">Reset All Mode Progress</button>
+      </div>
     </section>
 
     <section class="panel game-panel">
