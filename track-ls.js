@@ -3,6 +3,7 @@
 const SPREADSHEET_ID = '1nbdgawiSOXC5fw18NYjsA4W_h0E0vNibUTQ4A4aSchg';
 const PINS_KEY      = 'tk_ls_pins_v1';
 const STANDARDS_KEY = 'tk_ls_standards_v1';
+const THEME_KEY     = 'tk_theme_mode_v1';
 const AUTH_KEY      = 'tk_ls_auth_v1';
 const LOGIN_ROUTE   = 'track-login.html?target=track-ls.html&mode=ls';
 const GENDER_ROSTER_SHEET_ID = '15R6fvIM3Fg2AJqltAYDlxZ-hSq69MPRU0g0D3yf1A5I';
@@ -62,6 +63,7 @@ let preferredAthleteApplied = false;
 let rosterGenderByName = new Map();
 let rosterGenderByNameGrade = new Map();
 const weatherMonthCache = new Map();
+const THEME_MODES = new Set(['default', 'dark', 'inverted', 'high-contrast', 'neon', 'mono', 'warm', 'cool']);
 
 /* ── DOM refs ── */
 const $ = (id) => document.getElementById(id);
@@ -69,6 +71,7 @@ const el = {
   tabs:          $('tkTabs'),
   views:         $('tkViews'),
   gradeFilters:  $('tkGradeFilters'),
+  themeMode:     $('tkThemeMode'),
   search:        $('tkSearch'),
   fastest:       $('tkFastest'),
   average:       $('tkAverage'),
@@ -252,6 +255,29 @@ function refreshUserBadge() {
   const active = calendarAthlete || preferredAthlete || 'All athletes';
   el.viewingAs.textContent = `Viewing as: ${active}`;
   el.userBar.hidden = false;
+}
+
+function sanitizeThemeMode(mode) {
+  const value = String(mode || '').trim().toLowerCase();
+  return THEME_MODES.has(value) ? value : 'default';
+}
+
+function applyThemeMode(mode, persist = true) {
+  const next = sanitizeThemeMode(mode);
+  document.body.dataset.themeMode = next;
+  if (el.themeMode && el.themeMode.value !== next) el.themeMode.value = next;
+  if (!persist) return;
+  try {
+    localStorage.setItem(THEME_KEY, next);
+  } catch (_) {}
+}
+
+function initThemeMode() {
+  let saved = 'default';
+  try {
+    saved = sanitizeThemeMode(localStorage.getItem(THEME_KEY) || 'default');
+  } catch (_) {}
+  applyThemeMode(saved, false);
 }
 
 function ensureChartTooltip() {
@@ -2421,6 +2447,11 @@ function bindEvents() {
   // Search (main)
   el.search.addEventListener('input', () => { currentSearch = el.search.value; render(); });
 
+  // Theme mode settings
+  el.themeMode?.addEventListener('change', () => {
+    applyThemeMode(el.themeMode.value, true);
+  });
+
   // Table head sort
   el.tableHead.addEventListener('click', (e) => {
     const th = e.target.closest('th');
@@ -2594,6 +2625,7 @@ async function boot() {
   await loadRosterGenderMap();
   loadPins();
   loadStandards();
+  initThemeMode();
   bindEvents();
   bindStaticChartInteractions();
   applyRevealAnimation(document);
