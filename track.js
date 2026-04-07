@@ -29,6 +29,7 @@ const TRACK_LON = -121.9689221;
 const cache = {};
 let currentSheet  = '50 M';
 let currentGrade  = 'all';
+let currentGender = 'all';
 let currentSearch = '';
 let currentView   = 'dashboard';
 let sortCol  = null;
@@ -68,6 +69,7 @@ const el = {
   tabs:          $('tkTabs'),
   views:         $('tkViews'),
   gradeFilters:  $('tkGradeFilters'),
+  genderFilters: $('tkGenderFilters'),
   search:        $('tkSearch'),
   fastest:       $('tkFastest'),
   average:       $('tkAverage'),
@@ -756,6 +758,7 @@ function processData(sheetData) {
 function filterAthletes(athletes) {
   return athletes.filter((a) => {
     if (currentGrade !== 'all' && a.grade !== parseInt(currentGrade, 10)) return false;
+    if (currentGender !== 'all' && a.gender !== currentGender) return false;
     if (currentSearch) {
       const q = currentSearch.toLowerCase();
       if (!a.name.toLowerCase().includes(q) && !a.lastName.toLowerCase().includes(q)) return false;
@@ -821,11 +824,15 @@ function renderTable(athletes, sheetData) {
     sorted.sort((a, b) => { if (a.best == null && b.best == null) return 0; if (a.best == null) return 1; if (b.best == null) return -1; return a.best - b.best; });
   }
 
-  // Top-3 per grade
-  const top3ByGrade = {};
+  // Top-3 per gender within each grade (up to 6 starred athletes per grade).
+  const top3ByGradeGender = {};
+  const starredGenders = ['male', 'female'];
   [6, 7, 8].forEach((g) => {
-    const grp = timedAthletes(sorted.filter((a) => a.grade === g)).sort((a, b) => a.best - b.best);
-    top3ByGrade[g] = new Set(grp.slice(0, 3).map((a) => a.name));
+    top3ByGradeGender[g] = { male: new Set(), female: new Set() };
+    starredGenders.forEach((gender) => {
+      const grp = timedAthletes(sorted.filter((a) => a.grade === g && a.gender === gender)).sort((a, b) => a.best - b.best);
+      top3ByGradeGender[g][gender] = new Set(grp.slice(0, 3).map((a) => a.name));
+    });
   });
 
   let rank = 0;
@@ -833,10 +840,10 @@ function renderTable(athletes, sheetData) {
     if (a.best != null) rank++;
     const isFocusAthlete = preferredAthlete && a.name === preferredAthlete;
     const gradeClass = `tk-grade-${a.grade}`;
-    const isTop3     = top3ByGrade[a.grade]?.has(a.name);
+    const isTop3     = !!top3ByGradeGender[a.grade]?.[a.gender]?.has(a.name);
     const stdLabel   = getStandardLabel(currentSheet, a.best);
     const stdBadge   = stdLabel ? `<span class="tk-std-badge tk-std-${stdLabel}">${stdLabel[0].toUpperCase()}</span>` : '';
-    const starBadge  = isTop3 && a.best != null ? '<span class="tk-qual-star" title="Top 3 in grade">⭐</span>' : '';
+    const starBadge  = isTop3 && a.best != null ? '<span class="tk-qual-star" title="Top 3 in grade + gender">⭐</span>' : '';
     const pinBtn     = `<button class="tk-pin${isPinned(a.name) ? ' pinned' : ''}" data-pin="${encodeURIComponent(a.name)}" title="${isPinned(a.name) ? 'Unpin' : 'Pin athlete'}">${isPinned(a.name) ? '★' : '☆'}</button>`;
     const impStr     = a.improvement != null && a.improvement > 0 ? `<span class="tk-delta-pos">−${a.improvement.toFixed(2)}s</span>` : (a.improvement != null && a.improvement < 0 ? `<span class="tk-delta-neg">+${Math.abs(a.improvement).toFixed(2)}s</span>` : '');
 
@@ -937,7 +944,13 @@ async function renderPowerRankings() {
   for (const sheet of SHEETS) {
     const data = await fetchSheet(sheet.key);
     if (!data) continue;
-    const timed = timedAthletes(processData(data)).sort((a, b) => a.best - b.best);
+    const timed = timedAthletes(processData(data))
+      .filter((a) => {
+        if (currentGrade !== 'all' && a.grade !== parseInt(currentGrade, 10)) return false;
+        if (currentGender !== 'all' && a.gender !== currentGender) return false;
+        return true;
+      })
+      .sort((a, b) => a.best - b.best);
     timed.forEach((athlete, index) => {
       if (!athleteMap[athlete.name]) {
         athleteMap[athlete.name] = { name: athlete.name, grade: athlete.grade, scores: [], events: 0 };
@@ -2414,6 +2427,16 @@ function bindEvents() {
     el.gradeFilters.querySelectorAll('.tk-grade').forEach((b) => b.classList.remove('active'));
     btn.classList.add('active');
     currentGrade = btn.dataset.grade;
+    render();
+  });
+
+  // Gender filters (main)
+  el.genderFilters?.addEventListener('click', (e) => {
+    const btn = e.target.closest('.tk-grade');
+    if (!btn) return;
+    el.genderFilters.querySelectorAll('.tk-grade').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentGender = btn.dataset.gender;
     render();
   });
 
