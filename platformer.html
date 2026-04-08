@@ -47,29 +47,6 @@
       <div class="buffs" id="pfBuffs"></div>
     </section>
 
-    <section class="panel settings-panel" id="pfSettingsPanel">
-      <div class="settings-head">
-        <h2>Gameplay Settings</h2>
-        <span id="pfModeDesc" class="settings-mode-desc">Finish every sector in order.</span>
-      </div>
-      <div class="settings-grid">
-        <label class="setting-item" for="pfDiffScale">
-          <span>Difficulty Scale</span>
-          <input id="pfDiffScale" type="range" min="70" max="180" step="5" value="100" />
-          <strong id="pfDiffScaleVal">100%</strong>
-        </label>
-        <label class="setting-item" for="pfCoinReqScale">
-          <span>Coin Requirement Scale</span>
-          <input id="pfCoinReqScale" type="range" min="70" max="160" step="5" value="100" />
-          <strong id="pfCoinReqScaleVal">100%</strong>
-        </label>
-      </div>
-      <div class="settings-actions">
-        <button id="pfResetModeProgress" type="button">Reset Current Mode Progress</button>
-        <button id="pfResetAllProgress" type="button">Reset All Mode Progress</button>
-      </div>
-    </section>
-
     <section class="panel game-panel">
       <canvas id="pfCanvas" width="960" height="540" aria-label="Platformer game canvas"></canvas>
       <div class="overlay" id="pfOverlay"></div>

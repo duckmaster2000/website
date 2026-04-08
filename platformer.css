@@ -200,66 +200,6 @@ button:active,
   background: rgba(18, 63, 63, 0.72);
 }
 
-.settings-panel {
-  padding-top: 0.8rem;
-  background: linear-gradient(160deg, rgba(11, 20, 33, 0.86), rgba(12, 24, 40, 0.76));
-}
-
-.settings-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 0.7rem;
-  flex-wrap: wrap;
-}
-
-.settings-head h2 {
-  font-size: 1rem;
-}
-
-.settings-mode-desc {
-  color: var(--muted);
-  font-size: 0.83rem;
-}
-
-.settings-grid {
-  margin-top: 0.58rem;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-  gap: 0.62rem;
-}
-
-.setting-item {
-  border: 1px solid rgba(142, 218, 255, 0.24);
-  border-radius: 11px;
-  background: rgba(9, 17, 29, 0.72);
-  padding: 0.56rem;
-  display: grid;
-  gap: 0.34rem;
-}
-
-.setting-item span {
-  font-size: 0.8rem;
-  color: #d4e8f9;
-}
-
-.setting-item input[type="range"] {
-  width: 100%;
-}
-
-.setting-item strong {
-  font-family: "Orbitron", sans-serif;
-  font-size: 0.76rem;
-  color: var(--accent);
-}
-
-.settings-actions {
-  margin-top: 0.62rem;
-  display: flex;
-  gap: 0.52rem;
-  flex-wrap: wrap;
-}
-
 .game-panel {
   position: relative;
   padding: 0.6rem;
