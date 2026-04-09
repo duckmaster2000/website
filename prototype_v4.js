@@ -869,6 +869,10 @@ function startChestOpeningSession(chest) {
   };
 
   if (ui.chestOverlay) ui.chestOverlay.hidden = false;
+  if (ui.chestOverlay) {
+    ui.chestOverlay.setAttribute('tabindex', '-1');
+    ui.chestOverlay.focus();
+  }
   if (ui.chestTier) ui.chestTier.textContent = '1';
   if (ui.chestPhase) ui.chestPhase.textContent = 'CHEST UNLOCKED';
   if (ui.chestRolls) ui.chestRolls.textContent = 'Click to roll chance 1 of 4 (40%).';
@@ -954,6 +958,15 @@ function closeChestOverlay() {
   resetChestStars();
   state.chestOpening = false;
   state.chestSession = null;
+}
+
+function handleChestAdvanceClick() {
+  if (!state.chestOpening) return;
+  if (state.chestSession && state.chestSession.rollIndex < 4) {
+    advanceChestRoll();
+    return;
+  }
+  closeChestOverlay();
 }
 
 function openReadyChest() {
@@ -1234,12 +1247,20 @@ function bindProgressUi() {
     renderProgress();
   });
 
-  ui.chestClaim?.addEventListener('click', () => {
-    if (!state.chestOpening) return;
-    if (state.chestSession && state.chestSession.rollIndex < 4) {
-      advanceChestRoll();
-    } else {
-      closeChestOverlay();
+  ui.chestClaim?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    handleChestAdvanceClick();
+  });
+
+  ui.chestOverlay?.addEventListener('click', () => {
+    handleChestAdvanceClick();
+  });
+
+  ui.chestOverlay?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleChestAdvanceClick();
     }
   });
 }

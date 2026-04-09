@@ -824,18 +824,25 @@ select {
   place-items: center;
   z-index: 1200;
   animation: chestFadeIn 280ms ease;
+  cursor: pointer;
+  pointer-events: auto;
 }
 
 .chest-modal {
-  width: min(520px, 92vw);
-  border-radius: 18px;
-  border: 1px solid rgba(255, 210, 120, 0.42);
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
+  border: 0;
   background:
-    radial-gradient(540px 260px at 50% -20%, rgba(255, 219, 132, 0.18), transparent 60%),
+    radial-gradient(700px 300px at 50% 8%, rgba(255, 219, 132, 0.2), transparent 60%),
     linear-gradient(180deg, rgba(15, 23, 39, 0.98), rgba(7, 12, 24, 0.98));
-  box-shadow: 0 20px 80px rgba(0, 0, 0, 0.7), 0 0 34px rgba(255, 184, 84, 0.25);
-  padding: 1rem 1rem 0.9rem;
+  box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.45);
+  padding: 1.2rem 1rem 1.1rem;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .chest-kicker {
@@ -847,8 +854,9 @@ select {
 }
 
 .chest-tier-title {
-  margin: 0.25rem 0 0;
+  margin: 0.3rem 0 0;
   font-family: "Orbitron", sans-serif;
+  font-size: clamp(1.7rem, 3.6vw, 2.6rem);
 }
 
 .chest-tier-title span {
@@ -858,11 +866,11 @@ select {
 
 .chest-visual-wrap {
   position: relative;
-  width: 100%;
-  height: 190px;
+  width: min(760px, 96vw);
+  height: min(38vh, 340px);
   display: grid;
   place-items: center;
-  margin-top: 0.5rem;
+  margin-top: 0.7rem;
 }
 
 .chest-glow {
@@ -898,8 +906,8 @@ select {
 
 .chest-body {
   position: relative;
-  width: 210px;
-  height: 118px;
+  width: clamp(230px, 34vw, 380px);
+  height: clamp(126px, 18vw, 210px);
   border-radius: 14px;
   border: 2px solid rgba(255, 216, 138, 0.85);
   background: linear-gradient(165deg, #6e3314, #8b4217 48%, #5d2a10);
@@ -955,24 +963,24 @@ select {
 
 .chest-rolls,
 .chest-reward {
-  margin: 0.45rem 0 0;
+  margin: 0.55rem 0 0;
   color: var(--muted);
-  font-size: 0.8rem;
+  font-size: clamp(0.86rem, 1.5vw, 1.05rem);
 }
 
 .chest-stars {
-  margin: 0.4rem 0 0;
+  margin: 0.52rem 0 0;
   display: flex;
   justify-content: center;
-  gap: 0.45rem;
+  gap: 0.55rem;
 }
 
 .chest-star {
-  width: 28px;
-  height: 28px;
+  width: clamp(30px, 4vw, 42px);
+  height: clamp(30px, 4vw, 42px);
   display: grid;
   place-items: center;
-  font-size: 1rem;
+  font-size: clamp(1rem, 2.2vw, 1.35rem);
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.2);
   background: rgba(255, 255, 255, 0.05);
@@ -1011,14 +1019,18 @@ select {
 }
 
 #ptChestClaim {
-  margin-top: 0.55rem;
-  min-width: 190px;
-  font-size: 0.92rem;
-  padding: 0.52rem 0.86rem;
+  margin-top: 0.7rem;
+  min-width: clamp(220px, 28vw, 320px);
+  font-size: clamp(1rem, 2vw, 1.25rem);
+  padding: 0.66rem 1rem;
   border-radius: 14px;
   border: 1px solid rgba(113, 192, 255, 0.78);
   background: linear-gradient(160deg, rgba(43, 77, 121, 0.95), rgba(21, 43, 79, 0.95));
   box-shadow: 0 0 16px rgba(70, 160, 255, 0.25);
+}
+
+body:has(.chest-overlay:not([hidden])) {
+  overflow: hidden;
 }
 
 #ptChestClaim:hover:not(:disabled) {
