@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Prototype Lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Space+Grotesk:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="prototype.css" />
+</head>
+<body>
+  <div class="bg-noise" aria-hidden="true"></div>
+  <main class="wrap">
+    <header class="panel hero">
+      <p class="eyebrow">PROTOTYPE // ACCESS RESTRICTED</p>
+      <h1>Armored Frontline Prototype</h1>
+      <p>Experimental design lab for the drag-and-deploy tank combat game.</p>
+      <a class="home-link" href="index.html">Back Home</a>
+    </header>
+
+    <section class="panel lock-panel" id="ptLockPanel">
+      <h2>Enter Password</h2>
+      <p>Prototype is locked. Enter password to continue.</p>
+      <div class="lock-row">
+        <input id="ptPassword" type="password" placeholder="Password" autocomplete="off" />
+        <button id="ptUnlock" type="button">Unlock</button>
+      </div>
+      <p id="ptError" class="error" hidden>Incorrect password.</p>
+    </section>
+
+    <section class="panel content" id="ptContent" hidden>
+      <div class="match-topbar">
+        <h2>Live Match Prototype</h2>
+        <div class="match-controls">
+          <label for="ptMode">Mode</label>
+          <select id="ptMode">
+            <option value="pvp">1v1 Local (Player vs Player)</option>
+            <option value="ai">1v1 vs Enemy AI</option>
+          </select>
+          <button id="ptStartMatch" type="button">Start Match</button>
+          <button id="ptResetUpgrades" type="button">Reset Upgrades</button>
+        </div>
+      </div>
+
+      <p class="note">Drag a unit card into any lane to deploy. On touch devices: tap a card, then tap a lane. Goal: destroy enemy base first.</p>
+
+      <section class="battle-wrap" aria-label="battlefield">
+        <div class="status-row" id="ptStatusTop">
+          <strong id="ptNameB">Commander B</strong>
+          <span id="ptBaseB">Base 0 / 0</span>
+          <span id="ptTowerB">Towers 0 / 0</span>
+          <span id="ptEnergyB">Energy 0.0 / 0</span>
+          <span id="ptGoldB">Gold 0</span>
+        </div>
+
+        <div class="deck deck-top" id="ptDeckB" aria-label="commander b deck"></div>
+
+        <div class="board" id="ptBoard">
+          <div class="lane" data-lane="0"><span class="lane-label">Top Lane</span></div>
+          <div class="lane" data-lane="1"><span class="lane-label">Mid Lane</span></div>
+          <div class="lane" data-lane="2"><span class="lane-label">Bot Lane</span></div>
+          <div class="structure-layer" id="ptStructures"></div>
+          <div class="unit-layer" id="ptUnits"></div>
+        </div>
+
+        <div class="deck deck-bottom" id="ptDeckA" aria-label="commander a deck"></div>
+
+        <div class="status-row" id="ptStatusBottom">
+          <strong id="ptNameA">Commander A</strong>
+          <span id="ptBaseA">Base 0 / 0</span>
+          <span id="ptTowerA">Towers 0 / 0</span>
+          <span id="ptEnergyA">Energy 0.0 / 0</span>
+          <span id="ptGoldA">Gold 0</span>
+        </div>
+      </section>
+
+      <section class="panel upgrades">
+        <h3>Persistent Upgrades (Gold)</h3>
+        <p class="note">Gold is earned by dealing damage and winning. Upgrades apply to both modes.</p>
+        <div class="upgrade-grid">
+          <article>
+            <h4>Base Plating</h4>
+            <p>+120 base HP per level.</p>
+            <button data-upgrade="baseHp" type="button">Upgrade (<span id="ptCostBase">0</span>)</button>
+          </article>
+          <article>
+            <h4>Tower Caliber</h4>
+            <p>+2 tower damage per level.</p>
+            <button data-upgrade="towerDamage" type="button">Upgrade (<span id="ptCostTower">0</span>)</button>
+          </article>
+          <article>
+            <h4>Reactor Output</h4>
+            <p>+0.25 energy/s per level.</p>
+            <button data-upgrade="energyRegen" type="button">Upgrade (<span id="ptCostRegen">0</span>)</button>
+          </article>
+        </div>
+      </section>
+
+      <p class="note" id="ptMatchLog">Choose a mode and press Start Match.</p>
+    </section>
+  </main>
+
+  <script src="prototype.js"></script>
+</body>
+</html>

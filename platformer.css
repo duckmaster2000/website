@@ -347,6 +347,11 @@ button:active,
   width: 100%;
 }
 
+.shop-actions {
+  display: grid;
+  gap: 0.35rem;
+}
+
 .shop-item button[disabled] {
   opacity: 0.5;
   cursor: not-allowed;

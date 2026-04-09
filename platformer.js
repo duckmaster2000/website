@@ -10,6 +10,7 @@ const MAX_DASH_CHARGES = 2;
 const DASH_RECHARGE_SEC = 1.15;
 const BASE_MAX_HEALTH = 3;
 const BASE_LIVES = 3;
+const MAX_EQUIPPED_ACCESSORIES = 5;
 const LEVEL_COUNT = 180;
 const MAP_W = 68;
 const MAP_H = 15;
@@ -34,6 +35,7 @@ const el = {
   objective: document.getElementById('pfObjective'),
   status: document.getElementById('pfStatus'),
   modeLabel: document.getElementById('pfModeLabel'),
+  accessoryCount: document.getElementById('pfAccessoryCount'),
   modePills: document.getElementById('pfModePills'),
   buffs: document.getElementById('pfBuffs'),
   shop: document.getElementById('pfShop'),
@@ -259,6 +261,52 @@ function cosmeticOwned(key) {
   return Number(game.meta.upgrades[key] || 0) > 0;
 }
 
+function accessoryEquipped(key) {
+  return Array.isArray(game.meta.equippedAccessories) && game.meta.equippedAccessories.includes(key);
+}
+
+function equippedAccessories() {
+  return Array.isArray(game.meta.equippedAccessories) ? game.meta.equippedAccessories : [];
+}
+
+function sanitizeEquippedAccessories() {
+  const cosmetics = SHOP.filter((item) => item.kind === 'cosmetic').map((item) => item.key);
+  const owned = new Set(cosmetics.filter((key) => cosmeticOwned(key)));
+  const seen = new Set();
+  const next = [];
+  equippedAccessories().forEach((key) => {
+    if (!owned.has(key) || seen.has(key)) return;
+    seen.add(key);
+    next.push(key);
+  });
+  game.meta.equippedAccessories = next.slice(0, MAX_EQUIPPED_ACCESSORIES);
+}
+
+function toggleAccessoryEquip(key) {
+  if (!cosmeticOwned(key)) return;
+  if (!Array.isArray(game.meta.equippedAccessories)) game.meta.equippedAccessories = [];
+
+  const current = game.meta.equippedAccessories;
+  const idx = current.indexOf(key);
+  if (idx >= 0) {
+    current.splice(idx, 1);
+    saveMeta();
+    setStatus('Accessory unequipped.', 1.1);
+    renderShop();
+    return;
+  }
+
+  if (current.length >= MAX_EQUIPPED_ACCESSORIES) {
+    setStatus(`Max ${MAX_EQUIPPED_ACCESSORIES} accessories equipped.`, 1.3);
+    return;
+  }
+
+  current.push(key);
+  saveMeta();
+  setStatus('Accessory equipped.', 1.1);
+  renderShop();
+}
+
 function cosmeticBonuses() {
   const b = {
     moveMult: 1,
@@ -272,27 +320,27 @@ function cosmeticBonuses() {
     particleMult: 1
   };
 
-  if (cosmeticOwned('neoVisor')) b.moveMult *= 1.03;
-  if (cosmeticOwned('reactorBoots')) b.moveMult *= 1.025;
-  if (cosmeticOwned('prismOutline')) b.moveMult *= 1.02;
-  if (cosmeticOwned('starlightMask')) b.moveMult *= 1.02;
+  if (accessoryEquipped('neoVisor')) b.moveMult *= 1.03;
+  if (accessoryEquipped('reactorBoots')) b.moveMult *= 1.025;
+  if (accessoryEquipped('prismOutline')) b.moveMult *= 1.02;
+  if (accessoryEquipped('starlightMask')) b.moveMult *= 1.02;
 
-  if (cosmeticOwned('plasmaTrim')) b.jumpMult *= 1.04;
-  if (cosmeticOwned('jumpJets')) b.jumpMult *= 1.03;
-  if (cosmeticOwned('starlightMask')) b.jumpMult *= 1.02;
+  if (accessoryEquipped('plasmaTrim')) b.jumpMult *= 1.04;
+  if (accessoryEquipped('jumpJets')) b.jumpMult *= 1.03;
+  if (accessoryEquipped('starlightMask')) b.jumpMult *= 1.02;
 
-  if (cosmeticOwned('ionTrailSkin')) b.coinMult *= 1.04;
-  if (cosmeticOwned('luckyCharm')) b.coinMult *= 1.03;
-  if (cosmeticOwned('vaultKeychain')) b.coinMult *= 1.02;
+  if (accessoryEquipped('ionTrailSkin')) b.coinMult *= 1.04;
+  if (accessoryEquipped('luckyCharm')) b.coinMult *= 1.03;
+  if (accessoryEquipped('vaultKeychain')) b.coinMult *= 1.02;
 
-  if (cosmeticOwned('crownAntenna')) b.invulnBonus += 0.15;
-  if (cosmeticOwned('phaseCape')) b.invulnBonus += 0.08;
+  if (accessoryEquipped('crownAntenna')) b.invulnBonus += 0.15;
+  if (accessoryEquipped('phaseCape')) b.invulnBonus += 0.08;
 
-  if (cosmeticOwned('fluxBattery')) b.tempMult *= 1.05;
-  if (cosmeticOwned('magnetHalo')) b.magnetMult *= 1.12;
-  if (cosmeticOwned('dashGlyph')) b.dashMult *= 1.06;
-  if (cosmeticOwned('guardianShell')) b.maxHpBonus += 1;
-  if (cosmeticOwned('echoEmitter')) b.particleMult *= 1.05;
+  if (accessoryEquipped('fluxBattery')) b.tempMult *= 1.05;
+  if (accessoryEquipped('magnetHalo')) b.magnetMult *= 1.12;
+  if (accessoryEquipped('dashGlyph')) b.dashMult *= 1.06;
+  if (accessoryEquipped('guardianShell')) b.maxHpBonus += 1;
+  if (accessoryEquipped('echoEmitter')) b.particleMult *= 1.05;
 
   return b;
 }
@@ -518,6 +566,7 @@ const game = {
       chaos: 1,
       rush: 1
     },
+    equippedAccessories: [],
     upgrades: {
       maxHealth: 0,
       moveSpeed: 0,
@@ -568,6 +617,16 @@ function loadMeta() {
         game.meta.upgrades[item.key] = clamp(Number(parsed.upgrades[item.key] || 0), 0, item.max);
       });
     }
+
+    if (Array.isArray(parsed.equippedAccessories)) {
+      game.meta.equippedAccessories = parsed.equippedAccessories.slice(0, MAX_EQUIPPED_ACCESSORIES);
+    } else {
+      const ownedCosmetics = SHOP
+        .filter((item) => item.kind === 'cosmetic' && cosmeticOwned(item.key))
+        .map((item) => item.key);
+      game.meta.equippedAccessories = ownedCosmetics.slice(0, MAX_EQUIPPED_ACCESSORIES);
+    }
+    sanitizeEquippedAccessories();
   } catch (_e) {
     // Ignore malformed save.
   }
@@ -1297,9 +1356,13 @@ function updateHud(dt = 0) {
   if (game.player.buffs.speed > 0) active.push(`Speed ${game.player.buffs.speed.toFixed(1)}s`);
   if (game.player.buffs.jump > 0) active.push(`Jump ${game.player.buffs.jump.toFixed(1)}s`);
   if (game.player.buffs.magnet > 0) active.push(`Magnet ${game.player.buffs.magnet.toFixed(1)}s`);
-  SHOP.filter((item) => item.kind === 'cosmetic' && cosmeticOwned(item.key))
+  SHOP.filter((item) => item.kind === 'cosmetic' && accessoryEquipped(item.key))
     .slice(0, 6)
     .forEach((item) => active.push(`Cosmetic: ${item.name}`));
+
+  if (el.accessoryCount) {
+    el.accessoryCount.textContent = `${equippedAccessories().length}/${MAX_EQUIPPED_ACCESSORIES}`;
+  }
 
   el.buffs.innerHTML = active.map((txt) => `<span class="buff-chip">${txt}</span>`).join('');
 
@@ -1465,7 +1528,7 @@ function drawWorld(ctx) {
   const p = game.player;
   for (const t of p.trail || []) {
     const a = t.life / 0.22;
-    const trailColor = cosmeticOwned('ionTrailSkin')
+    const trailColor = accessoryEquipped('ionTrailSkin')
       ? `rgba(186, 161, 255, ${0.42 * a})`
       : `rgba(132, 255, 220, ${0.35 * a})`;
     ctx.fillStyle = trailColor;
@@ -1480,7 +1543,7 @@ function drawWorld(ctx) {
 
   const bob = Math.sin((p.animT || 0) * 0.9) * (p.onGround ? 1.1 : 0.2);
   const bodyColor = p.buffs.shield > 0 ? '#9cf5ff' : '#92ffce';
-  const trimColor = cosmeticOwned('plasmaTrim') ? '#ffba6e' : '#c9fff0';
+  const trimColor = accessoryEquipped('plasmaTrim') ? '#ffba6e' : '#c9fff0';
 
   // Core square body.
   ctx.fillStyle = bodyColor;
@@ -1498,7 +1561,7 @@ function drawWorld(ctx) {
   ctx.fillRect(p.x + 6, p.y + 11 + bob, p.w - 12, p.h - 20);
 
   // Face / visor.
-  if (cosmeticOwned('neoVisor')) {
+  if (accessoryEquipped('neoVisor')) {
     const g = 0.65 + Math.sin(game.time * 9) * 0.35;
     ctx.fillStyle = `rgba(103, 219, 255, ${0.55 + g * 0.3})`;
     ctx.fillRect(p.x + 6, p.y + 11 + bob, p.w - 12, 6);
@@ -1509,7 +1572,7 @@ function drawWorld(ctx) {
   }
 
   // Crown antenna cosmetic.
-  if (cosmeticOwned('crownAntenna')) {
+  if (accessoryEquipped('crownAntenna')) {
     ctx.strokeStyle = '#ffe18c';
     ctx.beginPath();
     ctx.moveTo(p.x + p.w / 2, p.y + 2 + bob);
@@ -1572,6 +1635,10 @@ function buyUpgrade(key) {
 
   game.meta.wallet -= cost;
   game.meta.upgrades[key] = level + 1;
+  if (item.kind === 'cosmetic' && equippedAccessories().length < MAX_EQUIPPED_ACCESSORIES && !accessoryEquipped(key)) {
+    game.meta.equippedAccessories.push(key);
+    sanitizeEquippedAccessories();
+  }
   saveMeta();
 
   if (game.player) {
@@ -1592,21 +1659,31 @@ function buyUpgrade(key) {
 
 function renderShop() {
   el.wallet.textContent = Math.round(game.meta.wallet);
+  sanitizeEquippedAccessories();
+  const equippedCount = equippedAccessories().length;
   const renderItems = (items) => items.map((item) => {
     const lvl = game.meta.upgrades[item.key] || 0;
     const maxed = lvl >= item.max;
     const cost = shopCost(item);
     const disabled = maxed || game.meta.wallet < cost;
+    const isCosmetic = item.kind === 'cosmetic';
+    const owned = lvl > 0;
+    const isEquipped = isCosmetic && accessoryEquipped(item.key);
+    const equipDisabled = !owned || (!isEquipped && equippedCount >= MAX_EQUIPPED_ACCESSORIES);
+    const equipText = isEquipped ? 'Unequip' : 'Equip';
 
     return `
       <article class="shop-item">
         <div>
-          <strong>${item.name} (Lv ${lvl}/${item.max})${item.kind === 'cosmetic' ? ' • Cosmetic' : ''}</strong>
+          <strong>${item.name} (Lv ${lvl}/${item.max})${isCosmetic ? ' • Cosmetic' : ''}</strong>
           <p>${item.desc}</p>
         </div>
-        <button data-upgrade="${item.key}" ${disabled ? 'disabled' : ''}>
-          ${maxed ? 'MAX' : `${item.kind === 'cosmetic' ? 'Unlock' : 'Buy'} (${cost})`}
-        </button>
+        <div class="shop-actions">
+          <button data-upgrade="${item.key}" ${disabled ? 'disabled' : ''}>
+            ${maxed ? 'MAX' : `${isCosmetic ? 'Unlock' : 'Buy'} (${cost})`}
+          </button>
+          ${isCosmetic ? `<button data-equip="${item.key}" ${equipDisabled ? 'disabled' : ''}>${equipText}</button>` : ''}
+        </div>
       </article>
     `;
   }).join('');
@@ -1660,6 +1737,11 @@ function bindEvents() {
 
   if (el.shop) {
     el.shop.addEventListener('click', (event) => {
+      const equipBtn = event.target.closest('[data-equip]');
+      if (equipBtn) {
+        toggleAccessoryEquip(equipBtn.dataset.equip);
+        return;
+      }
       const btn = event.target.closest('[data-upgrade]');
       if (!btn) return;
       buyUpgrade(btn.dataset.upgrade);
