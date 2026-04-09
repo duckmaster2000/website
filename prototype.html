@@ -92,6 +92,7 @@
           <div class="lane" data-lane="1"><span class="lane-label">Mid Lane</span></div>
           <div class="lane" data-lane="2"><span class="lane-label">Bot Lane</span></div>
           <div class="structure-layer" id="ptStructures"></div>
+          <div class="projectile-layer" id="ptProjectiles"></div>
           <div class="unit-layer" id="ptUnits"></div>
         </div>
 
@@ -118,25 +119,38 @@
         </div>
       </section>
 
-      <section class="panel upgrades">
-        <h3>Persistent Upgrades (Gold)</h3>
-        <p class="note">Gold is earned by dealing damage and winning. Upgrades apply to both modes.</p>
-        <div class="upgrade-grid">
+      <section class="panel progression">
+        <h3>Collection Progression</h3>
+        <p class="note">Build a collection of 50 cards, level them up, and pick only 8 cards per match.</p>
+        <div class="progress-grid">
           <article>
-            <h4>Base Plating</h4>
-            <p>+120 base HP per level.</p>
-            <button data-upgrade="baseHp" type="button">Upgrade (<span id="ptCostBase">0</span>)</button>
+            <h4>Wallet</h4>
+            <p>Gold: <strong id="ptGoldAmount">0</strong></p>
+            <button id="ptEarnChest" type="button">Earn Chest</button>
+            <button id="ptOpenChest" type="button">Open Ready Chest</button>
+            <p class="note" id="ptChestStatus">No chests queued.</p>
           </article>
           <article>
-            <h4>Tower Caliber</h4>
-            <p>+2 tower damage per level.</p>
-            <button data-upgrade="towerDamage" type="button">Upgrade (<span id="ptCostTower">0</span>)</button>
+            <h4>Building Levels</h4>
+            <p>Base Level: <strong id="ptBaseLevel">1</strong></p>
+            <p>Tower Level: <strong id="ptTowerLevel">1</strong></p>
+            <button id="ptUpgradeBase" type="button">Upgrade Base</button>
+            <button id="ptUpgradeTower" type="button">Upgrade Tower</button>
           </article>
-          <article>
-            <h4>Reactor Output</h4>
-            <p>+0.25 energy/s per level.</p>
-            <button data-upgrade="energyRegen" type="button">Upgrade (<span id="ptCostRegen">0</span>)</button>
-          </article>
+        </div>
+
+        <div class="deck-builder">
+          <h4>Battle Deck (8 Cards Max)</h4>
+          <p class="note">Select a card in collection, then click a deck slot to assign it.</p>
+          <div class="deck-slots" id="ptDeckSlots"></div>
+        </div>
+
+        <div class="collection-panel">
+          <div class="collection-head">
+            <h4>Card Collection</h4>
+            <input id="ptCardSearch" type="text" placeholder="Search cards, role, style, rarity" autocomplete="off" />
+          </div>
+          <div class="collection-grid" id="ptCardCollection"></div>
         </div>
       </section>
 
@@ -145,6 +159,6 @@
   </main>
 
   <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
-  <script src="prototype.js"></script>
+  <script src="prototype_v4.js"></script>
 </body>
 </html>
