@@ -37,21 +37,45 @@
           <select id="ptMode">
             <option value="pvp">1v1 Local (Player vs Player)</option>
             <option value="ai">1v1 vs Enemy AI</option>
+            <option value="online">1v1 Online vs Opponent</option>
           </select>
           <button id="ptStartMatch" type="button">Start Match</button>
           <button id="ptResetUpgrades" type="button">Reset Upgrades</button>
         </div>
       </div>
 
-      <p class="note">Drag a unit card into any lane to deploy. On touch devices: tap a card, then tap a lane. Goal: destroy enemy base first.</p>
+      <section class="panel lobby-panel" id="ptLobbyPanel" hidden>
+        <h2>Online Lobby</h2>
+        <div class="lobby-row">
+          <button id="ptCreateRoom" type="button">Create Room</button>
+          <span class="lobby-or">or</span>
+          <input id="ptJoinCode" placeholder="Room code" maxlength="6" autocomplete="off" />
+          <button id="ptJoinRoom" type="button">Join</button>
+        </div>
+        <p id="ptRoomCode" class="note room-code" hidden></p>
+        <button id="ptCopyCode" type="button" hidden>Copy Code</button>
+        <p id="ptLobbyStatus" class="note">Ready.</p>
+      </section>
 
       <section class="battle-wrap" aria-label="battlefield">
-        <div class="status-row" id="ptStatusTop">
-          <strong id="ptNameB">Commander B</strong>
-          <span id="ptBaseB">Base 0 / 0</span>
-          <span id="ptTowerB">Towers 0 / 0</span>
-          <span id="ptEnergyB">Energy 0.0 / 0</span>
-          <span id="ptGoldB">Gold 0</span>
+        <div class="nameplate nameplate-b" id="ptStatusTop">
+          <div class="np-left">
+            <span class="np-name" id="ptNameB">Commander B</span>
+            <span class="np-towers" id="ptTowerB">⬡⬡⬡</span>
+          </div>
+          <div class="np-bars">
+            <div class="bar-row">
+              <span class="bar-lbl">HP</span>
+              <div class="bar-track"><div class="bar-fill hp-fill" id="ptBaseBarB" style="width:100%"></div></div>
+              <span class="bar-num" id="ptBaseB">1300</span>
+            </div>
+            <div class="bar-row">
+              <span class="bar-lbl">EN</span>
+              <div class="bar-track"><div class="bar-fill en-fill" id="ptEnergyBarB" style="width:100%"></div></div>
+              <span class="bar-num" id="ptEnergyB">10</span>
+            </div>
+          </div>
+          <span class="np-gold" id="ptGoldB">— gold</span>
         </div>
 
         <div class="deck deck-top" id="ptDeckB" aria-label="commander b deck"></div>
@@ -66,12 +90,24 @@
 
         <div class="deck deck-bottom" id="ptDeckA" aria-label="commander a deck"></div>
 
-        <div class="status-row" id="ptStatusBottom">
-          <strong id="ptNameA">Commander A</strong>
-          <span id="ptBaseA">Base 0 / 0</span>
-          <span id="ptTowerA">Towers 0 / 0</span>
-          <span id="ptEnergyA">Energy 0.0 / 0</span>
-          <span id="ptGoldA">Gold 0</span>
+        <div class="nameplate nameplate-a" id="ptStatusBottom">
+          <div class="np-left">
+            <span class="np-name" id="ptNameA">Commander A</span>
+            <span class="np-towers" id="ptTowerA">⬡⬡⬡</span>
+          </div>
+          <div class="np-bars">
+            <div class="bar-row">
+              <span class="bar-lbl">HP</span>
+              <div class="bar-track"><div class="bar-fill hp-fill" id="ptBaseBarA" style="width:100%"></div></div>
+              <span class="bar-num" id="ptBaseA">1300</span>
+            </div>
+            <div class="bar-row">
+              <span class="bar-lbl">EN</span>
+              <div class="bar-track"><div class="bar-fill en-fill" id="ptEnergyBarA" style="width:100%"></div></div>
+              <span class="bar-num" id="ptEnergyA">10</span>
+            </div>
+          </div>
+          <span class="np-gold" id="ptGoldA">💰 0</span>
         </div>
       </section>
 
@@ -101,6 +137,7 @@
     </section>
   </main>
 
+  <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
   <script src="prototype.js"></script>
 </body>
 </html>

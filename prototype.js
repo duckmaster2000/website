@@ -1,13 +1,22 @@
 const PROTOTYPE_PASSWORD = '1ydzpU1y!';
 const PROTOTYPE_KEY = 'prototype_access_v1';
 const PROTOTYPE_UPGRADE_KEY = 'prototype_upgrades_v1';
+const SERVER_URL = 'http://localhost:3001';
+
+// Online 1v1 state
+let socket = null;
+let mySide = null;
+let onlineActive = false;
 
 const UNIT_TYPES = {
-  scout: { name: 'Scout', cost: 2, hp: 55, dmg: 10, range: 8, speed: 27, cd: 0.52, structureMult: 0.85, cool: 1.8 },
-  brawler: { name: 'Brawler', cost: 4, hp: 145, dmg: 17, range: 9, speed: 13, cd: 0.78, structureMult: 1, cool: 2.8 },
-  siege: { name: 'Siege', cost: 6, hp: 96, dmg: 37, range: 18, speed: 8, cd: 1.22, structureMult: 1.65, cool: 4.1 },
-  guardian: { name: 'Guardian', cost: 5, hp: 120, dmg: 9, range: 10, speed: 10, cd: 0.95, structureMult: 1, cool: 3.4 }
+  scout:    { name: 'Scout',    cost: 2, hp: 55,  dmg: 10, range: 8,  speed: 27, cd: 0.52, structureMult: 0.85, cool: 1.8 },
+  brawler:  { name: 'Brawler',  cost: 4, hp: 145, dmg: 17, range: 9,  speed: 13, cd: 0.78, structureMult: 1,    cool: 2.8 },
+  siege:    { name: 'Siege',    cost: 6, hp: 96,  dmg: 37, range: 18, speed: 8,  cd: 1.22, structureMult: 1.65, cool: 4.1 },
+  guardian: { name: 'Guardian', cost: 5, hp: 120, dmg: 9,  range: 10, speed: 10, cd: 0.95, structureMult: 1,    cool: 3.4 }
 };
+
+const UNIT_ICONS = { scout: '▶▶', brawler: '▮', siege: '◎', guardian: '⬡' };
+function costClass(c) { return c <= 2 ? 'cost-low' : c <= 4 ? 'cost-mid' : c <= 5 ? 'cost-high' : 'cost-max'; }
 
 const BOARD = {
   laneCount: 3,
@@ -75,7 +84,16 @@ const ui = {
     base: null,
     tower: null,
     regen: null
-  }
+  },
+  baseBars: { A: null, B: null },
+  energyBars: { A: null, B: null },
+  lobbyPanel: null,
+  createRoom: null,
+  joinCode: null,
+  joinRoom: null,
+  roomCodeDisplay: null,
+  copyCode: null,
+  lobbyStatus: null
 };
 
 function $(id) {
@@ -393,21 +411,27 @@ function renderStatus() {
   const B = state.players.B;
   if (!A || !B) return;
 
-  ui.status.A.name.textContent = A.name;
-  ui.status.B.name.textContent = B.name;
-  ui.status.A.base.textContent = `Base ${Math.ceil(A.baseHp)} / ${A.baseHpMax}`;
-  ui.status.B.base.textContent = `Base ${Math.ceil(B.baseHp)} / ${B.baseHpMax}`;
-  ui.status.A.tower.textContent = `Towers ${livingTowerCount('A')} / 3`;
-  ui.status.B.tower.textContent = `Towers ${livingTowerCount('B')} / 3`;
-  ui.status.A.energy.textContent = `Energy ${A.energy.toFixed(1)} / ${A.energyMax}`;
-  ui.status.B.energy.textContent = `Energy ${B.energy.toFixed(1)} / ${B.energyMax}`;
-  ui.status.A.gold.textContent = `Gold ${state.meta.gold}`;
-  ui.status.B.gold.textContent = state.mode === 'ai' ? 'Enemy AI' : 'Gold local';
+  ['A', 'B'].forEach((id) => {
+    const p = id === 'A' ? A : B;
+    const s = ui.status[id];
+    const alive = livingTowerCount(id);
+    s.name.textContent = p.name;
+    s.base.textContent = Math.ceil(p.baseHp);
+    s.tower.textContent = '⬡'.repeat(alive) + '✕'.repeat(3 - alive);
+    s.energy.textContent = p.energy.toFixed(1);
+    s.gold.textContent = id === 'A'
+      ? `💰 ${state.meta.gold}`
+      : (state.mode === 'ai' ? 'ENEMY AI' : '— gold');
+    const hpPct = clamp((p.baseHp / p.baseHpMax) * 100, 0, 100).toFixed(1);
+    const enPct = clamp((p.energy / p.energyMax) * 100, 0, 100).toFixed(1);
+    if (ui.baseBars[id])   ui.baseBars[id].style.width   = `${hpPct}%`;
+    if (ui.energyBars[id]) ui.energyBars[id].style.width = `${enPct}%`;
+  });
 
-  const baseCost = 120 + state.meta.upgrades.baseHp * 80;
-  const towerCost = 95 + state.meta.upgrades.towerDamage * 70;
+  const baseCost  = 120 + state.meta.upgrades.baseHp * 80;
+  const towerCost = 95  + state.meta.upgrades.towerDamage * 70;
   const regenCost = 110 + state.meta.upgrades.energyRegen * 90;
-  ui.costs.base.textContent = baseCost;
+  ui.costs.base.textContent  = baseCost;
   ui.costs.tower.textContent = towerCost;
   ui.costs.regen.textContent = regenCost;
 }
@@ -416,12 +440,12 @@ function renderStructures() {
   const chunks = [];
   state.structures.forEach((s) => {
     const y = laneY(s.lane);
-    const enemyClass = s.owner === 'B' ? 'enemy' : '';
-    const kindClass = s.kind === 'base' ? 'base' : 'tower';
+    const teamClass = s.owner === 'A' ? 'team-a' : 'team-b';
     const hpPercent = clamp((s.hp / s.hpMax) * 100, 0, 100);
+    const symbol = s.kind === 'base' ? '■' : '⬡';
     chunks.push(
-      `<div class="structure ${enemyClass} ${kindClass}" style="left:${s.x}%;top:${y}px;opacity:${s.hp > 0 ? '1' : '0.25'}">` +
-      `<span class="hp"><i style="width:${hpPercent}%"></i></span>` +
+      `<div class="structure ${teamClass} ${s.kind}" data-alive="${s.hp > 0 ? '1' : '0'}" style="left:${s.x}%;top:${y}px">` +
+      `${symbol}<span class="hp"><i style="width:${hpPercent}%"></i></span>` +
       '</div>'
     );
   });
@@ -434,7 +458,7 @@ function renderUnits() {
     const y = laneY(u.lane) + (u.owner === 'A' ? 14 : -14);
     const hpPercent = clamp((u.hp / u.stats.hp) * 100, 0, 100);
     chunks.push(
-      `<div class="unit owner${u.owner}" data-type="${u.type}" style="left:${u.x}%;top:${y}px">` +
+      `<div class="unit team-${u.owner.toLowerCase()}" data-type="${u.type}" style="left:${u.x}%;top:${y}px">` +
       `<span class="hp"><i style="width:${hpPercent}%"></i></span>` +
       '</div>'
     );
@@ -445,15 +469,19 @@ function renderUnits() {
 function cardTemplate(owner, key) {
   const def = UNIT_TYPES[key];
   const p = state.players[owner];
-  const onCd = p.cooldowns[key] > state.time;
+  const remaining = Math.max(0, p.cooldowns[key] - state.time);
+  const onCd = remaining > 0;
   const disabled = !state.running || p.energy < def.cost || onCd;
-  const cooldownText = onCd ? `${(p.cooldowns[key] - state.time).toFixed(1)}s` : 'Ready';
+  const cdPct = onCd ? Math.round((1 - remaining / def.cool) * 100) : 100;
   const selected = state.selectedCard && state.selectedCard.owner === owner && state.selectedCard.type === key;
+  const icon = UNIT_ICONS[key] || '◆';
   return (
     `<button class="card" data-owner="${owner}" data-type="${key}" draggable="true" data-disabled="${disabled ? '1' : '0'}" data-selected="${selected ? '1' : '0'}">` +
-    `<span class="name">${def.name}</span>` +
-    `<span class="meta">Cost ${def.cost} | HP ${def.hp}</span>` +
-    `<span class="meta">${cooldownText}</span>` +
+    `<span class="card-icon">${icon}</span>` +
+    `<span class="card-cost ${costClass(def.cost)}">${def.cost}</span>` +
+    `<span class="card-name">${def.name}</span>` +
+    `<span class="card-hp">HP ${def.hp}</span>` +
+    `<span class="card-cd-bar"><i style="width:${cdPct}%"></i></span>` +
     '</button>'
   );
 }
@@ -461,6 +489,15 @@ function cardTemplate(owner, key) {
 function renderDecks() {
   if (!state.players.A || !state.players.B) return;
   const keys = Object.keys(UNIT_TYPES);
+
+  if (onlineActive) {
+    const myDeck  = mySide === 'A' ? ui.deckA : ui.deckB;
+    const oppDeck = mySide === 'A' ? ui.deckB : ui.deckA;
+    myDeck.innerHTML  = keys.map((key) => cardTemplate(mySide, key)).join('');
+    oppDeck.innerHTML = '<div class="note">Opponent is playing…</div>';
+    return;
+  }
+
   ui.deckA.innerHTML = keys.map((key) => cardTemplate('A', key)).join('');
   if (state.mode === 'ai') {
     ui.deckB.innerHTML = '<div class="note">Enemy AI controls this deck in real time.</div>';
@@ -509,7 +546,11 @@ function gameLoop(ts) {
   if (!state.lastTick) state.lastTick = ts;
   const dt = clamp((ts - state.lastTick) / 1000, 0, 0.045);
   state.lastTick = ts;
-  update(dt);
+  if (!onlineActive) {
+    update(dt);
+  } else {
+    state.time += dt; // advance locally for cooldown display only
+  }
   renderStatus();
   renderDecks();
   renderUnits();
@@ -519,6 +560,12 @@ function gameLoop(ts) {
 
 function tryDeployFromSelection(lane) {
   if (!state.selectedCard) return;
+  if (onlineActive) {
+    if (state.selectedCard.owner !== mySide) return;
+    socket.emit('deploy', { unit: state.selectedCard.type, lane });
+    state.selectedCard = null;
+    return;
+  }
   const ok = deployUnit(state.selectedCard.owner, state.selectedCard.type, lane);
   if (ok) {
     writeLog(`${state.players[state.selectedCard.owner].name} deployed ${UNIT_TYPES[state.selectedCard.type].name} in ${['Top', 'Mid', 'Bot'][lane]} lane.`);
@@ -542,6 +589,11 @@ function bindLaneDrops() {
       const owner = event.dataTransfer?.getData('text/owner');
       const type = event.dataTransfer?.getData('text/type');
       if (!owner || !type) return;
+      if (onlineActive) {
+        if (owner !== mySide) return;
+        socket.emit('deploy', { unit: type, lane });
+        return;
+      }
       if (state.mode === 'ai' && owner === 'B') return;
       const ok = deployUnit(owner, type, lane);
       if (ok) writeLog(`${state.players[owner].name} deployed ${UNIT_TYPES[type].name} in ${['Top', 'Mid', 'Bot'][lane]} lane.`);
@@ -562,7 +614,8 @@ function bindDeckInput() {
     const type = card.dataset.type;
     if (!owner || !type) return;
     if (card.dataset.disabled === '1') return;
-    if (state.mode === 'ai' && owner === 'B') return;
+    if (onlineActive && owner !== mySide) return;
+    if (!onlineActive && state.mode === 'ai' && owner === 'B') return;
     state.selectedCard = { owner, type };
     renderDecks();
   };
@@ -574,10 +627,8 @@ function bindDeckInput() {
     const card = event.target.closest('.card');
     if (!card || card.dataset.disabled === '1') return;
     const owner = card.dataset.owner;
-    if (state.mode === 'ai' && owner === 'B') {
-      event.preventDefault();
-      return;
-    }
+    if (onlineActive && owner !== mySide) { event.preventDefault(); return; }
+    if (!onlineActive && state.mode === 'ai' && owner === 'B') { event.preventDefault(); return; }
     event.dataTransfer?.setData('text/owner', owner);
     event.dataTransfer?.setData('text/type', card.dataset.type || '');
   });
@@ -628,9 +679,15 @@ function buyUpgrade(key) {
 function bindGameEvents() {
   bindLaneDrops();
   bindDeckInput();
+  bindLobbyEvents();
 
   ui.start?.addEventListener('click', () => {
-    setupMatch();
+    if (ui.mode?.value === 'online') {
+      showOnlineLobby();
+    } else {
+      onlineActive = false;
+      setupMatch();
+    }
   });
 
   ui.resetUpgrades?.addEventListener('click', () => {
@@ -677,7 +734,178 @@ function cacheUi() {
   ui.costs.base = $('ptCostBase');
   ui.costs.tower = $('ptCostTower');
   ui.costs.regen = $('ptCostRegen');
+  ui.baseBars.A  = $('ptBaseBarA');
+  ui.baseBars.B  = $('ptBaseBarB');
+  ui.energyBars.A = $('ptEnergyBarA');
+  ui.energyBars.B = $('ptEnergyBarB');
+  ui.lobbyPanel = $('ptLobbyPanel');
+  ui.createRoom = $('ptCreateRoom');
+  ui.joinCode = $('ptJoinCode');
+  ui.joinRoom = $('ptJoinRoom');
+  ui.roomCodeDisplay = $('ptRoomCode');
+  ui.copyCode = $('ptCopyCode');
+  ui.lobbyStatus = $('ptLobbyStatus');
 }
+
+// ─── Online multiplayer ────────────────────────────────────────────────────
+
+function ensureSocket() {
+  if (socket && socket.connected) return;
+  if (socket) { socket.connect(); return; }
+
+  if (typeof io === 'undefined') {
+    writeLog('Socket.io library not loaded. Check your connection.');
+    return;
+  }
+
+  socket = io(SERVER_URL, { transports: ['websocket', 'polling'] });
+
+  socket.on('connect_error', () => {
+    if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Cannot reach game server. Make sure it is running.';
+    writeLog('Server connection failed.');
+  });
+
+  socket.on('room_created', ({ code, side }) => {
+    mySide = side;
+    if (ui.roomCodeDisplay) {
+      ui.roomCodeDisplay.textContent = code;
+      ui.roomCodeDisplay.dataset.code = code;
+      ui.roomCodeDisplay.hidden = false;
+    }
+    if (ui.copyCode) ui.copyCode.hidden = false;
+    if (ui.lobbyStatus) ui.lobbyStatus.textContent = `Room ${code} ready — waiting for opponent to join…`;
+  });
+
+  socket.on('room_joined', ({ code, side }) => {
+    mySide = side;
+    if (ui.lobbyStatus) ui.lobbyStatus.textContent = `Joined room ${code}. Starting match…`;
+  });
+
+  socket.on('room_error', ({ msg }) => {
+    if (ui.lobbyStatus) ui.lobbyStatus.textContent = `Error: ${msg}`;
+  });
+
+  socket.on('match_start', () => {
+    showMatchOnline();
+  });
+
+  socket.on('state_update', (serverState) => {
+    applyServerState(serverState);
+  });
+
+  socket.on('match_over', ({ winner }) => {
+    handleOnlineVictory(winner);
+  });
+
+  socket.on('opponent_left', () => {
+    state.running = false;
+    onlineActive = false;
+    writeLog('Opponent disconnected. Press Start Match to play again.');
+  });
+
+  socket.on('rematch_waiting', () => {
+    writeLog('Rematch requested — waiting for opponent to accept…');
+  });
+}
+
+function bindLobbyEvents() {
+  ui.createRoom?.addEventListener('click', () => {
+    ensureSocket();
+    if (!socket) return;
+    socket.emit('create_room');
+    if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Creating room…';
+  });
+
+  ui.joinRoom?.addEventListener('click', () => {
+    const code = String(ui.joinCode?.value || '').trim().toUpperCase();
+    if (!code) { if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Enter a room code first.'; return; }
+    ensureSocket();
+    if (!socket) return;
+    socket.emit('join_room', { code });
+    if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Joining…';
+  });
+
+  ui.copyCode?.addEventListener('click', () => {
+    const code = ui.roomCodeDisplay?.dataset.code;
+    if (code) navigator.clipboard?.writeText(code).catch(() => {});
+  });
+}
+
+function showOnlineLobby() {
+  if (ui.lobbyPanel) ui.lobbyPanel.hidden = false;
+  if (ui.roomCodeDisplay) ui.roomCodeDisplay.hidden = true;
+  if (ui.copyCode) ui.copyCode.hidden = true;
+  if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Ready. Create a room or join with a code.';
+  writeLog('Online mode selected. Use the lobby above to connect.');
+}
+
+function showMatchOnline() {
+  onlineActive = true;
+  if (ui.lobbyPanel) ui.lobbyPanel.hidden = true;
+  if (ui.joinCode) ui.joinCode.value = '';
+
+  state.players.A = {
+    name: mySide === 'A' ? 'You' : 'Opponent',
+    baseHp: 1300, baseHpMax: 1300, energy: 0, energyMax: 10,
+    cooldowns: { scout: 0, brawler: 0, siege: 0, guardian: 0 },
+  };
+  state.players.B = {
+    name: mySide === 'B' ? 'You' : 'Opponent',
+    baseHp: 1300, baseHpMax: 1300, energy: 0, energyMax: 10,
+    cooldowns: { scout: 0, brawler: 0, siege: 0, guardian: 0 },
+  };
+  state.units = [];
+  state.structures = [];
+  state.running = true;
+  state.winner = null;
+  state.time = 0;
+  state.lastTick = performance.now();
+
+  for (let lane = 0; lane < BOARD.laneCount; lane++) {
+    state.structures.push({ id: `tower-A-${lane}`, owner: 'A', lane, x: BOARD.towerX.A, hpMax: 320, hp: 320, kind: 'tower' });
+    state.structures.push({ id: `tower-B-${lane}`, owner: 'B', lane, x: BOARD.towerX.B, hpMax: 320, hp: 320, kind: 'tower' });
+  }
+  state.structures.push({ id: 'base-A', owner: 'A', lane: 1, x: BOARD.baseX.A, hpMax: 1300, hp: 1300, kind: 'base' });
+  state.structures.push({ id: 'base-B', owner: 'B', lane: 1, x: BOARD.baseX.B, hpMax: 1300, hp: 1300, kind: 'base' });
+
+  writeLog(`Online match started! You are side ${mySide}. Drag units into lanes to deploy.`);
+  renderDecks();
+  renderStructures();
+  renderStatus();
+}
+
+function applyServerState(serverState) {
+  if (!onlineActive) return;
+  state.structures = serverState.structures;
+  state.units = serverState.units.map((u) => ({
+    ...u,
+    stats: { hp: u.hpMax, ...UNIT_TYPES[u.type] },
+  }));
+  state.running = serverState.running;
+  state.winner  = serverState.winner;
+
+  const update = (player, srv) => {
+    player.energy    = srv.energy;
+    player.energyMax = srv.energyMax;
+    player.baseHp    = srv.baseHp;
+    player.baseHpMax = srv.baseHpMax;
+    Object.keys(srv.cooldownsRemaining).forEach((key) => {
+      player.cooldowns[key] = state.time + srv.cooldownsRemaining[key];
+    });
+  };
+  if (state.players.A) update(state.players.A, serverState.players.A);
+  if (state.players.B) update(state.players.B, serverState.players.B);
+}
+
+function handleOnlineVictory(winner) {
+  onlineActive = false;
+  state.running = false;
+  state.winner  = winner;
+  const label = winner === mySide ? 'You win! 🎉' : 'Opponent wins.';
+  writeLog(`${label} Press Start Match → Online Lobby to rematch.`);
+}
+
+// ─── Boot ──────────────────────────────────────────────────────────────────
 
 function boot() {
   cacheUi();
