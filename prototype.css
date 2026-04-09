@@ -652,8 +652,6 @@ select {
 .btn-primary:hover {
   box-shadow: 0 0 14px rgba(80, 160, 255, 0.5);
 }
-  font-size: 0.78rem;
-}
 
 #ptJoinCode {
   flex: 1;

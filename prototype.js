@@ -693,6 +693,7 @@ function bindGameEvents() {
       showOnlineLobby();
     } else {
       onlineActive = false;
+      if (ui.lobbyPanel) ui.lobbyPanel.hidden = true;
       setupMatch();
     }
   });
