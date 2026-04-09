@@ -179,7 +179,8 @@ const ui = {
   aiBaseMult: null, aiTowerMult: null, aiBaseMultOut: null, aiTowerMultOut: null, aiHealthInfo: null,
   aiDifficulty: null, aiDifficultyInfo: null,
   chestOverlay: null, chestPhase: null, chestTier: null, chestVisual: null, chestRolls: null, chestReward: null, chestClaim: null,
-  chestParticles: null
+  chestParticles: null,
+  chestStars: null
 };
 
 function $(id) { return document.getElementById(id); }
@@ -798,6 +799,25 @@ function playTierBurst(tier) {
   }, 1500);
 }
 
+function updateChestStars(rollIndex, success) {
+  if (!ui.chestStars) return;
+  const stars = ui.chestStars.querySelectorAll('.chest-star');
+  if (!stars || stars.length === 0) return;
+  const idx = Math.max(0, Math.min(stars.length - 1, rollIndex - 1));
+  const star = stars[idx];
+  if (!star) return;
+  star.classList.remove('pending', 'success', 'fail');
+  star.classList.add(success ? 'success' : 'fail');
+}
+
+function resetChestStars() {
+  if (!ui.chestStars) return;
+  ui.chestStars.querySelectorAll('.chest-star').forEach((star) => {
+    star.classList.remove('success', 'fail');
+    star.classList.add('pending');
+  });
+}
+
 function grantTierRewards(tier) {
   const mult = tierRewardMultiplier(tier);
   const gold = Math.round((90 + Math.random() * 150) * mult);
@@ -853,6 +873,7 @@ function startChestOpeningSession(chest) {
   if (ui.chestPhase) ui.chestPhase.textContent = 'CHEST UNLOCKED';
   if (ui.chestRolls) ui.chestRolls.textContent = 'Click to roll chance 1 of 4 (40%).';
   if (ui.chestReward) ui.chestReward.textContent = '';
+  resetChestStars();
   if (ui.chestVisual) {
     ui.chestVisual.classList.remove('tier-up');
     ui.chestVisual.classList.add('open');
@@ -904,6 +925,7 @@ function advanceChestRoll() {
   const success = state.chestSession.tier < 5 && Math.random() < 0.4;
   if (success) {
     state.chestSession.tier += 1;
+    updateChestStars(state.chestSession.rollIndex, true);
     if (ui.chestTier) ui.chestTier.textContent = String(state.chestSession.tier);
     if (ui.chestVisual) {
       ui.chestVisual.classList.remove('tier-up');
@@ -912,8 +934,9 @@ function advanceChestRoll() {
     }
     playTierBurst(state.chestSession.tier);
     if (ui.chestRolls) ui.chestRolls.textContent = `Chance ${state.chestSession.rollIndex}/4: Tier upgraded!`;
-  } else if (ui.chestRolls) {
-    ui.chestRolls.textContent = `Chance ${state.chestSession.rollIndex}/4: No upgrade.`;
+  } else {
+    updateChestStars(state.chestSession.rollIndex, false);
+    if (ui.chestRolls) ui.chestRolls.textContent = `Chance ${state.chestSession.rollIndex}/4: No upgrade.`;
   }
 
   if (state.chestSession.rollIndex < 4) {
@@ -928,6 +951,7 @@ function closeChestOverlay() {
   if (ui.chestOverlay) ui.chestOverlay.hidden = true;
   if (ui.chestVisual) ui.chestVisual.classList.remove('open', 'tier-up');
   if (ui.chestParticles) ui.chestParticles.innerHTML = '';
+  resetChestStars();
   state.chestOpening = false;
   state.chestSession = null;
 }
@@ -1425,6 +1449,7 @@ function cacheUi() {
   ui.chestReward = $('ptChestReward');
   ui.chestClaim = $('ptChestClaim');
   ui.chestParticles = $('ptChestParticles');
+  ui.chestStars = $('ptChestStars');
 }
 
 function bindCore() {

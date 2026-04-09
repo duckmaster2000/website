@@ -830,8 +830,10 @@ select {
   width: min(520px, 92vw);
   border-radius: 18px;
   border: 1px solid rgba(255, 210, 120, 0.42);
-  background: linear-gradient(180deg, rgba(15, 23, 39, 0.98), rgba(7, 12, 24, 0.98));
-  box-shadow: 0 20px 80px rgba(0, 0, 0, 0.7), 0 0 34px rgba(255, 184, 84, 0.18);
+  background:
+    radial-gradient(540px 260px at 50% -20%, rgba(255, 219, 132, 0.18), transparent 60%),
+    linear-gradient(180deg, rgba(15, 23, 39, 0.98), rgba(7, 12, 24, 0.98));
+  box-shadow: 0 20px 80px rgba(0, 0, 0, 0.7), 0 0 34px rgba(255, 184, 84, 0.25);
   padding: 1rem 1rem 0.9rem;
   text-align: center;
 }
@@ -905,6 +907,17 @@ select {
   transform: translateY(12px);
 }
 
+.chest-body::before {
+  content: '';
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 10px;
+  height: 20px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, rgba(255, 236, 169, 0.24), transparent);
+}
+
 .chest-lid {
   position: absolute;
   top: -31px;
@@ -947,6 +960,43 @@ select {
   font-size: 0.8rem;
 }
 
+.chest-stars {
+  margin: 0.4rem 0 0;
+  display: flex;
+  justify-content: center;
+  gap: 0.45rem;
+}
+
+.chest-star {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  font-size: 1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+  transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease, color 220ms ease;
+}
+
+.chest-star.pending {
+  color: rgba(210, 230, 255, 0.55);
+}
+
+.chest-star.success {
+  color: #ffd66e;
+  border-color: rgba(255, 214, 110, 0.92);
+  background: rgba(255, 198, 79, 0.16);
+  box-shadow: 0 0 14px rgba(255, 200, 90, 0.8);
+  transform: scale(1.08);
+}
+
+.chest-star.fail {
+  color: #9cb2cc;
+  border-color: rgba(156, 178, 204, 0.55);
+  background: rgba(66, 86, 112, 0.2);
+}
+
 .chest-reward {
   min-height: 1.2rem;
   color: #ffd98c;
@@ -958,6 +1008,27 @@ select {
   letter-spacing: 0.06em;
   font-family: "Orbitron", sans-serif;
   font-size: 0.7rem;
+}
+
+#ptChestClaim {
+  margin-top: 0.55rem;
+  min-width: 190px;
+  font-size: 0.92rem;
+  padding: 0.52rem 0.86rem;
+  border-radius: 14px;
+  border: 1px solid rgba(113, 192, 255, 0.78);
+  background: linear-gradient(160deg, rgba(43, 77, 121, 0.95), rgba(21, 43, 79, 0.95));
+  box-shadow: 0 0 16px rgba(70, 160, 255, 0.25);
+}
+
+#ptChestClaim:hover:not(:disabled) {
+  box-shadow: 0 0 22px rgba(95, 190, 255, 0.45);
+  transform: translateY(-1px);
+}
+
+#ptChestClaim:disabled {
+  opacity: 0.56;
+  cursor: not-allowed;
 }
 
 @keyframes chestFadeIn {
