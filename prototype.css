@@ -670,6 +670,26 @@ select {
   padding: 0.55rem;
 }
 
+.slider-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-top: 0.35rem;
+}
+
+.progress-grid input[type="range"] {
+  width: 100%;
+  margin-top: 0.2rem;
+}
+
+#ptAiDifficulty {
+  width: 100%;
+  margin-top: 0.2rem;
+}
+
 .progress-grid h4,
 .deck-builder h4,
 .collection-panel h4 {
@@ -710,6 +730,11 @@ select {
 .deck-slot small {
   color: var(--muted);
   font-size: 0.62rem;
+}
+
+.ai-deck-slot {
+  border-color: rgba(255, 146, 146, 0.48);
+  background: rgba(40, 14, 18, 0.65);
 }
 
 .collection-panel {
@@ -788,6 +813,174 @@ select {
 .collection-actions button {
   font-size: 0.64rem;
   padding: 0.28rem 0.46rem;
+}
+
+.chest-overlay {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at 50% 20%, rgba(255, 193, 92, 0.2), rgba(2, 6, 12, 0.88) 52%, rgba(0, 0, 0, 0.94));
+  backdrop-filter: blur(4px);
+  display: grid;
+  place-items: center;
+  z-index: 1200;
+  animation: chestFadeIn 280ms ease;
+}
+
+.chest-modal {
+  width: min(520px, 92vw);
+  border-radius: 18px;
+  border: 1px solid rgba(255, 210, 120, 0.42);
+  background: linear-gradient(180deg, rgba(15, 23, 39, 0.98), rgba(7, 12, 24, 0.98));
+  box-shadow: 0 20px 80px rgba(0, 0, 0, 0.7), 0 0 34px rgba(255, 184, 84, 0.18);
+  padding: 1rem 1rem 0.9rem;
+  text-align: center;
+}
+
+.chest-kicker {
+  margin: 0;
+  font-family: "Orbitron", sans-serif;
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  color: #ffd76f;
+}
+
+.chest-tier-title {
+  margin: 0.25rem 0 0;
+  font-family: "Orbitron", sans-serif;
+}
+
+.chest-tier-title span {
+  color: #ffc44a;
+  text-shadow: 0 0 12px rgba(255, 198, 92, 0.8);
+}
+
+.chest-visual-wrap {
+  position: relative;
+  width: 100%;
+  height: 190px;
+  display: grid;
+  place-items: center;
+  margin-top: 0.5rem;
+}
+
+.chest-glow {
+  position: absolute;
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 210, 110, 0.38), rgba(255, 140, 30, 0.07) 58%, transparent 70%);
+  filter: blur(2px);
+  animation: chestPulse 1100ms ease-in-out infinite;
+}
+
+.chest-particles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.chest-particle {
+  position: absolute;
+  left: 50%;
+  top: 58%;
+  width: var(--size, 8px);
+  height: var(--size, 8px);
+  margin-left: calc(var(--size, 8px) * -0.5);
+  margin-top: calc(var(--size, 8px) * -0.5);
+  border-radius: 50%;
+  background: var(--color, #ffd27b);
+  box-shadow: 0 0 12px var(--color, #ffd27b);
+  animation: chestBurst var(--dur, 920ms) ease-out forwards;
+}
+
+.chest-body {
+  position: relative;
+  width: 210px;
+  height: 118px;
+  border-radius: 14px;
+  border: 2px solid rgba(255, 216, 138, 0.85);
+  background: linear-gradient(165deg, #6e3314, #8b4217 48%, #5d2a10);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45), inset 0 0 18px rgba(255, 164, 72, 0.3);
+  transform: translateY(12px);
+}
+
+.chest-lid {
+  position: absolute;
+  top: -31px;
+  left: -2px;
+  width: calc(100% + 4px);
+  height: 34px;
+  border: 2px solid rgba(255, 216, 138, 0.85);
+  border-bottom: 0;
+  border-radius: 14px 14px 0 0;
+  background: linear-gradient(175deg, #9e4e1f, #753413);
+  transform-origin: bottom center;
+  transition: transform 380ms ease;
+}
+
+.chest-core {
+  position: absolute;
+  left: 50%;
+  top: 52%;
+  width: 34px;
+  height: 34px;
+  margin-left: -17px;
+  margin-top: -17px;
+  border-radius: 8px;
+  background: radial-gradient(circle at 40% 35%, #fff0b8, #ffcc58 52%, #d88012);
+  box-shadow: 0 0 16px rgba(255, 194, 88, 0.95);
+}
+
+.chest-body.open .chest-lid {
+  transform: rotateX(65deg) translateY(-6px);
+}
+
+.chest-body.tier-up {
+  animation: tierPop 320ms ease;
+}
+
+.chest-rolls,
+.chest-reward {
+  margin: 0.45rem 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.chest-reward {
+  min-height: 1.2rem;
+  color: #ffd98c;
+}
+
+@keyframes chestFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes chestPulse {
+  0%, 100% { transform: scale(0.95); opacity: 0.75; }
+  50% { transform: scale(1.08); opacity: 1; }
+}
+
+@keyframes tierPop {
+  0% { transform: translateY(12px) scale(1); }
+  35% { transform: translateY(8px) scale(1.08); }
+  100% { transform: translateY(12px) scale(1); }
+}
+
+@keyframes chestBurst {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.35);
+  }
+  12% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--tx, 0px), var(--ty, -120px)) scale(0.6);
+  }
 }
 
 .upgrade-grid {

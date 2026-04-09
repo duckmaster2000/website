@@ -139,12 +139,36 @@
             <button id="ptUpgradeBase" type="button">Upgrade Base</button>
             <button id="ptUpgradeTower" type="button">Upgrade Tower</button>
           </article>
+          <article>
+            <h4>AI Tuning</h4>
+            <p class="note">Adjust AI health when playing AI mode.</p>
+            <label class="slider-row" for="ptAiDifficulty">AI Difficulty</label>
+            <select id="ptAiDifficulty">
+              <option value="easy">Easy</option>
+              <option value="normal" selected>Normal</option>
+              <option value="hard">Hard</option>
+              <option value="insane">Insane</option>
+              <option value="custom">Custom</option>
+            </select>
+            <label class="slider-row" for="ptAiBaseMult">AI Base HP Multiplier <strong id="ptAiBaseMultOut">1.00x</strong></label>
+            <input id="ptAiBaseMult" type="range" min="0.6" max="2.2" step="0.1" value="1" />
+            <label class="slider-row" for="ptAiTowerMult">AI Tower HP Multiplier <strong id="ptAiTowerMultOut">1.00x</strong></label>
+            <input id="ptAiTowerMult" type="range" min="0.6" max="2.2" step="0.1" value="1" />
+            <p class="note" id="ptAiHealthInfo">AI Base HP: 1300 | AI Tower HP: 320</p>
+            <p class="note" id="ptAiDifficultyInfo">Normal: balanced deploy speed and lane targeting.</p>
+          </article>
         </div>
 
         <div class="deck-builder">
           <h4>Battle Deck (8 Cards Max)</h4>
           <p class="note">Select a card in collection, then click a deck slot to assign it.</p>
           <div class="deck-slots" id="ptDeckSlots"></div>
+        </div>
+
+        <div class="deck-builder">
+          <h4>AI Deck (8 Cards Max)</h4>
+          <p class="note">Select a card in collection, then click an AI slot to assign it.</p>
+          <div class="deck-slots" id="ptAiDeckSlots"></div>
         </div>
 
         <div class="collection-panel">
@@ -159,6 +183,24 @@
       <p class="note" id="ptMatchLog">Choose a mode and press Start Match.</p>
     </section>
   </main>
+
+  <div class="chest-overlay" id="ptChestOverlay" hidden>
+    <div class="chest-modal" role="dialog" aria-modal="true" aria-label="Chest opening">
+      <p class="chest-kicker" id="ptChestPhase">CHEST UNLOCKED</p>
+      <h3 class="chest-tier-title">Tier <span id="ptChestTier">1</span></h3>
+      <div class="chest-visual-wrap" id="ptChestVisualWrap">
+        <div class="chest-glow"></div>
+        <div class="chest-particles" id="ptChestParticles" aria-hidden="true"></div>
+        <div class="chest-body" id="ptChestVisual">
+          <div class="chest-lid"></div>
+          <div class="chest-core"></div>
+        </div>
+      </div>
+      <p class="chest-rolls" id="ptChestRolls">Rolling tier upgrades...</p>
+      <p class="chest-reward" id="ptChestReward">-</p>
+      <button id="ptChestClaim" type="button" disabled>Claim Rewards</button>
+    </div>
+  </div>
 
   <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
   <script src="prototype_v4.js"></script>

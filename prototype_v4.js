@@ -90,6 +90,49 @@ const ONLINE_CARD_IDS = ['scout', 'brawler', 'siege', 'guardian'];
 const STARTER_DECK = ['scout', 'brawler', 'siege', 'guardian', 'voltbug', 'drillcat', 'ramhog', 'flarepod'];
 const MAX_DECK = 8;
 
+const AI_PRESETS = {
+  easy: {
+    baseMult: 0.85,
+    towerMult: 0.85,
+    thinkMin: 0.85,
+    thinkMax: 1.15,
+    strategicChance: 0.42,
+    description: 'Easy: slower deploys and weaker structures.'
+  },
+  normal: {
+    baseMult: 1,
+    towerMult: 1,
+    thinkMin: 0.48,
+    thinkMax: 0.58,
+    strategicChance: 0.7,
+    description: 'Normal: balanced deploy speed and lane targeting.'
+  },
+  hard: {
+    baseMult: 1.2,
+    towerMult: 1.18,
+    thinkMin: 0.33,
+    thinkMax: 0.46,
+    strategicChance: 0.84,
+    description: 'Hard: faster deploys, better lane focus, tougher HP.'
+  },
+  insane: {
+    baseMult: 1.45,
+    towerMult: 1.4,
+    thinkMin: 0.22,
+    thinkMax: 0.33,
+    strategicChance: 0.92,
+    description: 'Insane: very fast deploys, aggressive targeting, high HP.'
+  },
+  custom: {
+    baseMult: 1,
+    towerMult: 1,
+    thinkMin: 0.46,
+    thinkMax: 0.62,
+    strategicChance: 0.72,
+    description: 'Custom: uses your manual HP multipliers.'
+  }
+};
+
 const state = {
   running: false,
   mode: 'pvp',
@@ -103,12 +146,16 @@ const state = {
   projectiles: [],
   nextId: 1,
   players: { A: null, B: null },
+  chestOpening: false,
   progress: {
     gold: 800,
     deck: [...STARTER_DECK],
+    aiDeck: [...STARTER_DECK],
     collection: {},
     chests: [],
-    buildings: { towerLevel: 1, baseLevel: 1 }
+    buildings: { towerLevel: 1, baseLevel: 1 },
+    aiHealth: { baseMult: 1, towerMult: 1 },
+    aiDifficulty: 'normal'
   }
 };
 
@@ -125,9 +172,13 @@ const ui = {
   lobbyPanel: null, createRoom: null, joinCode: null, joinRoom: null, roomCodeDisplay: null,
   shareBox: null, shareLink: null, copyLink: null, lobbyStatus: null,
   goldAmount: null, chestStatus: null, earnChest: null, openChest: null,
-  deckSlots: null, cardCollection: null, cardSearch: null,
+  deckSlots: null, aiDeckSlots: null, cardCollection: null, cardSearch: null,
   towerLevel: null, baseLevel: null, upgradeTower: null, upgradeBase: null,
-  towerUpgradeInfo: null, baseUpgradeInfo: null
+  towerUpgradeInfo: null, baseUpgradeInfo: null,
+  aiBaseMult: null, aiTowerMult: null, aiBaseMultOut: null, aiTowerMultOut: null, aiHealthInfo: null,
+  aiDifficulty: null, aiDifficultyInfo: null,
+  chestOverlay: null, chestPhase: null, chestTier: null, chestVisual: null, chestRolls: null, chestReward: null, chestClaim: null,
+  chestParticles: null
 };
 
 function $(id) { return document.getElementById(id); }
@@ -162,15 +213,26 @@ function loadProgress() {
     if (saved && typeof saved === 'object') {
       state.progress.gold = clamp(Number(saved.gold || 800), 0, 9999999);
       state.progress.deck = Array.isArray(saved.deck) ? saved.deck.slice(0, MAX_DECK) : [...STARTER_DECK];
+      state.progress.aiDeck = Array.isArray(saved.aiDeck) ? saved.aiDeck.slice(0, MAX_DECK) : [...STARTER_DECK];
       state.progress.collection = saved.collection && typeof saved.collection === 'object' ? saved.collection : {};
       state.progress.chests = Array.isArray(saved.chests) ? saved.chests.slice(0, 4) : [];
       state.progress.buildings = {
         towerLevel: clamp(Number(saved.buildings?.towerLevel || 1), 1, 20),
         baseLevel: clamp(Number(saved.buildings?.baseLevel || 1), 1, 20)
       };
+      state.progress.aiHealth = {
+        baseMult: clamp(Number(saved.aiHealth?.baseMult || 1), 0.6, 2.2),
+        towerMult: clamp(Number(saved.aiHealth?.towerMult || 1), 0.6, 2.2)
+      };
+      state.progress.aiDifficulty = Object.prototype.hasOwnProperty.call(AI_PRESETS, saved.aiDifficulty)
+        ? saved.aiDifficulty
+        : 'normal';
     }
   } catch (_) {}
   unlockInitial();
+  if (!Array.isArray(state.progress.aiDeck) || state.progress.aiDeck.length === 0) {
+    state.progress.aiDeck = [...STARTER_DECK];
+  }
   saveProgress();
 }
 
@@ -179,6 +241,23 @@ function getCardStats(id) {
   if (!card) return null;
   const p = cardProgress(id);
   return getCardStatsAtLevel(id, clamp(p.level || 1, 1, 14), p.abilityUnlocked, p.mastery || 0);
+}
+
+function getAiProfile() {
+  const key = state.progress.aiDifficulty || 'normal';
+  return AI_PRESETS[key] || AI_PRESETS.normal;
+}
+
+function applyAiDifficultyPreset(level) {
+  const key = Object.prototype.hasOwnProperty.call(AI_PRESETS, level) ? level : 'normal';
+  const profile = AI_PRESETS[key];
+  state.progress.aiDifficulty = key;
+  if (key !== 'custom') {
+    state.progress.aiHealth.baseMult = clamp(profile.baseMult, 0.6, 2.2);
+    state.progress.aiHealth.towerMult = clamp(profile.towerMult, 0.6, 2.2);
+  }
+  saveProgress();
+  renderProgress();
 }
 
 function getCardStatsAtLevel(id, level, abilityUnlocked, mastery) {
@@ -200,6 +279,8 @@ function deckFor(owner) {
   if (onlineActive) return ONLINE_CARD_IDS;
   if (owner === 'A') return state.progress.deck.filter((id) => cardProgress(id).unlocked).slice(0, MAX_DECK);
   if (state.mode === 'ai') {
+    const ai = state.progress.aiDeck.filter((id) => cardProgress(id).unlocked).slice(0, MAX_DECK);
+    if (ai.length > 0) return ai;
     const unlocked = CARD_LIBRARY.filter((c) => cardProgress(c.id).unlocked);
     return unlocked.sort((a, b) => a.cost - b.cost).slice(0, MAX_DECK).map((c) => c.id);
   }
@@ -209,11 +290,12 @@ function deckFor(owner) {
 function createPlayer(id, mode) {
   const b = state.progress.buildings;
   const isB = id === 'B';
+  const aiBaseMult = mode === 'ai' && isB ? state.progress.aiHealth.baseMult : 1;
   return {
     id,
     name: isB ? (mode === 'ai' ? 'Enemy AI' : 'Commander B') : 'Commander A',
-    baseHpMax: 1300 + (b.baseLevel - 1) * 120,
-    baseHp: 1300 + (b.baseLevel - 1) * 120,
+    baseHpMax: Math.round((1300 + (b.baseLevel - 1) * 120) * aiBaseMult),
+    baseHp: Math.round((1300 + (b.baseLevel - 1) * 120) * aiBaseMult),
     energyMax: 10,
     energy: 10,
     energyRegen: 2.35,
@@ -244,9 +326,13 @@ function setupMatch() {
   });
 
   for (let lane = 0; lane < BOARD.laneCount; lane += 1) {
-    const towerHp = 320 + (state.progress.buildings.towerLevel - 1) * 28;
-    state.structures.push({ id: `tower-A-${lane}`, owner: 'A', lane, x: BOARD.towerX.A, hpMax: towerHp, hp: towerHp, kind: 'tower', cd: 0 });
-    state.structures.push({ id: `tower-B-${lane}`, owner: 'B', lane, x: BOARD.towerX.B, hpMax: towerHp, hp: towerHp, kind: 'tower', cd: 0 });
+    const towerHpBase = 320 + (state.progress.buildings.towerLevel - 1) * 28;
+    const towerHpA = towerHpBase;
+    const towerHpB = state.mode === 'ai'
+      ? Math.round(towerHpBase * state.progress.aiHealth.towerMult)
+      : towerHpBase;
+    state.structures.push({ id: `tower-A-${lane}`, owner: 'A', lane, x: BOARD.towerX.A, hpMax: towerHpA, hp: towerHpA, kind: 'tower', cd: 0 });
+    state.structures.push({ id: `tower-B-${lane}`, owner: 'B', lane, x: BOARD.towerX.B, hpMax: towerHpB, hp: towerHpB, kind: 'tower', cd: 0 });
   }
   state.structures.push({ id: 'base-A', owner: 'A', lane: 1, x: BOARD.baseX.A, hpMax: state.players.A.baseHpMax, hp: state.players.A.baseHp, kind: 'base', cd: 0 });
   state.structures.push({ id: 'base-B', owner: 'B', lane: 1, x: BOARD.baseX.B, hpMax: state.players.B.baseHpMax, hp: state.players.B.baseHp, kind: 'base', cd: 0 });
@@ -483,9 +569,10 @@ function onVictory(winner) {
 
 function updateAi(dt) {
   if (!state.running || state.mode !== 'ai') return;
+  const profile = getAiProfile();
   state.aiTimer -= dt;
   if (state.aiTimer > 0) return;
-  state.aiTimer = 0.48 + Math.random() * 0.58;
+  state.aiTimer = profile.thinkMin + Math.random() * (profile.thinkMax - profile.thinkMin);
 
   const p = state.players.B;
   const options = deckFor('B').filter((id) => {
@@ -500,8 +587,15 @@ function updateAi(dt) {
     laneThreat[u.lane] += (100 - u.x) * 0.09 + u.hp * 0.03;
   });
 
-  const lane = Math.random() < 0.7 ? laneThreat.indexOf(Math.max(...laneThreat)) : Math.floor(Math.random() * 3);
-  const pick = options[Math.floor(Math.random() * options.length)];
+  const lane = Math.random() < profile.strategicChance
+    ? laneThreat.indexOf(Math.max(...laneThreat))
+    : Math.floor(Math.random() * 3);
+
+  const pick = state.progress.aiDifficulty === 'easy'
+    ? options.sort((a, b) => (CARD_MAP[a]?.cost || 0) - (CARD_MAP[b]?.cost || 0))[0]
+    : state.progress.aiDifficulty === 'insane'
+      ? options.sort((a, b) => (CARD_MAP[b]?.cost || 0) - (CARD_MAP[a]?.cost || 0))[0]
+      : options[Math.floor(Math.random() * options.length)];
   deployUnit('B', pick, lane);
 }
 
@@ -661,31 +755,159 @@ function bindBoardInput() {
 
 function chestReady(c) { return Date.now() >= c.readyAt; }
 
-function openReadyChest() {
-  const chest = state.progress.chests.find((c) => chestReady(c));
-  if (!chest) { writeLog('No chest ready yet.'); return; }
-  const mult = chest.type === 'wood' ? 1 : chest.type === 'silver' ? 1.45 : 2;
-  const gold = Math.round((90 + Math.random() * 130) * mult);
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function rollChestTier() {
+  let tier = 1;
+  const rolls = [];
+  for (let i = 1; i <= 4; i += 1) {
+    const success = tier < 5 && Math.random() < 0.4;
+    if (success) tier += 1;
+    rolls.push({ chance: i, success, tier });
+  }
+  return { tier, rolls };
+}
+
+function tierRewardMultiplier(tier) {
+  const map = { 1: 1, 2: 1.35, 3: 1.8, 4: 2.4, 5: 3.2 };
+  return map[tier] || 1;
+}
+
+function playTierBurst(tier) {
+  if (!ui.chestParticles) return;
+  ui.chestParticles.innerHTML = '';
+
+  const colorsByTier = {
+    1: ['#8fc8ff', '#6bb8ff'],
+    2: ['#63ffd2', '#47f3bf'],
+    3: ['#ffb36c', '#ff9c4d'],
+    4: ['#ffd35f', '#ffc24a'],
+    5: ['#ff7e99', '#ffd35f', '#8fd0ff']
+  };
+  const colors = colorsByTier[tier] || colorsByTier[1];
+  const count = 14 + tier * 7;
+
+  for (let i = 0; i < count; i += 1) {
+    const p = document.createElement('span');
+    p.className = 'chest-particle';
+    const angle = (Math.PI * 2 * i) / count + (Math.random() * 0.6 - 0.3);
+    const radius = 60 + Math.random() * (80 + tier * 14);
+    const tx = Math.cos(angle) * radius;
+    const ty = Math.sin(angle) * radius - (50 + Math.random() * 60);
+    const size = 4 + Math.random() * (4 + tier * 0.9);
+    const dur = 680 + Math.random() * 620;
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    p.style.setProperty('--tx', `${tx.toFixed(1)}px`);
+    p.style.setProperty('--ty', `${ty.toFixed(1)}px`);
+    p.style.setProperty('--size', `${size.toFixed(1)}px`);
+    p.style.setProperty('--dur', `${dur.toFixed(0)}ms`);
+    p.style.setProperty('--color', color);
+    ui.chestParticles.appendChild(p);
+  }
+
+  setTimeout(() => {
+    if (ui.chestParticles) ui.chestParticles.innerHTML = '';
+  }, 1500);
+}
+
+function grantTierRewards(tier) {
+  const mult = tierRewardMultiplier(tier);
+  const gold = Math.round((90 + Math.random() * 150) * mult);
   state.progress.gold += gold;
 
-  const locked = CARD_LIBRARY.filter((c) => !cardProgress(c.id).unlocked).sort((a, b) => RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity));
-  let unlockMsg = '';
-  if (locked.length > 0 && Math.random() < (chest.type === 'golden' ? 0.95 : chest.type === 'silver' ? 0.62 : 0.4)) {
-    const unlocked = locked[Math.floor(Math.random() * Math.min(12, locked.length))];
-    const cp = cardProgress(unlocked.id);
+  const unlockChanceByTier = [0.2, 0.38, 0.58, 0.76, 0.9];
+  const rarityCapByTier = ['rare', 'epic', 'legendary', 'champion', 'champion'];
+  const unlockChance = unlockChanceByTier[Math.max(0, Math.min(4, tier - 1))];
+  const maxRarity = rarityCapByTier[Math.max(0, Math.min(4, tier - 1))];
+
+  const maxIdx = RARITY_ORDER.indexOf(maxRarity);
+  const lockedEligible = CARD_LIBRARY.filter((c) => {
+    if (cardProgress(c.id).unlocked) return false;
+    return RARITY_ORDER.indexOf(c.rarity) <= maxIdx;
+  });
+
+  let unlockedName = '';
+  if (lockedEligible.length > 0 && Math.random() < unlockChance) {
+    const picked = lockedEligible[Math.floor(Math.random() * lockedEligible.length)];
+    const cp = cardProgress(picked.id);
     cp.unlocked = true;
     cp.copies += 1;
-    unlockMsg = ` Unlocked ${unlocked.name}.`;
+    unlockedName = picked.name;
   }
 
   const unlockedCards = CARD_LIBRARY.filter((c) => cardProgress(c.id).unlocked);
-  for (let i = 0; i < Math.min(3, unlockedCards.length); i += 1) {
+  const copyDrops = Math.min(6, 2 + tier);
+  for (let i = 0; i < copyDrops && unlockedCards.length > 0; i += 1) {
     const c = unlockedCards[Math.floor(Math.random() * unlockedCards.length)];
-    cardProgress(c.id).copies += Math.max(1, Math.round((RARITY_STYLE[c.rarity].copies || 1) * mult * (0.5 + Math.random() * 0.7)));
+    const baseCopies = RARITY_STYLE[c.rarity].copies || 1;
+    const bonus = Math.max(1, Math.round(baseCopies * (0.45 + Math.random() * 0.9) * mult));
+    cardProgress(c.id).copies += bonus;
   }
 
+  return {
+    gold,
+    unlockedName,
+    copyDrops
+  };
+}
+
+async function openReadyChest() {
+  if (state.chestOpening) return;
+  const chest = state.progress.chests.find((c) => chestReady(c));
+  if (!chest) { writeLog('No chest ready yet.'); return; }
+
+  if (!ui.chestOverlay || !ui.chestTier || !ui.chestVisual || !ui.chestRolls || !ui.chestPhase || !ui.chestReward || !ui.chestClaim) {
+    const fallback = grantTierRewards(2);
+    state.progress.chests = state.progress.chests.filter((c) => c.id !== chest.id);
+    writeLog(`Opened chest: +${fallback.gold} gold.`);
+    saveProgress();
+    renderProgress();
+    renderCollection();
+    return;
+  }
+
+  state.chestOpening = true;
+  ui.chestOverlay.hidden = false;
+  ui.chestTier.textContent = '1';
+  ui.chestPhase.textContent = 'CHEST UNLOCKED';
+  ui.chestRolls.textContent = 'Rolling tier upgrades...';
+  ui.chestReward.textContent = '';
+  ui.chestClaim.disabled = true;
+  ui.chestVisual.classList.remove('open');
+
+  await wait(220);
+  ui.chestVisual.classList.add('open');
+
+  const result = rollChestTier();
+  for (const roll of result.rolls) {
+    ui.chestPhase.textContent = `CHANCE ${roll.chance} OF 4`;
+    await wait(620);
+    if (roll.success) {
+      ui.chestTier.textContent = String(roll.tier);
+      ui.chestRolls.textContent = `Success! Tier increased to ${roll.tier}.`;
+      ui.chestVisual.classList.remove('tier-up');
+      void ui.chestVisual.offsetWidth;
+      ui.chestVisual.classList.add('tier-up');
+    } else {
+      ui.chestRolls.textContent = `No upgrade this chance. Tier stays ${roll.tier}.`;
+    }
+  }
+
+  const rewards = grantTierRewards(result.tier);
   state.progress.chests = state.progress.chests.filter((c) => c.id !== chest.id);
-  writeLog(`Opened ${chest.type} chest: +${gold} gold.${unlockMsg}`);
+
+  ui.chestPhase.textContent = `FINAL TIER ${result.tier}`;
+  ui.chestRolls.textContent = `4 rolls complete at 40% each.`;
+  playTierBurst(result.tier);
+  ui.chestReward.textContent = rewards.unlockedName
+    ? `+${rewards.gold} gold, ${rewards.copyDrops} copy drops, unlocked ${rewards.unlockedName}.`
+    : `+${rewards.gold} gold, ${rewards.copyDrops} copy drops.`;
+  ui.chestClaim.disabled = false;
+
+  writeLog(`Opened tier ${result.tier} chest: +${rewards.gold} gold${rewards.unlockedName ? `, unlocked ${rewards.unlockedName}` : ''}.`);
+
   saveProgress();
   renderProgress();
   renderCollection();
@@ -766,6 +988,23 @@ function setDeckSlot(slot, cardId) {
   renderDecks();
 }
 
+function setAiDeckSlot(slot, cardId) {
+  if (slot < 0 || slot >= MAX_DECK) return;
+  if (!cardProgress(cardId).unlocked) return;
+  const deck = [...state.progress.aiDeck];
+  const other = deck.indexOf(cardId);
+  if (other >= 0) {
+    const temp = deck[slot];
+    deck[slot] = cardId;
+    deck[other] = temp;
+  } else {
+    deck[slot] = cardId;
+  }
+  state.progress.aiDeck = deck.slice(0, MAX_DECK);
+  saveProgress();
+  renderCollection();
+}
+
 function renderProgress() {
   if (ui.goldAmount) ui.goldAmount.textContent = String(state.progress.gold);
   if (ui.towerLevel) ui.towerLevel.textContent = String(state.progress.buildings.towerLevel);
@@ -792,6 +1031,22 @@ function renderProgress() {
   }
   if (ui.upgradeTower) ui.upgradeTower.textContent = `Upgrade Tower (${buildingCost('tower')})`;
   if (ui.upgradeBase) ui.upgradeBase.textContent = `Upgrade Base (${buildingCost('base')})`;
+  if (ui.aiDifficulty) ui.aiDifficulty.value = state.progress.aiDifficulty || 'normal';
+  if (ui.aiDifficultyInfo) {
+    const profile = getAiProfile();
+    ui.aiDifficultyInfo.textContent = profile.description;
+  }
+  if (ui.aiBaseMult) ui.aiBaseMult.value = String(state.progress.aiHealth.baseMult);
+  if (ui.aiTowerMult) ui.aiTowerMult.value = String(state.progress.aiHealth.towerMult);
+  if (ui.aiBaseMultOut) ui.aiBaseMultOut.textContent = `${state.progress.aiHealth.baseMult.toFixed(2)}x`;
+  if (ui.aiTowerMultOut) ui.aiTowerMultOut.textContent = `${state.progress.aiHealth.towerMult.toFixed(2)}x`;
+  if (ui.aiHealthInfo) {
+    const playerBase = 1300 + (state.progress.buildings.baseLevel - 1) * 120;
+    const playerTower = 320 + (state.progress.buildings.towerLevel - 1) * 28;
+    const aiBase = Math.round(playerBase * state.progress.aiHealth.baseMult);
+    const aiTower = Math.round(playerTower * state.progress.aiHealth.towerMult);
+    ui.aiHealthInfo.textContent = `AI Base HP: ${aiBase} | AI Tower HP: ${aiTower}`;
+  }
 }
 
 function filterCards() {
@@ -805,6 +1060,10 @@ function renderCollection() {
   while (deck.length < MAX_DECK) deck.push(STARTER_DECK[deck.length % STARTER_DECK.length]);
   state.progress.deck = deck;
 
+  const aiDeck = state.progress.aiDeck.slice(0, MAX_DECK);
+  while (aiDeck.length < MAX_DECK) aiDeck.push(STARTER_DECK[aiDeck.length % STARTER_DECK.length]);
+  state.progress.aiDeck = aiDeck;
+
   if (ui.deckSlots) {
     ui.deckSlots.innerHTML = deck.map((id, idx) => {
       const card = CARD_MAP[id];
@@ -817,6 +1076,22 @@ function renderCollection() {
         const slot = Number(el.dataset.slot);
         if (state.selectedCard && state.selectedCard.owner === 'collection') setDeckSlot(slot, state.selectedCard.type);
         else writeLog('Select a collection card, then click a deck slot to assign it.');
+      });
+    });
+  }
+
+  if (ui.aiDeckSlots) {
+    ui.aiDeckSlots.innerHTML = aiDeck.map((id, idx) => {
+      const card = CARD_MAP[id];
+      const cp = cardProgress(id);
+      return `<button class="deck-slot ai-deck-slot" data-ai-slot="${idx}"><span>AI ${idx + 1}</span>${card.icon} ${card.name}<small>Lv ${cp.level}</small></button>`;
+    }).join('');
+
+    ui.aiDeckSlots.querySelectorAll('[data-ai-slot]').forEach((el) => {
+      el.addEventListener('click', () => {
+        const slot = Number(el.getAttribute('data-ai-slot'));
+        if (state.selectedCard && state.selectedCard.owner === 'collection') setAiDeckSlot(slot, state.selectedCard.type);
+        else writeLog('Select a collection card, then click an AI deck slot to assign it.');
       });
     });
   }
@@ -882,6 +1157,28 @@ function bindProgressUi() {
   ui.upgradeTower?.addEventListener('click', () => upgradeBuilding('tower'));
   ui.upgradeBase?.addEventListener('click', () => upgradeBuilding('base'));
   ui.cardSearch?.addEventListener('input', renderCollection);
+  ui.aiDifficulty?.addEventListener('change', () => {
+    applyAiDifficultyPreset(ui.aiDifficulty?.value || 'normal');
+  });
+  ui.aiBaseMult?.addEventListener('input', () => {
+    state.progress.aiHealth.baseMult = clamp(Number(ui.aiBaseMult.value || 1), 0.6, 2.2);
+    state.progress.aiDifficulty = 'custom';
+    saveProgress();
+    renderProgress();
+  });
+  ui.aiTowerMult?.addEventListener('input', () => {
+    state.progress.aiHealth.towerMult = clamp(Number(ui.aiTowerMult.value || 1), 0.6, 2.2);
+    state.progress.aiDifficulty = 'custom';
+    saveProgress();
+    renderProgress();
+  });
+
+  ui.chestClaim?.addEventListener('click', () => {
+    if (ui.chestOverlay) ui.chestOverlay.hidden = true;
+    if (ui.chestVisual) ui.chestVisual.classList.remove('open', 'tier-up');
+    if (ui.chestParticles) ui.chestParticles.innerHTML = '';
+    state.chestOpening = false;
+  });
 }
 
 function ensureSocket() {
@@ -1065,6 +1362,7 @@ function cacheUi() {
   ui.earnChest = $('ptEarnChest');
   ui.openChest = $('ptOpenChest');
   ui.deckSlots = $('ptDeckSlots');
+  ui.aiDeckSlots = $('ptAiDeckSlots');
   ui.cardCollection = $('ptCardCollection');
   ui.cardSearch = $('ptCardSearch');
   ui.towerLevel = $('ptTowerLevel');
@@ -1073,6 +1371,21 @@ function cacheUi() {
   ui.upgradeBase = $('ptUpgradeBase');
   ui.towerUpgradeInfo = $('ptTowerUpgradeInfo');
   ui.baseUpgradeInfo = $('ptBaseUpgradeInfo');
+  ui.aiBaseMult = $('ptAiBaseMult');
+  ui.aiTowerMult = $('ptAiTowerMult');
+  ui.aiBaseMultOut = $('ptAiBaseMultOut');
+  ui.aiTowerMultOut = $('ptAiTowerMultOut');
+  ui.aiHealthInfo = $('ptAiHealthInfo');
+  ui.aiDifficulty = $('ptAiDifficulty');
+  ui.aiDifficultyInfo = $('ptAiDifficultyInfo');
+  ui.chestOverlay = $('ptChestOverlay');
+  ui.chestPhase = $('ptChestPhase');
+  ui.chestTier = $('ptChestTier');
+  ui.chestVisual = $('ptChestVisual');
+  ui.chestRolls = $('ptChestRolls');
+  ui.chestReward = $('ptChestReward');
+  ui.chestClaim = $('ptChestClaim');
+  ui.chestParticles = $('ptChestParticles');
 }
 
 function bindCore() {
@@ -1091,7 +1404,16 @@ function bindCore() {
 
   ui.resetUpgrades?.addEventListener('click', () => {
     localStorage.removeItem(PROGRESS_KEY);
-    state.progress = { gold: 800, deck: [...STARTER_DECK], collection: {}, chests: [], buildings: { towerLevel: 1, baseLevel: 1 } };
+    state.progress = {
+      gold: 800,
+      deck: [...STARTER_DECK],
+      aiDeck: [...STARTER_DECK],
+      collection: {},
+      chests: [],
+      buildings: { towerLevel: 1, baseLevel: 1 },
+      aiHealth: { baseMult: 1, towerMult: 1 },
+      aiDifficulty: 'normal'
+    };
     unlockInitial();
     saveProgress();
     renderProgress();
