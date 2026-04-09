@@ -126,7 +126,8 @@ const ui = {
   shareBox: null, shareLink: null, copyLink: null, lobbyStatus: null,
   goldAmount: null, chestStatus: null, earnChest: null, openChest: null,
   deckSlots: null, cardCollection: null, cardSearch: null,
-  towerLevel: null, baseLevel: null, upgradeTower: null, upgradeBase: null
+  towerLevel: null, baseLevel: null, upgradeTower: null, upgradeBase: null,
+  towerUpgradeInfo: null, baseUpgradeInfo: null
 };
 
 function $(id) { return document.getElementById(id); }
@@ -177,9 +178,15 @@ function getCardStats(id) {
   const card = CARD_MAP[id];
   if (!card) return null;
   const p = cardProgress(id);
-  const lvl = clamp(p.level || 1, 1, 14);
+  return getCardStatsAtLevel(id, clamp(p.level || 1, 1, 14), p.abilityUnlocked, p.mastery || 0);
+}
+
+function getCardStatsAtLevel(id, level, abilityUnlocked, mastery) {
+  const card = CARD_MAP[id];
+  if (!card) return null;
+  const lvl = clamp(level || 1, 1, 14);
   const scale = 1 + (lvl - 1) * 0.075;
-  const abilityReady = p.abilityUnlocked && lvl >= card.ability.minLevel && (p.mastery || 0) >= card.ability.minMastery;
+  const abilityReady = !!abilityUnlocked && lvl >= card.ability.minLevel && (mastery || 0) >= card.ability.minMastery;
   return {
     ...card,
     hpScaled: Math.round(card.hp * scale * (abilityReady ? card.ability.hpBoost : 1)),
@@ -565,9 +572,10 @@ function renderStructures() {
   ui.structures.innerHTML = state.structures.map((s) => {
     const y = laneY(s.lane);
     const hp = clamp((s.hp / s.hpMax) * 100, 0, 100);
+    const hpNum = `${Math.max(0, Math.ceil(s.hp))}/${s.hpMax}`;
     const team = s.owner === 'A' ? 'team-a' : 'team-b';
     const icon = s.kind === 'base' ? '🏰' : '🗼';
-    return `<div class="structure ${team} ${s.kind}" data-alive="${s.hp > 0 ? '1' : '0'}" style="left:${s.x}%;top:${y}px"><span class="structure-icon">${icon}</span><span class="hp"><i style="width:${hp}%"></i></span></div>`;
+    return `<div class="structure ${team} ${s.kind}" data-alive="${s.hp > 0 ? '1' : '0'}" style="left:${s.x}%;top:${y}px"><span class="structure-icon">${icon}</span><span class="structure-hp-label">${hpNum}</span><span class="hp"><i style="width:${hp}%"></i></span></div>`;
   }).join('');
 }
 
@@ -762,6 +770,20 @@ function renderProgress() {
   if (ui.goldAmount) ui.goldAmount.textContent = String(state.progress.gold);
   if (ui.towerLevel) ui.towerLevel.textContent = String(state.progress.buildings.towerLevel);
   if (ui.baseLevel) ui.baseLevel.textContent = String(state.progress.buildings.baseLevel);
+  if (ui.baseUpgradeInfo) {
+    const lvl = state.progress.buildings.baseLevel;
+    const nowHp = 1300 + (lvl - 1) * 120;
+    const nextHp = 1300 + lvl * 120;
+    ui.baseUpgradeInfo.textContent = `Base HP: ${nowHp} (next ${nextHp}, +120)`;
+  }
+  if (ui.towerUpgradeInfo) {
+    const lvl = state.progress.buildings.towerLevel;
+    const nowHp = 320 + (lvl - 1) * 28;
+    const nextHp = 320 + lvl * 28;
+    const nowDmg = 13 + (lvl - 1) * 3;
+    const nextDmg = 13 + lvl * 3;
+    ui.towerUpgradeInfo.textContent = `Tower HP/DMG: ${nowHp} / ${nowDmg} (next ${nextHp} / ${nextDmg})`;
+  }
   if (ui.chestStatus) {
     const ready = state.progress.chests.filter((c) => chestReady(c)).length;
     ui.chestStatus.textContent = state.progress.chests.length === 0
@@ -809,7 +831,17 @@ function renderCollection() {
     const upCost = cardUpgradeCost(c.id, next);
     const canUp = unlocked && cp.level < 14 && cp.copies >= need && state.progress.gold >= upCost;
     const canAbility = unlocked && !cp.abilityUnlocked && cp.level >= c.ability.minLevel && cp.mastery >= c.ability.minMastery;
-    return `<article class="collection-card ${unlocked ? '' : 'locked'} ${inDeck ? 'in-deck' : ''}" data-card="${c.id}"><header><strong>${c.icon} ${c.name}</strong><span class="rarity-${c.rarity}">${RARITY_STYLE[c.rarity].label}</span></header><p>${unlocked ? `Lv ${cp.level} • Copies ${cp.copies} • Mastery ${Math.floor(cp.mastery)}` : 'Locked'}</p><p>Cost ${c.cost} • ${c.style} • ${c.role}</p><div class="collection-actions">${unlocked ? `<button data-select="${c.id}">${inDeck ? 'In Deck' : 'Select'}</button>` : '<button disabled>Locked</button>'}${unlocked ? `<button data-up="${c.id}" ${canUp ? '' : 'disabled'}>Level Up</button>` : ''}${unlocked ? `<button data-ability="${c.id}" ${canAbility ? '' : 'disabled'}>${cp.abilityUnlocked ? 'Ability ✓' : 'Unlock Ability'}</button>` : ''}</div></article>`;
+    let statLine = 'Locked';
+    let nextLine = '';
+    if (unlocked) {
+      const nowStats = getCardStats(c.id);
+      const nextStats = cp.level < 14 ? getCardStatsAtLevel(c.id, cp.level + 1, cp.abilityUnlocked, cp.mastery || 0) : null;
+      statLine = `Lv ${cp.level} • HP ${nowStats.hpScaled} • DMG ${Math.round(nowStats.dmgScaled)} • RNG ${nowStats.range} • SPD ${nowStats.speed} • CD ${nowStats.deployCdScaled.toFixed(2)}s`;
+      if (nextStats) {
+        nextLine = `Next Lv: HP ${nextStats.hpScaled} • DMG ${Math.round(nextStats.dmgScaled)} • CD ${nextStats.deployCdScaled.toFixed(2)}s`;
+      }
+    }
+    return `<article class="collection-card ${unlocked ? '' : 'locked'} ${inDeck ? 'in-deck' : ''}" data-card="${c.id}"><header><strong>${c.icon} ${c.name}</strong><span class="rarity-${c.rarity}">${RARITY_STYLE[c.rarity].label}</span></header><p>${unlocked ? `Copies ${cp.copies} • Mastery ${Math.floor(cp.mastery)}` : 'Locked'}</p><p>${statLine}</p><p>${unlocked ? `Cost ${c.cost} • ${c.style} target • ${c.role}` : 'Unknown stats'}</p><p>${nextLine}</p><div class="collection-actions">${unlocked ? `<button data-select="${c.id}">${inDeck ? 'In Deck' : 'Select'}</button>` : '<button disabled>Locked</button>'}${unlocked ? `<button data-up="${c.id}" ${canUp ? '' : 'disabled'}>Level Up (${need} copies, ${upCost}g)</button>` : ''}${unlocked ? `<button data-ability="${c.id}" ${canAbility ? '' : 'disabled'}>${cp.abilityUnlocked ? 'Ability ✓' : 'Unlock Ability'}</button>` : ''}</div></article>`;
   }).join('');
 
   ui.cardCollection.querySelectorAll('[data-select]').forEach((b) => {
@@ -1039,6 +1071,8 @@ function cacheUi() {
   ui.baseLevel = $('ptBaseLevel');
   ui.upgradeTower = $('ptUpgradeTower');
   ui.upgradeBase = $('ptUpgradeBase');
+  ui.towerUpgradeInfo = $('ptTowerUpgradeInfo');
+  ui.baseUpgradeInfo = $('ptBaseUpgradeInfo');
 }
 
 function bindCore() {
