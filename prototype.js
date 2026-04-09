@@ -1,7 +1,12 @@
 const PROTOTYPE_PASSWORD = '1ydzpU1y!';
 const PROTOTYPE_KEY = 'prototype_access_v1';
 const PROTOTYPE_UPGRADE_KEY = 'prototype_upgrades_v1';
-const SERVER_URL = 'http://localhost:3001';
+
+// Point to deployed server (Render). Falls back to localhost for dev.
+const SERVER_URL =
+  location.hostname === 'caleb-liu.com' || location.hostname === 'www.caleb-liu.com'
+    ? 'https://clash-tanks-server.onrender.com'
+    : 'http://localhost:3001';
 
 // Online 1v1 state
 let socket = null;
@@ -92,7 +97,9 @@ const ui = {
   joinCode: null,
   joinRoom: null,
   roomCodeDisplay: null,
-  copyCode: null,
+  shareBox: null,
+  shareLink: null,
+  copyLink: null,
   lobbyStatus: null
 };
 
@@ -743,7 +750,9 @@ function cacheUi() {
   ui.joinCode = $('ptJoinCode');
   ui.joinRoom = $('ptJoinRoom');
   ui.roomCodeDisplay = $('ptRoomCode');
-  ui.copyCode = $('ptCopyCode');
+  ui.shareBox = $('ptShareBox');
+  ui.shareLink = $('ptShareLink');
+  ui.copyLink = $('ptCopyLink');
   ui.lobbyStatus = $('ptLobbyStatus');
 }
 
@@ -767,13 +776,11 @@ function ensureSocket() {
 
   socket.on('room_created', ({ code, side }) => {
     mySide = side;
-    if (ui.roomCodeDisplay) {
-      ui.roomCodeDisplay.textContent = code;
-      ui.roomCodeDisplay.dataset.code = code;
-      ui.roomCodeDisplay.hidden = false;
-    }
-    if (ui.copyCode) ui.copyCode.hidden = false;
-    if (ui.lobbyStatus) ui.lobbyStatus.textContent = `Room ${code} ready — waiting for opponent to join…`;
+    const joinUrl = `${location.origin}/prototype.html?room=${code}`;
+    if (ui.roomCodeDisplay) ui.roomCodeDisplay.textContent = code;
+    if (ui.shareLink) ui.shareLink.value = joinUrl;
+    if (ui.shareBox) ui.shareBox.hidden = false;
+    if (ui.lobbyStatus) ui.lobbyStatus.textContent = `Waiting for opponent to join…`;
   });
 
   socket.on('room_joined', ({ code, side }) => {
@@ -808,6 +815,19 @@ function ensureSocket() {
   });
 }
 
+function buildShareUrl(code) {
+  return `${location.origin}/prototype.html?room=${code}`;
+}
+
+function joinRoomByCode(code) {
+  const upper = String(code || '').trim().toUpperCase();
+  if (!upper) { if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Enter a room code first.'; return; }
+  ensureSocket();
+  if (!socket) return;
+  socket.emit('join_room', { code: upper });
+  if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Joining…';
+}
+
 function bindLobbyEvents() {
   ui.createRoom?.addEventListener('click', () => {
     ensureSocket();
@@ -818,23 +838,31 @@ function bindLobbyEvents() {
 
   ui.joinRoom?.addEventListener('click', () => {
     const code = String(ui.joinCode?.value || '').trim().toUpperCase();
-    if (!code) { if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Enter a room code first.'; return; }
-    ensureSocket();
-    if (!socket) return;
-    socket.emit('join_room', { code });
-    if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Joining…';
+    joinRoomByCode(code);
   });
 
-  ui.copyCode?.addEventListener('click', () => {
-    const code = ui.roomCodeDisplay?.dataset.code;
-    if (code) navigator.clipboard?.writeText(code).catch(() => {});
+  // Also join when pressing Enter in the code input
+  ui.joinCode?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const code = String(ui.joinCode?.value || '').trim().toUpperCase();
+      joinRoomByCode(code);
+    }
+  });
+
+  ui.copyLink?.addEventListener('click', () => {
+    const link = ui.shareLink?.value;
+    if (link) {
+      navigator.clipboard?.writeText(link).then(() => {
+        ui.copyLink.textContent = 'Copied!';
+        setTimeout(() => { ui.copyLink.textContent = 'Copy Link'; }, 1800);
+      }).catch(() => {});
+    }
   });
 }
 
 function showOnlineLobby() {
   if (ui.lobbyPanel) ui.lobbyPanel.hidden = false;
-  if (ui.roomCodeDisplay) ui.roomCodeDisplay.hidden = true;
-  if (ui.copyCode) ui.copyCode.hidden = true;
+  if (ui.shareBox) ui.shareBox.hidden = true;
   if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Ready. Create a room or join with a code.';
   writeLog('Online mode selected. Use the lobby above to connect.');
 }
@@ -910,12 +938,34 @@ function handleOnlineVictory(winner) {
 function boot() {
   cacheUi();
 
+  // Check for ?room=CODE in URL (invite link)
+  const urlParams = new URLSearchParams(location.search);
+  const roomFromUrl = (urlParams.get('room') || '').trim().toUpperCase();
+
+  const launch = () => {
+    unlockPrototype();
+    if (roomFromUrl) {
+      // Switch mode to online, show lobby, auto-join
+      if (ui.mode) ui.mode.value = 'online';
+      showOnlineLobby();
+      // Small delay so socket can init
+      setTimeout(() => joinRoomByCode(roomFromUrl), 350);
+    }
+  };
+
   try {
     if (localStorage.getItem(PROTOTYPE_KEY) === 'ok') {
-      unlockPrototype();
+      launch();
       return;
     }
   } catch (_) {}
+
+  // If the URL has a room code, skip password and auto-unlock
+  if (roomFromUrl) {
+    try { localStorage.setItem(PROTOTYPE_KEY, 'ok'); } catch (_) {}
+    launch();
+    return;
+  }
 
   const tryUnlock = () => {
     const value = String(ui.password?.value || '');

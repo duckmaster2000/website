@@ -45,16 +45,23 @@
       </div>
 
       <section class="panel lobby-panel" id="ptLobbyPanel" hidden>
-        <h2>Online Lobby</h2>
+        <h3>Online 1v1</h3>
+        <p class="note lobby-desc">Play against a friend in real-time. Create a room and send them the link, or paste a room code to join.</p>
         <div class="lobby-row">
-          <button id="ptCreateRoom" type="button">Create Room</button>
+          <button id="ptCreateRoom" type="button" class="btn-primary">Create Room</button>
           <span class="lobby-or">or</span>
-          <input id="ptJoinCode" placeholder="Room code" maxlength="6" autocomplete="off" />
+          <input id="ptJoinCode" placeholder="ROOM CODE" maxlength="6" autocomplete="off" />
           <button id="ptJoinRoom" type="button">Join</button>
         </div>
-        <p id="ptRoomCode" class="note room-code" hidden></p>
-        <button id="ptCopyCode" type="button" hidden>Copy Code</button>
-        <p id="ptLobbyStatus" class="note">Ready.</p>
+        <div id="ptShareBox" class="share-box" hidden>
+          <p class="share-label">Send this link to your opponent:</p>
+          <div class="share-link-row">
+            <input id="ptShareLink" class="share-link" readonly />
+            <button id="ptCopyLink" type="button">Copy Link</button>
+          </div>
+          <p class="share-code">Room code: <strong id="ptRoomCode"></strong></p>
+        </div>
+        <p id="ptLobbyStatus" class="lobby-status">Ready. Create a room or join with a code.</p>
       </section>
 
       <section class="battle-wrap" aria-label="battlefield">

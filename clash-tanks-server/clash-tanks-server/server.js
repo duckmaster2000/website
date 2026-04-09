@@ -6,11 +6,32 @@ const { Server } = require('socket.io');
 
 const app = express();
 const httpServer = http.createServer(app);
+
+const ALLOWED_ORIGINS = [
+  'https://caleb-liu.com',
+  'https://www.caleb-liu.com',
+  'http://localhost:5500',
+  'http://127.0.0.1:5500',
+  'http://localhost:5501',
+  'http://127.0.0.1:5501',
+  'null', // file:// protocol sends null origin
+];
+
 const io = new Server(httpServer, {
-  cors: { origin: '*', methods: ['GET', 'POST'] }
+  cors: {
+    origin: (origin, cb) => {
+      if (!origin || ALLOWED_ORIGINS.includes(origin)) cb(null, true);
+      else cb(null, true); // allow all for now during development
+    },
+    methods: ['GET', 'POST'],
+  },
 });
 
 const PORT = process.env.PORT || 3001;
+
+// Health check endpoint for Render / uptime monitors
+app.get('/', (_req, res) => res.send('Clash Tanks server OK'));
+app.get('/health', (_req, res) => res.json({ status: 'ok', rooms: rooms.size }));
 
 // ─── Game constants (must stay in sync with prototype.js) ──────────────────
 
