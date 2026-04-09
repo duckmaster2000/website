@@ -147,6 +147,7 @@ const state = {
   nextId: 1,
   players: { A: null, B: null },
   chestOpening: false,
+  chestSession: null,
   progress: {
     gold: 800,
     deck: [...STARTER_DECK],
@@ -755,21 +756,6 @@ function bindBoardInput() {
 
 function chestReady(c) { return Date.now() >= c.readyAt; }
 
-function wait(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function rollChestTier() {
-  let tier = 1;
-  const rolls = [];
-  for (let i = 1; i <= 4; i += 1) {
-    const success = tier < 5 && Math.random() < 0.4;
-    if (success) tier += 1;
-    rolls.push({ chance: i, success, tier });
-  }
-  return { tier, rolls };
-}
-
 function tierRewardMultiplier(tier) {
   const map = { 1: 1, 2: 1.35, 3: 1.8, 4: 2.4, 5: 3.2 };
   return map[tier] || 1;
@@ -853,7 +839,100 @@ function grantTierRewards(tier) {
   };
 }
 
-async function openReadyChest() {
+function startChestOpeningSession(chest) {
+  state.chestOpening = true;
+  state.chestSession = {
+    chestId: chest.id,
+    tier: 1,
+    rollIndex: 0,
+    rewards: null
+  };
+
+  if (ui.chestOverlay) ui.chestOverlay.hidden = false;
+  if (ui.chestTier) ui.chestTier.textContent = '1';
+  if (ui.chestPhase) ui.chestPhase.textContent = 'CHEST UNLOCKED';
+  if (ui.chestRolls) ui.chestRolls.textContent = 'Click to roll chance 1 of 4 (40%).';
+  if (ui.chestReward) ui.chestReward.textContent = '';
+  if (ui.chestVisual) {
+    ui.chestVisual.classList.remove('tier-up');
+    ui.chestVisual.classList.add('open');
+  }
+  if (ui.chestClaim) {
+    ui.chestClaim.disabled = false;
+    ui.chestClaim.textContent = 'Roll Chance 1/4';
+  }
+}
+
+function finalizeChestOpeningSession() {
+  if (!state.chestSession) return;
+
+  const rewards = grantTierRewards(state.chestSession.tier);
+  state.chestSession.rewards = rewards;
+  state.progress.chests = state.progress.chests.filter((c) => c.id !== state.chestSession.chestId);
+
+  if (ui.chestPhase) ui.chestPhase.textContent = `FINAL TIER ${state.chestSession.tier}`;
+  if (ui.chestRolls) ui.chestRolls.textContent = 'All 4 chances used.';
+  playTierBurst(state.chestSession.tier);
+  if (ui.chestReward) {
+    const unlockText = rewards.unlockedName ? `Unlocked: ${rewards.unlockedName}` : 'No new card unlocked';
+    ui.chestReward.innerHTML = `
+      <strong>Rewards</strong><br>
+      Gold: +${rewards.gold}<br>
+      Copy drops: ${rewards.copyDrops}<br>
+      ${unlockText}
+    `;
+  }
+  if (ui.chestClaim) {
+    ui.chestClaim.disabled = false;
+    ui.chestClaim.textContent = 'Claim Rewards';
+  }
+
+  writeLog(`Opened tier ${state.chestSession.tier} chest: +${rewards.gold} gold${rewards.unlockedName ? `, unlocked ${rewards.unlockedName}` : ''}.`);
+  saveProgress();
+  renderProgress();
+  renderCollection();
+}
+
+function advanceChestRoll() {
+  if (!state.chestSession || !ui.chestClaim) return;
+  if (state.chestSession.rollIndex >= 4) {
+    closeChestOverlay();
+    return;
+  }
+
+  state.chestSession.rollIndex += 1;
+  const success = state.chestSession.tier < 5 && Math.random() < 0.4;
+  if (success) {
+    state.chestSession.tier += 1;
+    if (ui.chestTier) ui.chestTier.textContent = String(state.chestSession.tier);
+    if (ui.chestVisual) {
+      ui.chestVisual.classList.remove('tier-up');
+      void ui.chestVisual.offsetWidth;
+      ui.chestVisual.classList.add('tier-up');
+    }
+    playTierBurst(state.chestSession.tier);
+    if (ui.chestRolls) ui.chestRolls.textContent = `Chance ${state.chestSession.rollIndex}/4: Tier upgraded!`;
+  } else if (ui.chestRolls) {
+    ui.chestRolls.textContent = `Chance ${state.chestSession.rollIndex}/4: No upgrade.`;
+  }
+
+  if (state.chestSession.rollIndex < 4) {
+    ui.chestClaim.textContent = `Roll Chance ${state.chestSession.rollIndex + 1}/4`;
+    return;
+  }
+
+  finalizeChestOpeningSession();
+}
+
+function closeChestOverlay() {
+  if (ui.chestOverlay) ui.chestOverlay.hidden = true;
+  if (ui.chestVisual) ui.chestVisual.classList.remove('open', 'tier-up');
+  if (ui.chestParticles) ui.chestParticles.innerHTML = '';
+  state.chestOpening = false;
+  state.chestSession = null;
+}
+
+function openReadyChest() {
   if (state.chestOpening) return;
   const chest = state.progress.chests.find((c) => chestReady(c));
   if (!chest) { writeLog('No chest ready yet.'); return; }
@@ -868,49 +947,7 @@ async function openReadyChest() {
     return;
   }
 
-  state.chestOpening = true;
-  ui.chestOverlay.hidden = false;
-  ui.chestTier.textContent = '1';
-  ui.chestPhase.textContent = 'CHEST UNLOCKED';
-  ui.chestRolls.textContent = 'Rolling tier upgrades...';
-  ui.chestReward.textContent = '';
-  ui.chestClaim.disabled = true;
-  ui.chestVisual.classList.remove('open');
-
-  await wait(220);
-  ui.chestVisual.classList.add('open');
-
-  const result = rollChestTier();
-  for (const roll of result.rolls) {
-    ui.chestPhase.textContent = `CHANCE ${roll.chance} OF 4`;
-    await wait(620);
-    if (roll.success) {
-      ui.chestTier.textContent = String(roll.tier);
-      ui.chestRolls.textContent = `Success! Tier increased to ${roll.tier}.`;
-      ui.chestVisual.classList.remove('tier-up');
-      void ui.chestVisual.offsetWidth;
-      ui.chestVisual.classList.add('tier-up');
-    } else {
-      ui.chestRolls.textContent = `No upgrade this chance. Tier stays ${roll.tier}.`;
-    }
-  }
-
-  const rewards = grantTierRewards(result.tier);
-  state.progress.chests = state.progress.chests.filter((c) => c.id !== chest.id);
-
-  ui.chestPhase.textContent = `FINAL TIER ${result.tier}`;
-  ui.chestRolls.textContent = `4 rolls complete at 40% each.`;
-  playTierBurst(result.tier);
-  ui.chestReward.textContent = rewards.unlockedName
-    ? `+${rewards.gold} gold, ${rewards.copyDrops} copy drops, unlocked ${rewards.unlockedName}.`
-    : `+${rewards.gold} gold, ${rewards.copyDrops} copy drops.`;
-  ui.chestClaim.disabled = false;
-
-  writeLog(`Opened tier ${result.tier} chest: +${rewards.gold} gold${rewards.unlockedName ? `, unlocked ${rewards.unlockedName}` : ''}.`);
-
-  saveProgress();
-  renderProgress();
-  renderCollection();
+  startChestOpeningSession(chest);
 }
 
 function buildingCost(kind) {
@@ -1174,10 +1211,12 @@ function bindProgressUi() {
   });
 
   ui.chestClaim?.addEventListener('click', () => {
-    if (ui.chestOverlay) ui.chestOverlay.hidden = true;
-    if (ui.chestVisual) ui.chestVisual.classList.remove('open', 'tier-up');
-    if (ui.chestParticles) ui.chestParticles.innerHTML = '';
-    state.chestOpening = false;
+    if (!state.chestOpening) return;
+    if (state.chestSession && state.chestSession.rollIndex < 4) {
+      advanceChestRoll();
+    } else {
+      closeChestOverlay();
+    }
   });
 }
 

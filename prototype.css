@@ -950,6 +950,14 @@ select {
 .chest-reward {
   min-height: 1.2rem;
   color: #ffd98c;
+  line-height: 1.35;
+}
+
+.chest-reward strong {
+  color: #ffe7aa;
+  letter-spacing: 0.06em;
+  font-family: "Orbitron", sans-serif;
+  font-size: 0.7rem;
 }
 
 @keyframes chestFadeIn {
