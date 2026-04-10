@@ -1040,6 +1040,17 @@ body:has(.chest-overlay:not([hidden])) {
   overflow: hidden;
 }
 
+/* AI-only panels: hidden unless AI mode is selected */
+#ptAiTuningPanel,
+#ptAiDeckPanel {
+  display: none;
+}
+
+body.mode-ai #ptAiTuningPanel,
+body.mode-ai #ptAiDeckPanel {
+  display: block;
+}
+
 #ptChestClaim:hover:not(:disabled) {
   box-shadow: 0 0 22px rgba(95, 190, 255, 0.45);
   transform: translateY(-1px);

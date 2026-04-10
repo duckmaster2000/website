@@ -1478,6 +1478,12 @@ function bindCore() {
   bindLobby();
   bindProgressUi();
 
+  const syncModeClass = () => {
+    document.body.classList.toggle('mode-ai', (ui.mode?.value || 'pvp') === 'ai');
+  };
+  ui.mode?.addEventListener('change', syncModeClass);
+  syncModeClass();
+
   ui.start?.addEventListener('click', () => {
     if (ui.mode?.value === 'online') showOnlineLobby();
     else {
