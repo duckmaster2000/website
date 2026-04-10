@@ -1413,10 +1413,21 @@ function bindProgressUi() {
 
 function ensureSocket() {
   if (socket && socket.connected) return;
-  if (socket) { socket.connect(); return; }
+  // If we have a dead socket, destroy it so we build a fresh one
+  if (socket) {
+    socket.removeAllListeners();
+    socket.disconnect();
+    socket = null;
+  }
   if (typeof io === 'undefined') { writeLog('Socket.io not loaded.'); return; }
 
-  socket = io(SERVER_URL, { transports: ['websocket', 'polling'] });
+  socket = io(SERVER_URL, { transports: ['websocket', 'polling'], reconnection: false });
+
+  socket.on('connect', () => {
+    if (ui.lobbyStatus && ui.lobbyStatus.textContent.startsWith('Cannot reach')) {
+      ui.lobbyStatus.textContent = 'Connected. Ready to play!';
+    }
+  });
 
   socket.on('connect_error', () => {
     if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Cannot reach game server. Is the server running?';
@@ -1424,7 +1435,9 @@ function ensureSocket() {
     inQueue = false;
     if (ui.queueStatus) ui.queueStatus.hidden = true;
     if (ui.findMatch) ui.findMatch.disabled = false;
-    socket.disconnect(); // stop auto-reconnect spam
+    socket.removeAllListeners();
+    socket.disconnect();
+    socket = null;
   });
 
   socket.on('room_created', ({ code, side }) => {
@@ -1610,10 +1623,24 @@ function joinQueue() {
   ensureSocket();
   if (!socket) return;
   inQueue = true;
-  socket.emit('join_queue');
   if (ui.queueStatus) ui.queueStatus.hidden = false;
   if (ui.findMatch) ui.findMatch.disabled = true;
-  if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Finding opponent...';
+  if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Connecting...';
+  const doJoin = () => {
+    if (!inQueue) return; // cancelled while connecting
+    socket.emit('join_queue');
+    if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Searching for opponent...';
+  };
+  if (socket.connected) {
+    doJoin();
+  } else {
+    socket.once('connect', doJoin);
+    socket.once('connect_error', () => {
+      inQueue = false;
+      if (ui.queueStatus) ui.queueStatus.hidden = true;
+      if (ui.findMatch) ui.findMatch.disabled = false;
+    });
+  }
 }
 
 function leaveQueue() {
