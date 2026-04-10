@@ -1628,7 +1628,8 @@ function joinQueue() {
   if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Connecting...';
   const doJoin = () => {
     if (!inQueue) return; // cancelled while connecting
-    socket.emit('join_queue');
+    const skillRating = state.progress.gold > 0 ? Math.round(1000 + state.progress.gold * 0.05) : 1000;
+    socket.emit('join_queue', { skillRating, latency: 99 });
     if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Searching for opponent...';
   };
   if (socket.connected) {

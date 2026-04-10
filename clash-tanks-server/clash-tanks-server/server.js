@@ -58,7 +58,106 @@ const TICK_MS = 1000 / 20; // 20 ticks per second
 
 const rooms = new Map();     // code → room
 const socketRoom = new Map(); // socketId → code
-const matchQueue = [];        // socketId[] waiting for auto-match
+
+// ─── Ticket-based Matchmaking ──────────────────────────────────────────────
+
+class PlayerTicket {
+  constructor(socketId, skillRating, latency) {
+    this.socketId    = socketId;
+    this.skillRating = skillRating;   // Elo (default 1000 until real tracking is added)
+    this.latency     = latency;       // ms round-trip reported by client
+    this.queuedAt    = Date.now();
+  }
+
+  waitSeconds() {
+    return (Date.now() - this.queuedAt) / 1000;
+  }
+
+  // Starts at ±100 Elo, widens by 50 every 10 s of waiting
+  allowedSkillGap() {
+    const expansions = Math.floor(this.waitSeconds() / 10);
+    return 100 + expansions * 50;
+  }
+}
+
+const matchQueue = new Map(); // socketId → PlayerTicket
+
+function addToMatchQueue(socketId, skillRating, latency) {
+  if (matchQueue.has(socketId)) return;
+  matchQueue.set(socketId, new PlayerTicket(socketId, skillRating, latency));
+  console.log(`[Queue] ${socketId} added (Elo ${skillRating}). Queue size: ${matchQueue.size}`);
+}
+
+function removeFromMatchQueue(socketId) {
+  matchQueue.delete(socketId);
+}
+
+function runMatchmaker() {
+  if (matchQueue.size < 2) return;
+
+  const tickets = [...matchQueue.values()]
+    .filter(t => io.sockets.sockets.get(t.socketId)?.connected)
+    .sort((a, b) => a.skillRating - b.skillRating);
+
+  // Prune disconnected tickets
+  matchQueue.forEach((_, id) => {
+    if (!io.sockets.sockets.get(id)?.connected) matchQueue.delete(id);
+  });
+
+  const used = new Set();
+
+  for (let i = 0; i < tickets.length - 1; i++) {
+    if (used.has(tickets[i].socketId)) continue;
+    const a = tickets[i];
+
+    for (let j = i + 1; j < tickets.length; j++) {
+      if (used.has(tickets[j].socketId)) continue;
+      const b = tickets[j];
+
+      const allowedGap = Math.max(a.allowedSkillGap(), b.allowedSkillGap());
+      const skillDiff  = Math.abs(a.skillRating - b.skillRating);
+
+      if (skillDiff <= allowedGap) {
+        used.add(a.socketId);
+        used.add(b.socketId);
+        matchQueue.delete(a.socketId);
+        matchQueue.delete(b.socketId);
+        startQueueMatch(a, b);
+        break;
+      }
+    }
+  }
+}
+
+function startQueueMatch(ticketA, ticketB) {
+  const sockA = io.sockets.sockets.get(ticketA.socketId);
+  const sockB = io.sockets.sockets.get(ticketB.socketId);
+  if (!sockA || !sockB) return;
+
+  const code = generateCode();
+  const room = {
+    code,
+    players: [ticketA.socketId, ticketB.socketId],
+    sockets: { A: ticketA.socketId, B: ticketB.socketId },
+    state: null,
+    interval: null,
+    rematchVotes: 0,
+  };
+  rooms.set(code, room);
+  socketRoom.set(ticketA.socketId, code);
+  socketRoom.set(ticketB.socketId, code);
+  sockA.join(code);
+  sockB.join(code);
+  const gap = Math.abs(ticketA.skillRating - ticketB.skillRating);
+  console.log(`[Match] Room ${code}: ${ticketA.socketId} (${ticketA.skillRating}) vs ${ticketB.socketId} (${ticketB.skillRating}) | gap: ${gap} Elo`);
+  sockA.emit('room_joined', { code, side: 'A' });
+  sockB.emit('room_joined', { code, side: 'B' });
+  io.to(code).emit('match_start', { code });
+  startRoom(room);
+}
+
+// Run matchmaker every 2 seconds
+setInterval(runMatchmaker, 2000);
 
 function generateCode() {
   let code;
@@ -394,63 +493,25 @@ io.on('connection', socket => {
     }
   });
 
-  socket.on('join_queue', () => {
-    // Remove from any existing room first
+  socket.on('join_queue', ({ skillRating = 1000, latency = 99 } = {}) => {
     leaveCurrentRoom(socket);
-    // Already in queue?
-    if (matchQueue.includes(socket.id)) {
+    if (matchQueue.has(socket.id)) {
       socket.emit('queue_waiting', {});
       return;
     }
-    // Find a waiting opponent, skipping stale disconnected IDs
-    let opponentId = null;
-    while (matchQueue.length > 0) {
-      const candidate = matchQueue.shift();
-      const candidateSocket = io.sockets.sockets.get(candidate);
-      if (candidateSocket && candidateSocket.connected) {
-        opponentId = candidate;
-        break;
-      }
-    }
-    if (opponentId) {
-      const opponentSocket = io.sockets.sockets.get(opponentId);
-      const code = generateCode();
-      const room = {
-        code,
-        players: [opponentId, socket.id],
-        sockets: { A: opponentId, B: socket.id },
-        state: null,
-        interval: null,
-        rematchVotes: 0,
-      };
-      rooms.set(code, room);
-      socketRoom.set(opponentId, code);
-      socketRoom.set(socket.id, code);
-      opponentSocket.join(code);
-      socket.join(code);
-      opponentSocket.emit('room_joined', { code, side: 'A' });
-      socket.emit('room_joined', { code, side: 'B' });
-      io.to(code).emit('match_start', { code });
-      startRoom(room);
-      console.log(`Queue match: room ${code} (${opponentId} vs ${socket.id})`);
-    } else {
-      matchQueue.push(socket.id);
-      socket.emit('queue_waiting', {});
-      console.log(`${socket.id} joined queue (${matchQueue.length} waiting)`);
-    }
+    addToMatchQueue(socket.id, Number(skillRating) || 1000, Number(latency) || 99);
+    socket.emit('queue_waiting', {});
   });
 
   socket.on('leave_queue', () => {
-    const idx = matchQueue.indexOf(socket.id);
-    if (idx !== -1) matchQueue.splice(idx, 1);
+    removeFromMatchQueue(socket.id);
     socket.emit('queue_left', {});
   });
 
   socket.on('disconnect', () => {
     console.log(`disconnect ${socket.id}`);
     // Remove from matchmaking queue
-    const queueIdx = matchQueue.indexOf(socket.id);
-    if (queueIdx !== -1) matchQueue.splice(queueIdx, 1);
+    removeFromMatchQueue(socket.id);
     const code = socketRoom.get(socket.id);
     if (code) {
       const room = rooms.get(code);
