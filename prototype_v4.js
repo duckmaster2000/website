@@ -51,7 +51,12 @@ const ARCHETYPES = [
   { slug: 'mortarfox', name: 'Mortar Fox', icon: '🧨', rarity: 'epic', cost: 6, hp: 96, dmg: 34, range: 20, speed: 7, cd: 1.32, structureMult: 1.55, deployCd: 1.65, style: 'splash', proj: 'mortar', role: 'artillery', winCondition: true,
     ability: { name: 'Barrage Mode', minLevel: 7, minMastery: 15, dmgBoost: 1.14, hpBoost: 1.07 } },
   { slug: 'ramhog', name: 'Ram Hog', icon: '🐗', rarity: 'rare', cost: 5, hp: 128, dmg: 24, range: 8, speed: 15, cd: 0.9, structureMult: 1.2, deployCd: 1.18, style: 'burst', proj: 'ram', role: 'charge', winCondition: true,
-    ability: { name: 'Rampage', minLevel: 7, minMastery: 15, dmgBoost: 1.16, hpBoost: 1.08 } }
+    ability: { name: 'Rampage', minLevel: 7, minMastery: 15, dmgBoost: 1.16, hpBoost: 1.08 } },
+  // ── Swarm archetypes ──────────────────────────────────────────────────────
+  { slug: 'junkpack', name: 'Junk Pack', icon: '🔧', rarity: 'common', cost: 3, hp: 120, dmg: 27, range: 7, speed: 18, cd: 0.6, structureMult: 0.8, deployCd: 1.1, style: 'single', proj: 'slug', role: 'swarm', swarmCount: 3,
+    ability: { name: 'Mob Rush', minLevel: 5, minMastery: 10, dmgBoost: 1.1, hpBoost: 1.08 } },
+  { slug: 'bugsquad', name: 'Bug Squad', icon: '🐛', rarity: 'rare', cost: 4, hp: 160, dmg: 36, range: 9, speed: 22, cd: 0.55, structureMult: 0.9, deployCd: 1.2, style: 'double', proj: 'spark', role: 'swarm', swarmCount: 4,
+    ability: { name: 'Hive Mind', minLevel: 6, minMastery: 12, dmgBoost: 1.12, hpBoost: 1.1 } }
 ];
 
 const VARIANTS = [
@@ -90,6 +95,7 @@ function buildCards() {
         role: a.role,
         splash: (v.style === 'splash' || a.style === 'splash') ? 5 : 0,
         winCondition: a.winCondition || false,
+        swarmCount: a.swarmCount || 1,
         ability: a.ability
       });
     });
@@ -463,29 +469,39 @@ function deployUnit(owner, cardId, lane) {
   p.energy -= card.cost;
   p.cooldowns[cardId] = state.time + card.deployCdScaled;
 
-  state.units.push({
-    id: `u-${state.nextId++}`,
-    owner,
-    lane,
-    cardId,
-    icon: card.icon,
-    rarity: card.rarity,
-    name: card.name,
-    hp: card.hpScaled,
-    hpMax: card.hpScaled,
-    dmg: card.dmgScaled,
-    range: card.range,
-    speed: card.speed,
-    cd: card.cd,
-    atkCd: 0,
-    x: owner === 'A' ? BOARD.spawnA : BOARD.spawnB,
-    style: card.style,
-    proj: card.proj,
-    splash: card.splash,
-    structureMult: card.structureMult,
-    winCondition: card.winCondition || false,
-    rewardPool: 0
-  });
+  const count = card.swarmCount || 1;
+  // Each swarm unit is proportionally weaker so total value equals one normal unit
+  const hpPer  = Math.max(10, Math.round(card.hpScaled  / count));
+  const dmgPer = Math.max(1,  +(card.dmgScaled / count).toFixed(2));
+  const spawnX = owner === 'A' ? BOARD.spawnA : BOARD.spawnB;
+
+  for (let i = 0; i < count; i++) {
+    // Spread swarm units slightly so they don't stack on top of each other
+    const xOffset = count > 1 ? (i - (count - 1) / 2) * 1.2 : 0;
+    state.units.push({
+      id: `u-${state.nextId++}`,
+      owner,
+      lane,
+      cardId,
+      icon: card.icon,
+      rarity: card.rarity,
+      name: count > 1 ? `${card.name} #${i + 1}` : card.name,
+      hp: hpPer,
+      hpMax: hpPer,
+      dmg: dmgPer,
+      range: card.range,
+      speed: card.speed,
+      cd: card.cd,
+      atkCd: i * 0.08, // slight stagger so they don't all fire simultaneously
+      x: spawnX + xOffset,
+      style: card.style,
+      proj: card.proj,
+      splash: card.splash,
+      structureMult: card.structureMult,
+      winCondition: card.winCondition || false,
+      rewardPool: 0
+    });
+  }
 
   const cp = cardProgress(cardId);
   cp.mastery = (cp.mastery || 0) + 0.25;
@@ -766,7 +782,7 @@ function cardButton(owner, id) {
   const cdPct = onCd ? Math.round((1 - rem / card.deployCdScaled) * 100) : 100;
   const selected = state.selectedCard && state.selectedCard.owner === owner && state.selectedCard.type === id;
   const cp = cardProgress(id);
-  return `<button class="card rarity-${card.rarity}${card.winCondition ? ' wc' : ''}" data-owner="${owner}" data-type="${id}" draggable="true" data-disabled="${disabled ? '1' : '0'}" data-selected="${selected ? '1' : '0'}"><span class="card-rarity">${RARITY_STYLE[card.rarity].label}${card.winCondition ? ' 👑' : ''}</span><span class="card-icon">${card.icon}</span><span class="card-cost ${costClass(card.cost)}">${card.cost}</span><span class="card-name">${card.name}</span><span class="card-meta">Lv ${cp.level} • ${card.style}</span><span class="card-cd-bar"><i style="width:${cdPct}%"></i></span></button>`;
+  return `<button class="card rarity-${card.rarity}${card.winCondition ? ' wc' : ''}${card.swarmCount > 1 ? ' swarm' : ''}" data-owner="${owner}" data-type="${id}" draggable="true" data-disabled="${disabled ? '1' : '0'}" data-selected="${selected ? '1' : '0'}"><span class="card-rarity">${RARITY_STYLE[card.rarity].label}${card.winCondition ? ' 👑' : ''}${card.swarmCount > 1 ? ` ×${card.swarmCount}` : ''}</span><span class="card-icon">${card.icon}</span><span class="card-cost ${costClass(card.cost)}">${card.cost}</span><span class="card-name">${card.name}</span><span class="card-meta">Lv ${cp.level} • ${card.role}</span><span class="card-cd-bar"><i style="width:${cdPct}%"></i></span></button>`;
 }
 
 function deckAvgCost(ids) {
@@ -1336,7 +1352,7 @@ function renderCollection() {
         nextLine = `Next Lv: HP ${nextStats.hpScaled} • DMG ${Math.round(nextStats.dmgScaled)} • CD ${nextStats.deployCdScaled.toFixed(2)}s`;
       }
     }
-    return `<article class="collection-card ${unlocked ? '' : 'locked'} ${inDeck ? 'in-deck' : ''} ${c.winCondition ? 'win-condition' : ''}" data-card="${c.id}"><header><strong>${c.icon} ${c.name}</strong><span class="rarity-${c.rarity}">${RARITY_STYLE[c.rarity].label}</span>${c.winCondition ? '<span class="wc-badge">👑 Win Condition</span>' : ''}</header><p>${unlocked ? `Copies ${cp.copies} • Mastery ${Math.floor(cp.mastery)}` : 'Locked'}</p><p>${statLine}</p><p>${unlocked ? `Cost ${c.cost} • ${c.style} target • ${c.role}` : 'Unknown stats'}</p><p>${nextLine}</p><div class="collection-actions">${unlocked ? `<button data-select="${c.id}">${inDeck ? 'In Deck' : 'Select'}</button>` : '<button disabled>Locked</button>'}${unlocked ? `<button data-up="${c.id}" ${canUp ? '' : 'disabled'}>Level Up (${need} copies, ${upCost}g)</button>` : ''}${unlocked ? `<button data-ability="${c.id}" ${canAbility ? '' : 'disabled'}>${cp.abilityUnlocked ? `✓ ${c.ability.name}` : `${c.ability.name} (Lv${c.ability.minLevel}, ${c.ability.minMastery}M, 400g)`}</button>` : ''}</div></article>`;
+    return `<article class="collection-card ${unlocked ? '' : 'locked'} ${inDeck ? 'in-deck' : ''} ${c.winCondition ? 'win-condition' : ''} ${c.swarmCount > 1 ? 'swarm-card' : ''}" data-card="${c.id}"><header><strong>${c.icon} ${c.name}</strong><span class="rarity-${c.rarity}">${RARITY_STYLE[c.rarity].label}</span>${c.winCondition ? '<span class="wc-badge">👑 Win Condition</span>' : ''}${c.swarmCount > 1 ? `<span class="swarm-badge">🐝 ×${c.swarmCount} Swarm</span>` : ''}</header><p>${unlocked ? `Copies ${cp.copies} • Mastery ${Math.floor(cp.mastery)}` : 'Locked'}</p><p>${statLine}</p><p>${unlocked ? `Cost ${c.cost} • ${c.style} target • ${c.role}${c.swarmCount > 1 ? ` • ${c.swarmCount} units (${Math.round(c.hp / c.swarmCount)} HP / ${Math.round(c.dmg / c.swarmCount)} DMG each)` : ''}` : 'Unknown stats'}</p><p>${nextLine}</p><div class="collection-actions">${unlocked ? `<button data-select="${c.id}">${inDeck ? 'In Deck' : 'Select'}</button>` : '<button disabled>Locked</button>'}${unlocked ? `<button data-up="${c.id}" ${canUp ? '' : 'disabled'}>Level Up (${need} copies, ${upCost}g)</button>` : ''}${unlocked ? `<button data-ability="${c.id}" ${canAbility ? '' : 'disabled'}>${cp.abilityUnlocked ? `✓ ${c.ability.name}` : `${c.ability.name} (Lv${c.ability.minLevel}, ${c.ability.minMastery}M, 400g)`}</button>` : ''}</div></article>`;
   }).join('');
 
   ui.cardCollection.querySelectorAll('[data-select]').forEach((b) => {

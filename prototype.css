@@ -1233,6 +1233,30 @@ body:has(.chest-overlay:not([hidden])) {
   color: #ffe066;
 }
 
+.swarm-badge {
+  display: inline-block;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #7dffb3;
+  background: rgba(80, 255, 150, 0.12);
+  border: 1px solid rgba(80, 255, 150, 0.3);
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-left: 6px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.collection-card.swarm-card {
+  border-color: rgba(80, 255, 150, 0.25);
+  box-shadow: 0 0 0 1px rgba(80, 255, 150, 0.1);
+}
+
+.card.swarm .card-rarity {
+  color: #7dffb3;
+}
+
 /* ─── Next-card preview ──────────────────────────────────────────────────── */
 .next-card-preview {
   display: flex;
