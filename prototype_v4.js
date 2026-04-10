@@ -10,6 +10,8 @@ const SERVER_URL =
 let socket = null;
 let mySide = null;
 let onlineActive = false;
+let inQueue = false;
+let lastMatchWasOnline = false;
 
 const BOARD = {
   laneCount: 3,
@@ -180,7 +182,9 @@ const ui = {
   aiDifficulty: null, aiDifficultyInfo: null,
   chestOverlay: null, chestPhase: null, chestTier: null, chestVisual: null, chestRolls: null, chestReward: null, chestClaim: null,
   chestParticles: null,
-  chestStars: null
+  chestStars: null,
+  winOverlay: null, winHeadline: null, winSubline: null, winCardSlot: null, winCardReveal: null, winCardLabel: null, winClaim: null, winRematch: null,
+  findMatch: null, cancelQueue: null, queueStatus: null
 };
 
 function $(id) { return document.getElementById(id); }
@@ -308,6 +312,8 @@ function createPlayer(id, mode) {
 
 function setupMatch() {
   state.mode = ui.mode?.value || 'pvp';
+  leaveQueue();
+  lastMatchWasOnline = false;
   state.running = true;
   state.time = 0;
   state.lastTick = performance.now();
@@ -552,21 +558,98 @@ function awardChest() {
   state.progress.chests.push({ id: `ch-${Date.now()}-${Math.random()}`, type: t, readyAt: Date.now() + ms });
 }
 
+function awardWinCard() {
+  const locked = CARD_LIBRARY.filter((c) => !cardProgress(c.id).unlocked);
+  const unlocked = CARD_LIBRARY.filter((c) => cardProgress(c.id).unlocked);
+
+  // 25% chance to unlock a brand-new card
+  if (locked.length > 0 && Math.random() < 0.25) {
+    const pick = locked[Math.floor(Math.random() * locked.length)];
+    const cp = cardProgress(pick.id);
+    cp.unlocked = true;
+    cp.copies += 1;
+    return { card: pick, isUnlock: true, copies: 1 };
+  }
+
+  // Otherwise add copies to a random unlocked card
+  const pool = unlocked.length > 0 ? unlocked : locked;
+  if (pool.length === 0) return null;
+  const pick = pool[Math.floor(Math.random() * pool.length)];
+  const cp = cardProgress(pick.id);
+  if (!cp.unlocked) { cp.unlocked = true; }
+  const copies = Math.max(1, RARITY_STYLE[pick.rarity].copies || 1);
+  cp.copies += copies;
+  return { card: pick, isUnlock: false, copies };
+}
+
+function showWinOverlay(won, cardAward, goldBonus, isOnline) {
+  if (!ui.winOverlay) return;
+  if (ui.winHeadline) ui.winHeadline.textContent = won ? 'VICTORY!' : 'DEFEAT';
+  ui.winOverlay.classList.toggle('is-loss', !won);
+  if (ui.winSubline) ui.winSubline.textContent = goldBonus ? `+${goldBonus} gold` : '';
+
+  if (won && cardAward) {
+    const { card, isUnlock, copies } = cardAward;
+    const rarityColor = RARITY_STYLE[card.rarity]?.color || '#8effd2';
+    if (ui.winCardSlot) {
+      ui.winCardSlot.hidden = false;
+      ui.winCardSlot.style.setProperty('--rarity-color', rarityColor);
+    }
+    if (ui.winCardReveal) ui.winCardReveal.innerHTML = `<span class="win-card-icon">${card.icon}</span>`;
+    if (ui.winCardLabel) {
+      ui.winCardLabel.textContent = isUnlock
+        ? `✨ NEW: ${card.name} unlocked!`
+        : `+${copies} ${card.name} ${copies === 1 ? 'copy' : 'copies'}`;
+      ui.winCardLabel.style.color = rarityColor;
+    }
+  } else {
+    if (ui.winCardSlot) ui.winCardSlot.hidden = true;
+    if (ui.winCardLabel) ui.winCardLabel.textContent = '';
+  }
+
+  if (ui.winRematch) {
+    ui.winRematch.hidden = !isOnline;
+    ui.winRematch.disabled = false;
+    ui.winRematch.textContent = 'Rematch';
+  }
+  if (ui.winClaim) ui.winClaim.textContent = 'Continue';
+  ui.winOverlay.hidden = false;
+}
+
+function closeWinOverlay() {
+  if (ui.winOverlay) ui.winOverlay.hidden = true;
+  if (lastMatchWasOnline) {
+    if (ui.lobbyPanel) ui.lobbyPanel.hidden = false;
+    if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Ready. Create or join a room.';
+  }
+  saveProgress();
+  renderProgress();
+  renderCollection();
+}
+
 function onVictory(winner) {
   if (!state.running || state.winner) return;
   state.winner = winner;
   state.running = false;
+  let cardAward = null;
+  let goldBonus = 0;
   if (winner === 'A') {
-    state.progress.gold += 140;
+    goldBonus = 140;
+    state.progress.gold += goldBonus;
     awardChest();
     deckFor('A').forEach((id) => { cardProgress(id).mastery += 1; });
-    writeLog('You win. +140 gold and a chest earned.');
+    cardAward = awardWinCard();
+    const cardMsg = cardAward
+      ? (cardAward.isUnlock ? ` Unlocked ${cardAward.card.name}!` : ` +${cardAward.copies} ${cardAward.card.name}.`)
+      : '';
+    writeLog(`You win! +${goldBonus} gold, chest earned.${cardMsg}`);
   } else {
     writeLog('Opponent wins. Press Start Match to rematch.');
   }
   saveProgress();
   renderProgress();
   renderCollection();
+  showWinOverlay(winner === 'A', cardAward, goldBonus, false);
 }
 
 function updateAi(dt) {
@@ -1275,6 +1358,9 @@ function ensureSocket() {
   socket.on('connect_error', () => {
     if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Cannot reach game server.';
     writeLog('Server connection failed.');
+    inQueue = false;
+    if (ui.queueStatus) ui.queueStatus.hidden = true;
+    if (ui.findMatch) ui.findMatch.disabled = false;
   });
 
   socket.on('room_created', ({ code, side }) => {
@@ -1287,11 +1373,32 @@ function ensureSocket() {
 
   socket.on('room_joined', ({ code, side }) => {
     mySide = side;
-    if (ui.lobbyStatus) ui.lobbyStatus.textContent = `Joined room ${code}. Starting...`;
+    inQueue = false;
+    if (ui.queueStatus) ui.queueStatus.hidden = true;
+    if (ui.findMatch) ui.findMatch.disabled = false;
+    if (ui.lobbyStatus) ui.lobbyStatus.textContent = `Matched! Room ${code}. Starting...`;
   });
 
   socket.on('room_error', ({ msg }) => {
     if (ui.lobbyStatus) ui.lobbyStatus.textContent = `Error: ${msg}`;
+  });
+
+  socket.on('queue_waiting', () => {
+    inQueue = true;
+    if (ui.queueStatus) ui.queueStatus.hidden = false;
+    if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'In queue — waiting for opponent...';
+  });
+
+  socket.on('queue_left', () => {
+    inQueue = false;
+    if (ui.queueStatus) ui.queueStatus.hidden = true;
+    if (ui.findMatch) ui.findMatch.disabled = false;
+    if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Ready. Create or join a room.';
+  });
+
+  socket.on('rematch_waiting', () => {
+    if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Waiting for opponent to accept rematch...';
+    if (ui.winRematch) { ui.winRematch.disabled = true; ui.winRematch.textContent = 'Waiting...'; }
   });
 
   socket.on('match_start', showMatchOnline);
@@ -1301,7 +1408,8 @@ function ensureSocket() {
   socket.on('opponent_left', () => {
     state.running = false;
     onlineActive = false;
-    writeLog('Opponent disconnected. Press Start Match.');
+    writeLog('Opponent disconnected.');
+    if (ui.lobbyPanel) ui.lobbyPanel.hidden = false;
   });
 }
 
@@ -1333,6 +1441,18 @@ function bindLobby() {
       setTimeout(() => { ui.copyLink.textContent = 'Copy Link'; }, 1400);
     }).catch(() => {});
   });
+
+  ui.findMatch?.addEventListener('click', joinQueue);
+  ui.cancelQueue?.addEventListener('click', leaveQueue);
+  ui.winClaim?.addEventListener('click', closeWinOverlay);
+  ui.winRematch?.addEventListener('click', () => {
+    if (!socket || !socket.connected) return;
+    socket.emit('rematch');
+    if (ui.winRematch) { ui.winRematch.disabled = true; ui.winRematch.textContent = 'Waiting...'; }
+    closeWinOverlay();
+    if (ui.lobbyPanel) ui.lobbyPanel.hidden = false;
+    if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Waiting for opponent to accept rematch...';
+  });
 }
 
 function showOnlineLobby() {
@@ -1344,7 +1464,10 @@ function showOnlineLobby() {
 
 function showMatchOnline() {
   onlineActive = true;
+  lastMatchWasOnline = true;
+  inQueue = false;
   if (ui.lobbyPanel) ui.lobbyPanel.hidden = true;
+  if (ui.queueStatus) ui.queueStatus.hidden = true;
   if (ui.joinCode) ui.joinCode.value = '';
 
   state.players.A = { name: mySide === 'A' ? 'You' : 'Opponent', baseHp: 1300, baseHpMax: 1300, energy: 0, energyMax: 10, cooldowns: { scout: 0, brawler: 0, siege: 0, guardian: 0 } };
@@ -1398,7 +1521,43 @@ function handleOnlineVictory(winner) {
   onlineActive = false;
   state.running = false;
   state.winner = winner;
-  writeLog(winner === mySide ? 'You win online.' : 'Opponent wins online.');
+  const won = winner === mySide;
+  let cardAward = null;
+  let goldBonus = 0;
+  if (won) {
+    goldBonus = 200;
+    state.progress.gold += goldBonus;
+    awardChest();
+    cardAward = awardWinCard();
+    const cardMsg = cardAward
+      ? (cardAward.isUnlock ? ` Unlocked ${cardAward.card.name}!` : ` +${cardAward.copies} ${cardAward.card.name}.`)
+      : '';
+    writeLog(`Online win! +${goldBonus} gold, chest earned.${cardMsg}`);
+    saveProgress();
+    renderProgress();
+    renderCollection();
+  } else {
+    writeLog('Opponent wins online.');
+  }
+  showWinOverlay(won, cardAward, goldBonus, true);
+}
+
+function joinQueue() {
+  ensureSocket();
+  if (!socket) return;
+  inQueue = true;
+  socket.emit('join_queue');
+  if (ui.queueStatus) ui.queueStatus.hidden = false;
+  if (ui.findMatch) ui.findMatch.disabled = true;
+  if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Finding opponent...';
+}
+
+function leaveQueue() {
+  inQueue = false;
+  if (socket && socket.connected) socket.emit('leave_queue');
+  if (ui.queueStatus) ui.queueStatus.hidden = true;
+  if (ui.findMatch) ui.findMatch.disabled = false;
+  if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Ready. Create or join a room.';
 }
 
 function cacheUi() {
@@ -1471,6 +1630,17 @@ function cacheUi() {
   ui.chestClaim = $('ptChestClaim');
   ui.chestParticles = $('ptChestParticles');
   ui.chestStars = $('ptChestStars');
+  ui.winOverlay = $('ptWinOverlay');
+  ui.winHeadline = $('ptWinHeadline');
+  ui.winSubline = $('ptWinSubline');
+  ui.winCardSlot = $('ptWinCardSlot');
+  ui.winCardReveal = $('ptWinCardReveal');
+  ui.winCardLabel = $('ptWinCardLabel');
+  ui.winClaim = $('ptWinClaim');
+  ui.winRematch = $('ptWinRematch');
+  ui.findMatch = $('ptFindMatch');
+  ui.cancelQueue = $('ptCancelQueue');
+  ui.queueStatus = $('ptQueueStatus');
 }
 
 function bindCore() {

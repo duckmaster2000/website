@@ -61,6 +61,15 @@
           </div>
           <p class="share-code">Room code: <strong id="ptRoomCode"></strong></p>
         </div>
+        <div class="lobby-find">
+          <span class="lobby-find-or">— or find a match automatically —</span>
+          <button id="ptFindMatch" type="button" class="btn-primary">⚡ Find Match</button>
+          <div id="ptQueueStatus" class="queue-status" hidden>
+            <span class="queue-dot"></span>
+            <span>Searching for opponent...</span>
+            <button id="ptCancelQueue" type="button">Cancel</button>
+          </div>
+        </div>
         <p id="ptLobbyStatus" class="lobby-status">Ready. Create a room or join with a code.</p>
       </section>
 
@@ -183,6 +192,21 @@
       <p class="note" id="ptMatchLog">Choose a mode and press Start Match.</p>
     </section>
   </main>
+
+  <div class="win-overlay" id="ptWinOverlay" hidden>
+    <div class="win-modal" role="dialog" aria-modal="true">
+      <p class="win-headline" id="ptWinHeadline">VICTORY!</p>
+      <p class="win-subline" id="ptWinSubline"></p>
+      <div class="win-card-slot" id="ptWinCardSlot" hidden>
+        <div class="win-card-reveal" id="ptWinCardReveal"></div>
+      </div>
+      <p class="win-card-label" id="ptWinCardLabel"></p>
+      <div class="win-actions">
+        <button id="ptWinRematch" type="button" hidden>Rematch</button>
+        <button id="ptWinClaim" type="button">Continue</button>
+      </div>
+    </div>
+  </div>
 
   <div class="chest-overlay" id="ptChestOverlay" hidden>
     <div class="chest-modal" role="dialog" aria-modal="true" aria-label="Chest opening">

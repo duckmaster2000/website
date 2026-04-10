@@ -14,6 +14,8 @@ const ALLOWED_ORIGINS = [
   'http://127.0.0.1:5500',
   'http://localhost:5501',
   'http://127.0.0.1:5501',
+  'http://localhost:8765',
+  'http://127.0.0.1:8765',
   'null', // file:// protocol sends null origin
 ];
 
@@ -56,6 +58,7 @@ const TICK_MS = 1000 / 20; // 20 ticks per second
 
 const rooms = new Map();     // code → room
 const socketRoom = new Map(); // socketId → code
+const matchQueue = [];        // socketId[] waiting for auto-match
 
 function generateCode() {
   let code;
@@ -387,8 +390,63 @@ io.on('connection', socket => {
     }
   });
 
+  socket.on('join_queue', () => {
+    // Remove from any existing room first
+    leaveCurrentRoom(socket);
+    // Already in queue?
+    if (matchQueue.includes(socket.id)) {
+      socket.emit('queue_waiting', {});
+      return;
+    }
+    // Find a waiting opponent, skipping stale disconnected IDs
+    let opponentId = null;
+    while (matchQueue.length > 0) {
+      const candidate = matchQueue.shift();
+      const candidateSocket = io.sockets.sockets.get(candidate);
+      if (candidateSocket && candidateSocket.connected) {
+        opponentId = candidate;
+        break;
+      }
+    }
+    if (opponentId) {
+      const opponentSocket = io.sockets.sockets.get(opponentId);
+      const code = generateCode();
+      const room = {
+        code,
+        players: [opponentId, socket.id],
+        sockets: { A: opponentId, B: socket.id },
+        state: null,
+        interval: null,
+        rematchVotes: 0,
+      };
+      rooms.set(code, room);
+      socketRoom.set(opponentId, code);
+      socketRoom.set(socket.id, code);
+      opponentSocket.join(code);
+      socket.join(code);
+      opponentSocket.emit('room_joined', { code, side: 'A' });
+      socket.emit('room_joined', { code, side: 'B' });
+      io.to(code).emit('match_start', { code });
+      startRoom(room);
+      console.log(`Queue match: room ${code} (${opponentId} vs ${socket.id})`);
+    } else {
+      matchQueue.push(socket.id);
+      socket.emit('queue_waiting', {});
+      console.log(`${socket.id} joined queue (${matchQueue.length} waiting)`);
+    }
+  });
+
+  socket.on('leave_queue', () => {
+    const idx = matchQueue.indexOf(socket.id);
+    if (idx !== -1) matchQueue.splice(idx, 1);
+    socket.emit('queue_left', {});
+  });
+
   socket.on('disconnect', () => {
     console.log(`disconnect ${socket.id}`);
+    // Remove from matchmaking queue
+    const queueIdx = matchQueue.indexOf(socket.id);
+    if (queueIdx !== -1) matchQueue.splice(queueIdx, 1);
     const code = socketRoom.get(socket.id);
     if (code) {
       const room = rooms.get(code);

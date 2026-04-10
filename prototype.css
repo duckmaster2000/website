@@ -1040,6 +1040,174 @@ body:has(.chest-overlay:not([hidden])) {
   overflow: hidden;
 }
 
+/* ── Win overlay ────────────────────────────────────────────────────────── */
+.win-overlay[hidden] { display: none; }
+
+.win-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: chestFadeIn 260ms ease;
+}
+
+.win-modal {
+  background: linear-gradient(170deg, rgba(12, 20, 40, 0.99), rgba(5, 10, 22, 0.99));
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-top: 3px solid rgba(142, 255, 178, 0.55);
+  border-radius: 1.4rem 1.4rem 0 0;
+  padding: 2.2rem 2.2rem 2.8rem;
+  text-align: center;
+  width: min(480px, 96vw);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+  animation: winSlideUp 380ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+.win-overlay.is-loss .win-modal {
+  border-top-color: rgba(255, 80, 80, 0.5);
+}
+
+.win-headline {
+  font-family: "Orbitron", sans-serif;
+  font-size: clamp(2rem, 5vw, 3rem);
+  margin: 0;
+  color: #8effd2;
+  text-shadow: 0 0 24px rgba(142, 255, 178, 0.6);
+}
+
+.win-overlay.is-loss .win-headline {
+  color: #ff7070;
+  text-shadow: 0 0 24px rgba(255, 80, 80, 0.55);
+}
+
+.win-subline {
+  margin: 0;
+  color: #ffd76f;
+  font-size: 1.05rem;
+  font-weight: 600;
+  min-height: 1.4em;
+}
+
+.win-card-slot {
+  margin: 0.9rem 0 0.3rem;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  border: 2.5px solid var(--rarity-color, #8effd2);
+  box-shadow: 0 0 24px color-mix(in srgb, var(--rarity-color, #8effd2) 50%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: winCardPop 420ms 160ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  background: radial-gradient(circle, color-mix(in srgb, var(--rarity-color, #8effd2) 14%, transparent), transparent 70%);
+}
+
+.win-card-icon { font-size: 3rem; line-height: 1; }
+
+.win-card-label {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.win-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.win-actions button {
+  padding: 0.6rem 1.5rem;
+  border-radius: 0.55rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.08);
+  color: #e9f5ff;
+  transition: background 0.18s, transform 0.14s;
+}
+
+.win-actions button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.16);
+  transform: translateY(-1px);
+}
+
+.win-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@keyframes winSlideUp {
+  from { transform: translateY(90px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+@keyframes winCardPop {
+  from { transform: scale(0) rotate(-15deg); opacity: 0; }
+  to   { transform: scale(1) rotate(0);      opacity: 1; }
+}
+
+/* ── Queue status ───────────────────────────────────────────────────────── */
+.lobby-find {
+  margin-top: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.lobby-find-or {
+  font-size: 0.78rem;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+.queue-status {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+.queue-status[hidden] { display: none; }
+
+.queue-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #8effd2;
+  flex-shrink: 0;
+  animation: queuePulse 1s ease-in-out infinite;
+}
+
+@keyframes queuePulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.35; transform: scale(0.65); }
+}
+
+.queue-status button {
+  font-size: 0.78rem;
+  padding: 0.22rem 0.65rem;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 0.4rem;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.queue-status button:hover { background: rgba(255, 255, 255, 0.08); }
+
 /* AI-only panels: hidden unless AI mode is selected */
 #ptAiTuningPanel,
 #ptAiDeckPanel {
