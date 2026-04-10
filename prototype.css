@@ -1208,6 +1208,69 @@ body:has(.chest-overlay:not([hidden])) {
 
 .queue-status button:hover { background: rgba(255, 255, 255, 0.08); }
 
+/* ─── Win Condition badge ────────────────────────────────────────────────── */
+.wc-badge {
+  display: inline-block;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #ffe066;
+  background: rgba(255, 210, 50, 0.13);
+  border: 1px solid rgba(255, 210, 50, 0.35);
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-left: 6px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.collection-card.win-condition {
+  border-color: rgba(255, 210, 50, 0.3);
+  box-shadow: 0 0 0 1px rgba(255, 210, 50, 0.15);
+}
+
+.card.wc .card-rarity {
+  color: #ffe066;
+}
+
+/* ─── Next-card preview ──────────────────────────────────────────────────── */
+.next-card-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  min-width: 52px;
+  opacity: 0.72;
+}
+
+.next-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #8ab4d4;
+  text-transform: uppercase;
+}
+
+.next-icon {
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.next-name {
+  font-size: 0.58rem;
+  color: #a0b8cc;
+  text-align: center;
+  max-width: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ─── Average elixir bar ─────────────────────────────────────────────────── */
 .avg-elixir {
   display: flex;
