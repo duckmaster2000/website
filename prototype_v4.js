@@ -32,16 +32,26 @@ const RARITY_STYLE = {
 };
 
 const ARCHETYPES = [
-  { slug: 'scout', name: 'Scout', icon: '🏎️', rarity: 'common', cost: 2, hp: 58, dmg: 11, range: 8, speed: 27, cd: 0.52, structureMult: 0.9, deployCd: 1.0, style: 'single', proj: 'slug', role: 'flank' },
-  { slug: 'brawler', name: 'Brawler', icon: '🚛', rarity: 'common', cost: 4, hp: 146, dmg: 18, range: 9, speed: 13, cd: 0.78, structureMult: 1, deployCd: 1.15, style: 'single', proj: 'slug', role: 'tank' },
-  { slug: 'siege', name: 'Siege', icon: '🛞', rarity: 'rare', cost: 6, hp: 98, dmg: 38, range: 18, speed: 8, cd: 1.2, structureMult: 1.6, deployCd: 1.45, style: 'single', proj: 'shell', role: 'siege' },
-  { slug: 'guardian', name: 'Guardian', icon: '🛡️', rarity: 'rare', cost: 5, hp: 124, dmg: 10, range: 10, speed: 10, cd: 0.9, structureMult: 1, deployCd: 1.25, style: 'single', proj: 'pulse', role: 'aura' },
-  { slug: 'voltbug', name: 'Volt Bug', icon: '⚡', rarity: 'common', cost: 3, hp: 82, dmg: 12, range: 10, speed: 22, cd: 0.66, structureMult: 1, deployCd: 1.0, style: 'double', proj: 'spark', role: 'chain' },
-  { slug: 'flarepod', name: 'Flare Pod', icon: '🔥', rarity: 'epic', cost: 4, hp: 84, dmg: 13, range: 16, speed: 11, cd: 0.82, structureMult: 1.1, deployCd: 1.2, style: 'splash', proj: 'flare', role: 'burn' },
-  { slug: 'drillcat', name: 'Drill Cat', icon: '🚜', rarity: 'rare', cost: 4, hp: 134, dmg: 21, range: 7, speed: 12, cd: 0.8, structureMult: 1.25, deployCd: 1.15, style: 'single', proj: 'drill', role: 'breaker' },
-  { slug: 'raylance', name: 'Ray Lance', icon: '💠', rarity: 'legendary', cost: 5, hp: 100, dmg: 16, range: 15, speed: 12, cd: 0.62, structureMult: 1, deployCd: 1.35, style: 'beam', proj: 'beam', role: 'sniper' },
-  { slug: 'mortarfox', name: 'Mortar Fox', icon: '🧨', rarity: 'epic', cost: 6, hp: 96, dmg: 34, range: 20, speed: 7, cd: 1.32, structureMult: 1.55, deployCd: 1.65, style: 'splash', proj: 'mortar', role: 'artillery' },
-  { slug: 'ramhog', name: 'Ram Hog', icon: '🐗', rarity: 'rare', cost: 5, hp: 128, dmg: 24, range: 8, speed: 15, cd: 0.9, structureMult: 1.2, deployCd: 1.18, style: 'burst', proj: 'ram', role: 'charge' }
+  { slug: 'scout', name: 'Scout', icon: '🏎️', rarity: 'common', cost: 2, hp: 58, dmg: 11, range: 8, speed: 27, cd: 0.52, structureMult: 0.9, deployCd: 1.0, style: 'single', proj: 'slug', role: 'flank',
+    ability: { name: 'Turbo Drive', minLevel: 5, minMastery: 10, dmgBoost: 1.08, hpBoost: 1.07 } },
+  { slug: 'brawler', name: 'Brawler', icon: '🚛', rarity: 'common', cost: 4, hp: 146, dmg: 18, range: 9, speed: 13, cd: 0.78, structureMult: 1, deployCd: 1.15, style: 'single', proj: 'slug', role: 'tank',
+    ability: { name: 'Iron Shell', minLevel: 6, minMastery: 12, dmgBoost: 1.05, hpBoost: 1.12 } },
+  { slug: 'siege', name: 'Siege', icon: '🛞', rarity: 'rare', cost: 6, hp: 98, dmg: 38, range: 18, speed: 8, cd: 1.2, structureMult: 1.6, deployCd: 1.45, style: 'single', proj: 'shell', role: 'siege',
+    ability: { name: 'Heavy Payload', minLevel: 6, minMastery: 12, dmgBoost: 1.14, hpBoost: 1.05 } },
+  { slug: 'guardian', name: 'Guardian', icon: '🛡️', rarity: 'rare', cost: 5, hp: 124, dmg: 10, range: 10, speed: 10, cd: 0.9, structureMult: 1, deployCd: 1.25, style: 'single', proj: 'pulse', role: 'aura',
+    ability: { name: 'Forcefield', minLevel: 5, minMastery: 10, dmgBoost: 1.07, hpBoost: 1.14 } },
+  { slug: 'voltbug', name: 'Volt Bug', icon: '⚡', rarity: 'common', cost: 3, hp: 82, dmg: 12, range: 10, speed: 22, cd: 0.66, structureMult: 1, deployCd: 1.0, style: 'double', proj: 'spark', role: 'chain',
+    ability: { name: 'Static Burst', minLevel: 5, minMastery: 10, dmgBoost: 1.12, hpBoost: 1.05 } },
+  { slug: 'flarepod', name: 'Flare Pod', icon: '🔥', rarity: 'epic', cost: 4, hp: 84, dmg: 13, range: 16, speed: 11, cd: 0.82, structureMult: 1.1, deployCd: 1.2, style: 'splash', proj: 'flare', role: 'burn',
+    ability: { name: 'Inferno Surge', minLevel: 6, minMastery: 12, dmgBoost: 1.12, hpBoost: 1.07 } },
+  { slug: 'drillcat', name: 'Drill Cat', icon: '🚜', rarity: 'rare', cost: 4, hp: 134, dmg: 21, range: 7, speed: 12, cd: 0.8, structureMult: 1.25, deployCd: 1.15, style: 'single', proj: 'drill', role: 'breaker',
+    ability: { name: 'Diamond Drill', minLevel: 6, minMastery: 12, dmgBoost: 1.14, hpBoost: 1.06 } },
+  { slug: 'raylance', name: 'Ray Lance', icon: '💠', rarity: 'legendary', cost: 5, hp: 100, dmg: 16, range: 15, speed: 12, cd: 0.62, structureMult: 1, deployCd: 1.35, style: 'beam', proj: 'beam', role: 'sniper',
+    ability: { name: 'Overcharge', minLevel: 7, minMastery: 15, dmgBoost: 1.16, hpBoost: 1.05 } },
+  { slug: 'mortarfox', name: 'Mortar Fox', icon: '🧨', rarity: 'epic', cost: 6, hp: 96, dmg: 34, range: 20, speed: 7, cd: 1.32, structureMult: 1.55, deployCd: 1.65, style: 'splash', proj: 'mortar', role: 'artillery',
+    ability: { name: 'Barrage Mode', minLevel: 7, minMastery: 15, dmgBoost: 1.14, hpBoost: 1.07 } },
+  { slug: 'ramhog', name: 'Ram Hog', icon: '🐗', rarity: 'rare', cost: 5, hp: 128, dmg: 24, range: 8, speed: 15, cd: 0.9, structureMult: 1.2, deployCd: 1.18, style: 'burst', proj: 'ram', role: 'charge',
+    ability: { name: 'Rampage', minLevel: 7, minMastery: 15, dmgBoost: 1.16, hpBoost: 1.08 } }
 ];
 
 const VARIANTS = [
@@ -79,7 +89,7 @@ function buildCards() {
         proj: a.proj,
         role: a.role,
         splash: (v.style === 'splash' || a.style === 'splash') ? 5 : 0,
-        ability: { name: 'Overclock Stub', minLevel: 12, minMastery: 40, dmgBoost: 1.05, hpBoost: 1.04 }
+        ability: a.ability
       });
     });
   });
@@ -304,7 +314,7 @@ function createPlayer(id, mode) {
     baseHp: Math.round((1300 + (b.baseLevel - 1) * 120) * aiBaseMult),
     energyMax: 10,
     energy: 10,
-    energyRegen: 2.35,
+    energyRegen: 1.05,
     towerDamage: 13 + (b.towerLevel - 1) * 3,
     cooldowns: {}
   };
@@ -483,16 +493,6 @@ function updateUnits(dt) {
   state.units.forEach((u) => {
     if (u.hp <= 0) return;
     u.atkCd -= dt;
-
-    const targets = findUnitTargets(u);
-    if (targets.length > 0) {
-      if (u.atkCd <= 0) {
-        targets.forEach((t) => spawnProjectile(u, t, u.dmg, 'unit'));
-        if (u.style === 'burst') spawnProjectile(u, targets[0], u.dmg * 0.45, 'unit');
-        u.atkCd = u.cd;
-      }
-      return;
-    }
 
     const structure = primaryEnemyStructure(u);
     if (!structure) return;
@@ -731,20 +731,36 @@ function cardButton(owner, id) {
   return `<button class="card rarity-${card.rarity}" data-owner="${owner}" data-type="${id}" draggable="true" data-disabled="${disabled ? '1' : '0'}" data-selected="${selected ? '1' : '0'}"><span class="card-rarity">${RARITY_STYLE[card.rarity].label}</span><span class="card-icon">${card.icon}</span><span class="card-cost ${costClass(card.cost)}">${card.cost}</span><span class="card-name">${card.name}</span><span class="card-meta">Lv ${cp.level} • ${card.style}</span><span class="card-cd-bar"><i style="width:${cdPct}%"></i></span></button>`;
 }
 
+function deckAvgCost(ids) {
+  if (!ids.length) return '0.0';
+  return (ids.reduce((s, id) => s + (CARD_MAP[id]?.cost || 0), 0) / ids.length).toFixed(1);
+}
+
+function avgElixirBar(ids) {
+  const avg = Number(deckAvgCost(ids));
+  const pct = Math.min(100, (avg / 9) * 100);
+  const cls = avg <= 3 ? 'avg-low' : avg <= 5 ? 'avg-mid' : 'avg-high';
+  return `<div class="avg-elixir"><span class="avg-elixir-label">⚡ Avg ${avg.toFixed(1)}</span><span class="avg-elixir-track"><span class="avg-elixir-fill ${cls}" style="width:${pct}%"></span></span></div>`;
+}
+
 function renderDecks() {
   if (!state.players.A || !state.players.B) return;
   if (onlineActive) {
     const myDeck = mySide === 'A' ? ui.deckA : ui.deckB;
     const oppDeck = mySide === 'A' ? ui.deckB : ui.deckA;
-    myDeck.innerHTML = ONLINE_CARD_IDS.map((id) => cardButton(mySide, id)).join('');
+    myDeck.innerHTML = ONLINE_CARD_IDS.map((id) => cardButton(mySide, id)).join('') + avgElixirBar(ONLINE_CARD_IDS);
     oppDeck.innerHTML = '<div class="note">Opponent is playing…</div>';
     return;
   }
 
-  ui.deckA.innerHTML = deckFor('A').map((id) => cardButton('A', id)).join('');
-  ui.deckB.innerHTML = state.mode === 'ai'
-    ? '<div class="note">Enemy AI controls this deck in real time.</div>'
-    : deckFor('B').map((id) => cardButton('B', id)).join('');
+  const aIds = deckFor('A');
+  ui.deckA.innerHTML = aIds.map((id) => cardButton('A', id)).join('') + avgElixirBar(aIds);
+  if (state.mode === 'ai') {
+    ui.deckB.innerHTML = '<div class="note">Enemy AI controls this deck in real time.</div>';
+  } else {
+    const bIds = deckFor('B');
+    ui.deckB.innerHTML = bIds.map((id) => cardButton('B', id)).join('') + avgElixirBar(bIds);
+  }
 }
 
 function renderStructures() {
@@ -1118,8 +1134,8 @@ function unlockAbility(id) {
     writeLog('Ability unlock is intentionally hard: level 12 + mastery 40.');
     return;
   }
-  if (state.progress.gold < 5000) { writeLog('Need 5000 gold to unlock ability.'); return; }
-  state.progress.gold -= 5000;
+  if (state.progress.gold < 400) { writeLog('Need 400 gold to unlock ability.'); return; }
+  state.progress.gold -= 400;
   cp.abilityUnlocked = true;
   saveProgress();
   renderProgress();
@@ -1262,7 +1278,7 @@ function renderCollection() {
     const need = copiesNeed(next);
     const upCost = cardUpgradeCost(c.id, next);
     const canUp = unlocked && cp.level < 14 && cp.copies >= need && state.progress.gold >= upCost;
-    const canAbility = unlocked && !cp.abilityUnlocked && cp.level >= c.ability.minLevel && cp.mastery >= c.ability.minMastery;
+    const canAbility = unlocked && !cp.abilityUnlocked && cp.level >= c.ability.minLevel && cp.mastery >= c.ability.minMastery && state.progress.gold >= 400;
     let statLine = 'Locked';
     let nextLine = '';
     if (unlocked) {
@@ -1273,7 +1289,7 @@ function renderCollection() {
         nextLine = `Next Lv: HP ${nextStats.hpScaled} • DMG ${Math.round(nextStats.dmgScaled)} • CD ${nextStats.deployCdScaled.toFixed(2)}s`;
       }
     }
-    return `<article class="collection-card ${unlocked ? '' : 'locked'} ${inDeck ? 'in-deck' : ''}" data-card="${c.id}"><header><strong>${c.icon} ${c.name}</strong><span class="rarity-${c.rarity}">${RARITY_STYLE[c.rarity].label}</span></header><p>${unlocked ? `Copies ${cp.copies} • Mastery ${Math.floor(cp.mastery)}` : 'Locked'}</p><p>${statLine}</p><p>${unlocked ? `Cost ${c.cost} • ${c.style} target • ${c.role}` : 'Unknown stats'}</p><p>${nextLine}</p><div class="collection-actions">${unlocked ? `<button data-select="${c.id}">${inDeck ? 'In Deck' : 'Select'}</button>` : '<button disabled>Locked</button>'}${unlocked ? `<button data-up="${c.id}" ${canUp ? '' : 'disabled'}>Level Up (${need} copies, ${upCost}g)</button>` : ''}${unlocked ? `<button data-ability="${c.id}" ${canAbility ? '' : 'disabled'}>${cp.abilityUnlocked ? 'Ability ✓' : 'Unlock Ability'}</button>` : ''}</div></article>`;
+    return `<article class="collection-card ${unlocked ? '' : 'locked'} ${inDeck ? 'in-deck' : ''}" data-card="${c.id}"><header><strong>${c.icon} ${c.name}</strong><span class="rarity-${c.rarity}">${RARITY_STYLE[c.rarity].label}</span></header><p>${unlocked ? `Copies ${cp.copies} • Mastery ${Math.floor(cp.mastery)}` : 'Locked'}</p><p>${statLine}</p><p>${unlocked ? `Cost ${c.cost} • ${c.style} target • ${c.role}` : 'Unknown stats'}</p><p>${nextLine}</p><div class="collection-actions">${unlocked ? `<button data-select="${c.id}">${inDeck ? 'In Deck' : 'Select'}</button>` : '<button disabled>Locked</button>'}${unlocked ? `<button data-up="${c.id}" ${canUp ? '' : 'disabled'}>Level Up (${need} copies, ${upCost}g)</button>` : ''}${unlocked ? `<button data-ability="${c.id}" ${canAbility ? '' : 'disabled'}>${cp.abilityUnlocked ? `✓ ${c.ability.name}` : `${c.ability.name} (Lv${c.ability.minLevel}, ${c.ability.minMastery}M, 400g)`}</button>` : ''}</div></article>`;
   }).join('');
 
   ui.cardCollection.querySelectorAll('[data-select]').forEach((b) => {

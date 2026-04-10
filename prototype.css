@@ -1208,6 +1208,42 @@ body:has(.chest-overlay:not([hidden])) {
 
 .queue-status button:hover { background: rgba(255, 255, 255, 0.08); }
 
+/* ─── Average elixir bar ─────────────────────────────────────────────────── */
+.avg-elixir {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 2px;
+  font-size: 0.72rem;
+  color: #b0c4de;
+}
+
+.avg-elixir-label {
+  white-space: nowrap;
+  min-width: 5ch;
+  font-weight: 600;
+  color: #cde;
+}
+
+.avg-elixir-track {
+  flex: 1;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.avg-elixir-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s;
+}
+
+.avg-elixir-fill.avg-low  { background: #63ffd2; }
+.avg-elixir-fill.avg-mid  { background: #a78bff; }
+.avg-elixir-fill.avg-high { background: #ff6e6e; }
+
 /* AI-only panels: hidden unless AI mode is selected */
 #ptAiTuningPanel,
 #ptAiDeckPanel {

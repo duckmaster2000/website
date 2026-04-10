@@ -77,7 +77,7 @@ function createPlayer(id) {
     baseHp: 1300,
     energyMax: 10,
     energy: 10,
-    energyRegen: 2.2,
+    energyRegen: 1.05,
     towerDamage: 12,
     cooldowns: { scout: 0, brawler: 0, siege: 0, guardian: 0 },
   };
@@ -184,18 +184,10 @@ function tick(state, dt) {
     p.energy = clamp(p.energy + p.energyRegen * dt, 0, p.energyMax);
   });
 
-  // Unit AI: attack or advance
+  // Unit AI: advance and attack structures only
   state.units.forEach(u => {
     if (u.hp <= 0) return;
     u.attackCd -= dt;
-    const enemy = nearestEnemyUnit(state, u);
-    if (enemy) {
-      if (u.attackCd <= 0) {
-        dealDamage(state, enemy, u.stats.dmg, false);
-        u.attackCd = u.stats.cd;
-      }
-      return;
-    }
     const structure = primaryEnemyStructure(state, u);
     if (structure) {
       const dist = Math.abs(structure.x - u.x);
