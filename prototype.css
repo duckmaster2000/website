@@ -815,6 +815,13 @@ select {
   padding: 0.28rem 0.46rem;
 }
 
+/* The [hidden] attribute alone won't hide this element because author CSS
+   (display:grid) always beats UA stylesheet (display:none). We must
+   explicitly handle it here with higher specificity. */
+.chest-overlay[hidden] {
+  display: none;
+}
+
 .chest-overlay {
   position: fixed;
   inset: 0;

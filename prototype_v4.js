@@ -919,7 +919,7 @@ function finalizeChestOpeningSession() {
 }
 
 function advanceChestRoll() {
-  if (!state.chestSession || !ui.chestClaim) return;
+  if (!state.chestSession) return;
   if (state.chestSession.rollIndex >= 4) {
     closeChestOverlay();
     return;
