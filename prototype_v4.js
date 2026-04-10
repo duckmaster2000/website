@@ -483,6 +483,7 @@ function deployUnit(owner, cardId, lane) {
     proj: card.proj,
     splash: card.splash,
     structureMult: card.structureMult,
+    winCondition: card.winCondition || false,
     rewardPool: 0
   });
 
@@ -515,6 +516,20 @@ function updateUnits(dt) {
   state.units.forEach((u) => {
     if (u.hp <= 0) return;
     u.atkCd -= dt;
+
+    // Win conditions ignore enemy units and march straight for structures.
+    // All other cards fight enemy units first, then advance on structures.
+    if (!u.winCondition) {
+      const targets = findUnitTargets(u);
+      if (targets.length > 0) {
+        if (u.atkCd <= 0) {
+          targets.forEach((t) => spawnProjectile(u, t, u.dmg, 'unit'));
+          if (u.style === 'burst') spawnProjectile(u, targets[0], u.dmg * 0.45, 'unit');
+          u.atkCd = u.cd;
+        }
+        return;
+      }
+    }
 
     const structure = primaryEnemyStructure(u);
     if (!structure) return;

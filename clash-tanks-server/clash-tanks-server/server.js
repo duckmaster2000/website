@@ -38,10 +38,10 @@ app.get('/health', (_req, res) => res.json({ status: 'ok', rooms: rooms.size }))
 // ─── Game constants (must stay in sync with prototype.js) ──────────────────
 
 const UNIT_TYPES = {
-  scout:    { name: 'Scout',    cost: 2, hp: 55,  dmg: 10, range: 8,  speed: 27, cd: 0.52, structureMult: 0.85, cool: 1.8 },
-  brawler:  { name: 'Brawler',  cost: 4, hp: 145, dmg: 17, range: 9,  speed: 13, cd: 0.78, structureMult: 1,    cool: 2.8 },
-  siege:    { name: 'Siege',    cost: 6, hp: 96,  dmg: 37, range: 18, speed: 8,  cd: 1.22, structureMult: 1.65, cool: 4.1 },
-  guardian: { name: 'Guardian', cost: 5, hp: 120, dmg: 9,  range: 10, speed: 10, cd: 0.95, structureMult: 1,    cool: 3.4 },
+  scout:    { name: 'Scout',    cost: 2, hp: 55,  dmg: 10, range: 8,  speed: 27, cd: 0.52, structureMult: 0.85, cool: 1.8,  winCondition: true },
+  brawler:  { name: 'Brawler',  cost: 4, hp: 145, dmg: 17, range: 9,  speed: 13, cd: 0.78, structureMult: 1,    cool: 2.8,  winCondition: false },
+  siege:    { name: 'Siege',    cost: 6, hp: 96,  dmg: 37, range: 18, speed: 8,  cd: 1.22, structureMult: 1.65, cool: 4.1,  winCondition: true },
+  guardian: { name: 'Guardian', cost: 5, hp: 120, dmg: 9,  range: 10, speed: 10, cd: 0.95, structureMult: 1,    cool: 3.4,  winCondition: false },
 };
 
 const BOARD = {
@@ -184,10 +184,22 @@ function tick(state, dt) {
     p.energy = clamp(p.energy + p.energyRegen * dt, 0, p.energyMax);
   });
 
-  // Unit AI: advance and attack structures only
+  // Unit AI: win conditions target structures only; others fight units first
   state.units.forEach(u => {
     if (u.hp <= 0) return;
     u.attackCd -= dt;
+
+    if (!u.stats.winCondition) {
+      const enemy = nearestEnemyUnit(state, u);
+      if (enemy) {
+        if (u.attackCd <= 0) {
+          dealDamage(state, enemy, u.stats.dmg, false);
+          u.attackCd = u.stats.cd;
+        }
+        return;
+      }
+    }
+
     const structure = primaryEnemyStructure(state, u);
     if (structure) {
       const dist = Math.abs(structure.x - u.x);
