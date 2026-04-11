@@ -99,6 +99,56 @@ button {
   margin: 0.45rem 0 0;
 }
 
+.admin-panel {
+  border-color: rgba(255, 184, 77, 0.45);
+  background: linear-gradient(180deg, rgba(32, 24, 12, 0.9), rgba(18, 16, 12, 0.85));
+}
+
+.admin-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.admin-state {
+  border: 1px solid rgba(255, 184, 77, 0.5);
+  border-radius: 999px;
+  padding: 0.18rem 0.55rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: #ffd98b;
+  background: rgba(255, 184, 77, 0.12);
+}
+
+.admin-panel.active .admin-state {
+  color: #8effd7;
+  border-color: rgba(142, 255, 215, 0.5);
+  background: rgba(142, 255, 215, 0.15);
+}
+
+.admin-row {
+  display: flex;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+#ptAdminPassword {
+  flex: 1;
+  min-width: 220px;
+  border: 1px solid rgba(255, 184, 77, 0.35);
+  border-radius: 10px;
+  background: rgba(22, 18, 11, 0.9);
+  color: var(--text);
+  padding: 0.48rem 0.6rem;
+  font-size: 0.92rem;
+}
+
+.admin-actions {
+  margin-top: 0.55rem;
+}
+
 .content ul {
   margin: 0.45rem 0 0.85rem;
   color: #d4e8f8;

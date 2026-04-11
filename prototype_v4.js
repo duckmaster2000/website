@@ -1,4 +1,5 @@
 const PROTOTYPE_PASSWORD = '1ydzpU1y!';
+const ADMIN_PASSWORD = '2ydzpU2y!';
 const PROTOTYPE_KEY = 'prototype_access_v1';
 const PROGRESS_KEY = 'prototype_progress_v4';
 
@@ -207,6 +208,10 @@ const state = {
   handQueue: { A: [], B: [] },
   chestOpening: false,
   chestSession: null,
+  admin: {
+    active: false,
+    backupProgress: null
+  },
   progress: {
     gold: 800,
     deck: [...STARTER_DECK],
@@ -237,6 +242,8 @@ const ui = {
   towerUpgradeInfo: null, baseUpgradeInfo: null,
   aiBaseMult: null, aiTowerMult: null, aiBaseMultOut: null, aiTowerMultOut: null, aiHealthInfo: null,
   aiDifficulty: null, aiDifficultyInfo: null,
+  adminToggle: null, adminPanel: null, adminState: null,
+  adminUnlockRow: null, adminPassword: null, adminUnlock: null, adminError: null, adminExit: null,
   chestOverlay: null, chestPhase: null, chestTier: null, chestVisual: null, chestRolls: null, chestReward: null, chestClaim: null,
   chestParticles: null,
   chestStars: null,
@@ -267,7 +274,107 @@ function unlockInitial() {
 }
 
 function saveProgress() {
+  if (state.admin.active) return;
   try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(state.progress)); } catch (_) {}
+}
+
+function cloneProgress(progress) {
+  try {
+    return JSON.parse(JSON.stringify(progress));
+  } catch (_) {
+    return null;
+  }
+}
+
+function applyAdminProgressSnapshot() {
+  CARD_LIBRARY.forEach((c) => {
+    const cp = cardProgress(c.id);
+    cp.unlocked = true;
+    cp.level = 14;
+    cp.copies = 999;
+    cp.mastery = 999;
+    cp.abilityUnlocked = true;
+  });
+  state.progress.gold = 9999999;
+  state.progress.buildings.baseLevel = 20;
+  state.progress.buildings.towerLevel = 20;
+  state.progress.aiHealth.baseMult = 2.2;
+  state.progress.aiHealth.towerMult = 2.2;
+  state.progress.aiDifficulty = 'custom';
+  state.progress.deck = CARD_LIBRARY.slice(0, MAX_DECK).map((c) => c.id);
+  state.progress.aiDeck = CARD_LIBRARY.slice(-MAX_DECK).map((c) => c.id);
+}
+
+function updateAdminUi() {
+  if (!ui.adminPanel) return;
+  ui.adminPanel.classList.toggle('active', state.admin.active);
+  if (ui.adminState) ui.adminState.textContent = state.admin.active ? 'Active' : 'Inactive';
+  if (ui.adminUnlockRow) ui.adminUnlockRow.hidden = state.admin.active;
+  if (ui.adminExit) ui.adminExit.hidden = !state.admin.active;
+  if (ui.adminError) ui.adminError.hidden = true;
+}
+
+function enableAdminMode() {
+  if (state.admin.active) return;
+  const backup = cloneProgress(state.progress);
+  if (!backup) {
+    writeLog('Admin mode failed to initialize.');
+    return;
+  }
+  state.admin.backupProgress = backup;
+  state.admin.active = true;
+  applyAdminProgressSnapshot();
+  renderProgress();
+  renderCollection();
+  setupMatch();
+  updateAdminUi();
+  writeLog('Admin mode enabled: temporary max progression applied.');
+}
+
+function disableAdminMode() {
+  if (!state.admin.active) return;
+  if (state.admin.backupProgress) {
+    state.progress = cloneProgress(state.admin.backupProgress) || state.progress;
+  }
+  state.admin.backupProgress = null;
+  state.admin.active = false;
+  saveProgress();
+  renderProgress();
+  renderCollection();
+  setupMatch();
+  updateAdminUi();
+  writeLog('Admin mode disabled: normal progression restored.');
+}
+
+function bindAdminUi() {
+  ui.adminToggle?.addEventListener('click', () => {
+    if (ui.adminPanel && !ui.adminPanel.hidden && state.admin.active) {
+      disableAdminMode();
+    }
+    if (ui.adminPanel) ui.adminPanel.hidden = !ui.adminPanel.hidden;
+    updateAdminUi();
+  });
+
+  const tryAdminUnlock = () => {
+    const value = String(ui.adminPassword?.value || '');
+    if (value !== ADMIN_PASSWORD) {
+      if (ui.adminError) ui.adminError.hidden = false;
+      return;
+    }
+    if (ui.adminError) ui.adminError.hidden = true;
+    if (ui.adminPassword) ui.adminPassword.value = '';
+    enableAdminMode();
+  };
+
+  ui.adminUnlock?.addEventListener('click', tryAdminUnlock);
+  ui.adminPassword?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') tryAdminUnlock();
+  });
+
+  ui.adminExit?.addEventListener('click', () => {
+    disableAdminMode();
+    if (ui.adminPanel) ui.adminPanel.hidden = true;
+  });
 }
 
 function loadProgress() {
@@ -1767,6 +1874,14 @@ function cacheUi() {
   ui.aiHealthInfo = $('ptAiHealthInfo');
   ui.aiDifficulty = $('ptAiDifficulty');
   ui.aiDifficultyInfo = $('ptAiDifficultyInfo');
+  ui.adminToggle = $('ptAdminToggle');
+  ui.adminPanel = $('ptAdminPanel');
+  ui.adminState = $('ptAdminState');
+  ui.adminUnlockRow = $('ptAdminUnlockRow');
+  ui.adminPassword = $('ptAdminPassword');
+  ui.adminUnlock = $('ptAdminUnlock');
+  ui.adminError = $('ptAdminError');
+  ui.adminExit = $('ptAdminExit');
   ui.chestOverlay = $('ptChestOverlay');
   ui.chestPhase = $('ptChestPhase');
   ui.chestTier = $('ptChestTier');
@@ -1793,6 +1908,8 @@ function bindCore() {
   bindBoardInput();
   bindLobby();
   bindProgressUi();
+  bindAdminUi();
+  updateAdminUi();
 
   const syncModeClass = () => {
     document.body.classList.toggle('mode-ai', (ui.mode?.value || 'pvp') === 'ai');

@@ -40,9 +40,26 @@
             <option value="online">1v1 Online vs Opponent</option>
           </select>
           <button id="ptStartMatch" type="button">Start Match</button>
+          <button id="ptAdminToggle" type="button">Admin Panel</button>
           <button id="ptResetUpgrades" type="button">Reset Upgrades</button>
         </div>
       </div>
+
+      <section class="panel admin-panel" id="ptAdminPanel" hidden>
+        <div class="admin-head">
+          <h3>Admin Override</h3>
+          <span id="ptAdminState" class="admin-state">Inactive</span>
+        </div>
+        <p class="note">Unlock admin mode to temporarily max progression and unlock all cards.</p>
+        <div class="admin-row" id="ptAdminUnlockRow">
+          <input id="ptAdminPassword" type="password" placeholder="Admin password" autocomplete="off" />
+          <button id="ptAdminUnlock" type="button">Unlock Admin</button>
+        </div>
+        <p id="ptAdminError" class="error" hidden>Incorrect admin password.</p>
+        <div class="admin-actions">
+          <button id="ptAdminExit" type="button" hidden>Exit Admin (Restore Normal)</button>
+        </div>
+      </section>
 
       <section class="panel lobby-panel" id="ptLobbyPanel" hidden>
         <h3>Online 1v1</h3>
