@@ -10,29 +10,77 @@
   <link rel="stylesheet" href="platformer.css" />
 </head>
 <body>
+  <svg style="display:none" aria-hidden="true">
+    <defs>
+      <symbol id="icon-heart" viewBox="0 0 24 24"><path d="M12 21s-7.2-4.6-10-9.2C.4 8.7 1.8 5 5.4 4.2c2-.4 3.9.5 5 2.1a5.7 5.7 0 0 1 1.6-2C13.7 3 17 2.9 19 5.4c2.3 2.9 1 6.6-1.9 9.4C14.9 17.6 12 21 12 21z"/></symbol>
+      <symbol id="icon-bolt" viewBox="0 0 24 24"><path d="M13 2 3 14h7l-1 8 11-14h-7l0-6z"/></symbol>
+      <symbol id="icon-coin" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.2c-2 0-3.4 1-3.4 2.3 0 3 6.4 1.6 6.4 4.9 0 1.4-1.6 2.4-3.5 2.4-1.6 0-3-.7-3.6-1.8M12 6v1.2M12 16.8V18" stroke="#10243d" stroke-width="1.1" fill="none" stroke-linecap="round"/></symbol>
+      <symbol id="icon-wallet" viewBox="0 0 24 24"><path d="M3 6.5A2.5 2.5 0 0 1 5.5 4h11A2.5 2.5 0 0 1 19 6.5V8h-2.5A3.5 3.5 0 0 0 13 11.5v1A3.5 3.5 0 0 0 16.5 16H19v.5A2.5 2.5 0 0 1 16.5 19h-11A2.5 2.5 0 0 1 3 16.5v-10z"/><circle cx="16.3" cy="12" r="1.3" fill="#10243d"/></symbol>
+      <symbol id="icon-clone" viewBox="0 0 24 24"><rect x="4" y="4" width="12" height="12" rx="2"/><path d="M8 16v1.5A2.5 2.5 0 0 0 10.5 20H18a2.5 2.5 0 0 0 2.5-2.5V10a2.5 2.5 0 0 0-2.5-2.5H16" fill="none" stroke-width="2" stroke="currentColor"/></symbol>
+      <symbol id="icon-flame" viewBox="0 0 24 24"><path d="M12 2c1 3-2.5 4-2.5 7.3 0 1.3.9 2.2 2 2.2.9 0 1.6-.6 1.8-1.4.8.9 1.2 2 1.2 3.2 0 2.9-2.4 5.2-5.2 5.2S3.1 17.2 3.1 14.3c0-4.3 3.4-6 5-9.2.9-1.8 1.6-2.4 3.9-3.1z"/></symbol>
+      <symbol id="icon-flag" viewBox="0 0 24 24"><path d="M6 3v18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M6 4h12l-3 3.5L18 11H6z"/></symbol>
+      <symbol id="icon-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M3 12h18M12 3c2.6 2.6 4 5.7 4 9s-1.4 6.4-4 9c-2.6-2.6-4-5.7-4-9s1.4-6.4 4-9z" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+      <symbol id="icon-star" viewBox="0 0 24 24"><path d="M12 2.5l2.9 6.3 6.9.7-5.2 4.7 1.5 6.8L12 17.6l-6.1 3.4 1.5-6.8-5.2-4.7 6.9-.7z"/></symbol>
+      <symbol id="icon-trophy" viewBox="0 0 24 24"><path d="M6 4h12v3a6 6 0 0 1-6 6 6 6 0 0 1-6-6V4z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6 5H3v1a4 4 0 0 0 4 4M18 5h3v1a4 4 0 0 1-4 4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 13.5h4v2.5h-4z"/><path d="M8 20h8v-1.5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2z"/></symbol>
+      <symbol id="icon-pause" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></symbol>
+      <symbol id="icon-play" viewBox="0 0 24 24"><path d="M7 4l14 8-14 8z"/></symbol>
+      <symbol id="icon-speaker" viewBox="0 0 24 24"><path d="M4 9v6h4l6 5V4l-6 5z"/><path d="M16.5 9a4.5 4.5 0 0 1 0 6M19 6.5a8 8 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+      <symbol id="icon-mute" viewBox="0 0 24 24"><path d="M4 9v6h4l6 5V4l-6 5z"/><path d="M16 9l5 6M21 9l-5 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+      <symbol id="icon-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 3v2.4M12 18.6V21M21 12h-2.4M5.4 12H3M18.4 5.6l-1.7 1.7M7.3 16.7l-1.7 1.7M18.4 18.4l-1.7-1.7M7.3 7.3 5.6 5.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+      <symbol id="icon-crate" viewBox="0 0 24 24"><path d="M3 8l9-4 9 4-9 4z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M3 8v9l9 4 9-4V8M12 12v9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="3.6" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="1" /></symbol>
+      <symbol id="icon-skull" viewBox="0 0 24 24"><path d="M12 3a7 7 0 0 0-7 7c0 2.7 1.4 4.4 2.6 5.6.5.5.8 1.1.8 1.8V19h7.2v-1.6c0-.7.3-1.3.8-1.8C17.6 14.4 19 12.7 19 10a7 7 0 0 0-7-7z" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="9.3" cy="10.5" r="1.4"/><circle cx="14.7" cy="10.5" r="1.4"/><path d="M10.3 19v2M13.7 19v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+      <symbol id="icon-shuffle" viewBox="0 0 24 24"><path d="M3 6h4l7 12h4M14 6h4l-2.5 3M14 18h4l-2.5-3M3 18h4l3-5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-hook" viewBox="0 0 24 24"><path d="M8 3v9a4 4 0 0 0 8 0v-1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="8" cy="3" r="1.8"/><circle cx="16" cy="11" r="1.6" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+      <symbol id="icon-map" viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M9 4v14M15 6v14" stroke="currentColor" stroke-width="1.3"/></symbol>
+    </defs>
+  </svg>
   <div class="bg-noise" aria-hidden="true"></div>
+  <div class="toast-stack" id="pfToasts" aria-live="polite"></div>
   <main class="wrap">
     <header class="panel topbar hero">
       <div>
         <p class="eyebrow">ULTRA PLATFORMER</p>
         <h1>Astro Ruins Platformer</h1>
-        <p class="sub">WASD/Arrows move, Space jump, Shift dash, B open shop, R restart level. On mobile, use the touch controls under the game.</p>
+        <p class="sub">WASD/Arrows move, Space jump, Shift dash, E fire grapple hook, Q class special, B open shop, R restart level, Esc pause. Hold toward a wall while airborne to slide down it, then jump again to wall-kick off. Chain coins and stomps quickly for a combo multiplier, and look for glowing spring pads for a huge bounce. Every 30th sector guards a biome boss. Not every wall is what it looks like - a well-placed dash can open up more than you'd expect. On mobile, use the touch controls under the game.</p>
       </div>
-      <a class="home-link" href="index.html">Back Home</a>
+      <div class="topbar-actions">
+        <button type="button" class="icon-btn" id="pfLoadoutBtn" title="Loadout" aria-label="Loadout"><svg class="icon"><use href="#icon-target"></use></svg></button>
+        <button type="button" class="icon-btn" id="pfVaultBtn" title="Mystery Vault" aria-label="Mystery Vault"><svg class="icon"><use href="#icon-crate"></use></svg></button>
+        <button type="button" class="icon-btn" id="pfMuteBtn" title="Toggle sound" aria-label="Toggle sound"><svg class="icon"><use href="#icon-speaker"></use></svg></button>
+        <button type="button" class="icon-btn" id="pfPauseBtn" title="Pause (Esc)" aria-label="Pause"><svg class="icon"><use href="#icon-pause"></use></svg></button>
+        <button type="button" class="icon-btn" id="pfAchBtn" title="Achievements" aria-label="Achievements"><svg class="icon"><use href="#icon-trophy"></use></svg><span class="icon-btn-badge" id="pfAchBadge" hidden>0</span></button>
+        <a class="home-link" href="index.html">Back Home</a>
+      </div>
     </header>
 
     <section class="panel hud">
       <div class="hud-row">
-        <span>Level: <strong id="pfLevel">1</strong></span>
-        <span>Health: <strong id="pfHealth">3</strong></span>
-        <span>Lives: <strong id="pfLives">3</strong></span>
-        <span>Dashes: <strong id="pfDashes">2</strong></span>
-        <span>Coins (run): <strong id="pfRunCoins">0</strong></span>
-        <span>Wallet Coins: <strong id="pfWallet">0</strong></span>
+        <span class="stat-chip"><svg class="icon"><use href="#icon-flag"></use></svg>Level <strong id="pfLevel">1</strong></span>
+        <span class="stat-chip biome-chip"><svg class="icon"><use href="#icon-globe"></use></svg><strong id="pfBiome">Astro Ruins</strong></span>
+        <span class="stat-chip"><svg class="icon"><use href="#icon-clone"></use></svg>Lives <strong id="pfLives">3</strong></span>
+        <span class="stat-chip"><svg class="icon"><use href="#icon-coin"></use></svg>Run <strong id="pfRunCoins">0</strong></span>
+        <span class="stat-chip"><svg class="icon"><use href="#icon-wallet"></use></svg>Wallet <strong id="pfWallet">0</strong></span>
+      </div>
+      <div class="hud-row vitals-row">
+        <div class="vital">
+          <span class="vital-label"><svg class="icon small"><use href="#icon-heart"></use></svg>Hull <strong id="pfHealth">3/3</strong></span>
+          <div class="hp-bar" id="pfHpBar"></div>
+        </div>
+        <div class="vital">
+          <span class="vital-label"><svg class="icon small"><use href="#icon-bolt"></use></svg>Dash</span>
+          <div class="dash-pips" id="pfDashPips"></div>
+        </div>
       </div>
       <div class="hud-row small">
         <span>Objective: <strong id="pfObjective">Collect coins and reach the portal.</strong></span>
         <span>Status: <strong id="pfStatus">Ready</strong></span>
+      </div>
+      <div class="coin-progress"><div class="coin-progress-fill" id="pfCoinFill"></div></div>
+      <div class="biome-track" id="pfBiomeTrack"></div>
+      <div class="style-meter">
+        <div class="style-meter-fill" id="pfStyleFill"></div>
+        <span class="style-meter-label" id="pfStyleLabel">Style 0</span>
       </div>
       <div class="hud-row mode-row">
         <span>Mode: <strong id="pfModeLabel">Level</strong></span>
@@ -50,7 +98,16 @@
 
     <section class="panel game-panel">
       <canvas id="pfCanvas" width="960" height="540" aria-label="Platformer game canvas"></canvas>
+      <canvas id="pfMinimap" class="minimap" width="160" height="60" aria-hidden="true"></canvas>
       <div class="overlay" id="pfOverlay"></div>
+      <div class="combo-badge" id="pfCombo" hidden>
+        <svg class="icon"><use href="#icon-flame"></use></svg>
+        <span id="pfComboText">x2</span>
+      </div>
+      <div class="boss-bar" id="pfBossBar" hidden>
+        <span class="boss-name" id="pfBossName">Boss</span>
+        <div class="boss-hp-track"><div class="boss-hp-fill" id="pfBossHpFill"></div></div>
+      </div>
       <div class="touch-controls" aria-label="Mobile controls for platformer">
         <div class="touch-row">
           <button type="button" class="touch-btn" data-touch="left">Left</button>
@@ -59,6 +116,10 @@
         <div class="touch-row">
           <button type="button" class="touch-btn" data-touch="jump">Jump</button>
           <button type="button" class="touch-btn" data-touch="dash">Dash</button>
+        </div>
+        <div class="touch-row">
+          <button type="button" class="touch-btn" data-touch="grapple">Hook</button>
+          <button type="button" class="touch-btn" data-touch="special">Special</button>
         </div>
       </div>
     </section>
@@ -80,6 +141,82 @@
         </section>
       </div>
     </section>
+
+    <div class="modal-backdrop" id="pfPauseModal" hidden>
+      <section class="panel modal-panel">
+        <div class="shop-head">
+          <h2>Paused</h2>
+          <button type="button" id="pfResumeBtn">Resume (Esc)</button>
+        </div>
+        <div class="pause-stats" id="pfPauseStats"></div>
+        <div class="settings-list">
+          <label class="setting-row">
+            <span>Sound effects</span>
+            <button type="button" class="toggle-btn" id="pfSettingSound" data-setting="muted">On</button>
+          </label>
+          <label class="setting-row">
+            <span>Screen shake</span>
+            <button type="button" class="toggle-btn" id="pfSettingShake" data-setting="screenShake">On</button>
+          </label>
+          <label class="setting-row">
+            <span>Particle density</span>
+            <button type="button" class="toggle-btn" id="pfSettingParticles" data-setting="particleDensity">High</button>
+          </label>
+        </div>
+        <div class="pause-actions">
+          <button type="button" id="pfPauseRestart">Restart Level (R)</button>
+        </div>
+      </section>
+    </div>
+
+    <div class="modal-backdrop" id="pfAchModal" hidden>
+      <section class="panel modal-panel">
+        <div class="shop-head">
+          <h2>Achievements</h2>
+          <button type="button" id="pfCloseAch">Close</button>
+        </div>
+        <p class="shop-sub" id="pfAchProgress">0 / 0 unlocked</p>
+        <div class="ach-list square-scroll" id="pfAchList"></div>
+      </section>
+    </div>
+
+    <div class="modal-backdrop" id="pfLoadoutModal" hidden>
+      <section class="panel modal-panel">
+        <div class="shop-head">
+          <h2>Loadout</h2>
+          <button type="button" id="pfCloseLoadout">Close</button>
+        </div>
+        <p class="shop-sub">Pick a class. Each one changes your stats and gives a unique special move (Q).</p>
+        <div class="class-grid" id="pfClassGrid"></div>
+      </section>
+    </div>
+
+    <div class="modal-backdrop" id="pfVaultModal" hidden>
+      <section class="panel modal-panel">
+        <div class="shop-head">
+          <h2>Mystery Vault</h2>
+          <button type="button" id="pfCloseVault">Close</button>
+        </div>
+        <p class="shop-sub">Spend wallet coins on a Vault Key for a random reward: coins, rare cosmetics, or a jackpot.</p>
+        <div class="vault-crate" id="pfVaultCrate">
+          <svg class="icon vault-crate-icon"><use href="#icon-crate"></use></svg>
+        </div>
+        <p class="vault-result" id="pfVaultResult"></p>
+        <button type="button" class="vault-open-btn" id="pfOpenVault">Open Vault (60)</button>
+        <p class="shop-sub" id="pfVaultCount">Vaults opened: 0</p>
+      </section>
+    </div>
+
+    <div class="modal-backdrop" id="pfRelicModal" hidden>
+      <section class="panel modal-panel">
+        <div class="shop-head">
+          <h2>Choose a Relic</h2>
+        </div>
+        <p class="shop-sub">Pick one run modifier. It lasts until your run ends.</p>
+        <div class="relic-grid" id="pfRelicGrid"></div>
+        <button type="button" id="pfSkipRelic">Skip</button>
+      </section>
+    </div>
   </main>
 
   <script src="anti-inspect.js"></script>
