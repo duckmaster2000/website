@@ -20,17 +20,18 @@ let onlineDeckIds = [];
 const NET_INTERP_DELAY = 0.1; // seconds
 let netSnapshots = [];
 let netClockOffset = null; // client clock (s) minus server match time
+let netFx = [];            // server effects waiting for the delayed picture to reach them
+let arena = null;          // canvas renderer (prototype_arena.js)
 
-const BOARD = {
-  laneCount: 3,
-  laneHeight: 100,
-  spawnA: 6,
-  spawnB: 94,
-  towerX: { A: 24, B: 76 },
-  baseX: { A: 2, B: 98 }
-};
+// Cards, arena rules and the match simulation are shared with the server (clash-sim.js)
+const Sim = window.ClashSim;
+const CARD_LIBRARY = Sim.CARD_LIBRARY;
+const CARD_MAP = Sim.CARD_MAP;
+const STARTER_DECK = Sim.STARTER_DECK;
+const MAX_DECK = Sim.MAX_DECK;
+const RARITY_ORDER = Sim.RARITY_ORDER;
+const STEP = Sim.MATCH.step;
 
-const RARITY_ORDER = ['common', 'rare', 'epic', 'legendary', 'champion'];
 const RARITY_STYLE = {
   common: { label: 'Common', color: '#88c7ff', copies: 1, gold: 55 },
   rare: { label: 'Rare', color: '#63ffd2', copies: 2, gold: 85 },
@@ -39,121 +40,6 @@ const RARITY_STYLE = {
   champion: { label: 'Champion', color: '#ff728f', copies: 7, gold: 300 }
 };
 
-const ARCHETYPES = [
-  { slug: 'scout', name: 'Scout', icon: '🏎️', rarity: 'common', cost: 2, hp: 58, dmg: 11, range: 8, speed: 27, cd: 0.52, structureMult: 0.9, deployCd: 1.0, style: 'single', proj: 'slug', role: 'flank', winCondition: true,
-    ability: { name: 'Turbo Drive', minLevel: 5, minMastery: 10, dmgBoost: 1.08, hpBoost: 1.07 } },
-  { slug: 'brawler', name: 'Brawler', icon: '🚛', rarity: 'common', cost: 4, hp: 146, dmg: 18, range: 9, speed: 13, cd: 0.78, structureMult: 1, deployCd: 1.15, style: 'single', proj: 'slug', role: 'tank',
-    ability: { name: 'Iron Shell', minLevel: 6, minMastery: 12, dmgBoost: 1.05, hpBoost: 1.12 } },
-  { slug: 'siege', name: 'Siege', icon: '🛞', rarity: 'rare', cost: 6, hp: 98, dmg: 38, range: 18, speed: 8, cd: 1.2, structureMult: 1.6, deployCd: 1.45, style: 'single', proj: 'shell', role: 'siege', winCondition: true,
-    ability: { name: 'Heavy Payload', minLevel: 6, minMastery: 12, dmgBoost: 1.14, hpBoost: 1.05 } },
-  { slug: 'guardian', name: 'Guardian', icon: '🛡️', rarity: 'rare', cost: 5, hp: 124, dmg: 10, range: 10, speed: 10, cd: 0.9, structureMult: 1, deployCd: 1.25, style: 'single', proj: 'pulse', role: 'aura',
-    ability: { name: 'Forcefield', minLevel: 5, minMastery: 10, dmgBoost: 1.07, hpBoost: 1.14 } },
-  { slug: 'voltbug', name: 'Volt Bug', icon: '⚡', rarity: 'common', cost: 3, hp: 82, dmg: 12, range: 10, speed: 22, cd: 0.66, structureMult: 1, deployCd: 1.0, style: 'double', proj: 'spark', role: 'chain',
-    ability: { name: 'Static Burst', minLevel: 5, minMastery: 10, dmgBoost: 1.12, hpBoost: 1.05 } },
-  { slug: 'flarepod', name: 'Flare Pod', icon: '🔥', rarity: 'epic', cost: 4, hp: 84, dmg: 13, range: 16, speed: 11, cd: 0.82, structureMult: 1.1, deployCd: 1.2, style: 'splash', proj: 'flare', role: 'burn',
-    ability: { name: 'Inferno Surge', minLevel: 6, minMastery: 12, dmgBoost: 1.12, hpBoost: 1.07 } },
-  { slug: 'drillcat', name: 'Drill Cat', icon: '🚜', rarity: 'rare', cost: 4, hp: 134, dmg: 21, range: 7, speed: 12, cd: 0.8, structureMult: 1.25, deployCd: 1.15, style: 'single', proj: 'drill', role: 'breaker',
-    ability: { name: 'Diamond Drill', minLevel: 6, minMastery: 12, dmgBoost: 1.14, hpBoost: 1.06 } },
-  { slug: 'raylance', name: 'Ray Lance', icon: '💠', rarity: 'legendary', cost: 5, hp: 100, dmg: 16, range: 15, speed: 12, cd: 0.62, structureMult: 1, deployCd: 1.35, style: 'beam', proj: 'beam', role: 'sniper',
-    ability: { name: 'Overcharge', minLevel: 7, minMastery: 15, dmgBoost: 1.16, hpBoost: 1.05 } },
-  { slug: 'mortarfox', name: 'Mortar Fox', icon: '🧨', rarity: 'epic', cost: 6, hp: 96, dmg: 34, range: 20, speed: 7, cd: 1.32, structureMult: 1.55, deployCd: 1.65, style: 'splash', proj: 'mortar', role: 'artillery', winCondition: true,
-    ability: { name: 'Barrage Mode', minLevel: 7, minMastery: 15, dmgBoost: 1.14, hpBoost: 1.07 } },
-  { slug: 'ramhog', name: 'Ram Hog', icon: '🐗', rarity: 'rare', cost: 5, hp: 128, dmg: 24, range: 8, speed: 15, cd: 0.9, structureMult: 1.2, deployCd: 1.18, style: 'burst', proj: 'ram', role: 'charge', winCondition: true,
-    ability: { name: 'Rampage', minLevel: 7, minMastery: 15, dmgBoost: 1.16, hpBoost: 1.08 } },
-  // ── Swarm archetypes ──────────────────────────────────────────────────────
-  { slug: 'junkpack', name: 'Junk Pack', icon: '🔧', rarity: 'common', cost: 3, hp: 120, dmg: 27, range: 7, speed: 18, cd: 0.6, structureMult: 0.8, deployCd: 1.1, style: 'single', proj: 'slug', role: 'swarm', swarmCount: 3,
-    ability: { name: 'Mob Rush', minLevel: 5, minMastery: 10, dmgBoost: 1.1, hpBoost: 1.08 } },
-  { slug: 'bugsquad', name: 'Bug Squad', icon: '🐛', rarity: 'rare', cost: 4, hp: 160, dmg: 36, range: 9, speed: 22, cd: 0.55, structureMult: 0.9, deployCd: 1.2, style: 'double', proj: 'spark', role: 'swarm', swarmCount: 4,
-    ability: { name: 'Hive Mind', minLevel: 6, minMastery: 12, dmgBoost: 1.12, hpBoost: 1.1 } },
-  { slug: 'mechmice', name: 'Mech Mice', icon: '🐭', rarity: 'common', cost: 2, hp: 84, dmg: 18, range: 7, speed: 24, cd: 0.65, structureMult: 0.85, deployCd: 0.95, style: 'single', proj: 'slug', role: 'swarm', swarmCount: 2,
-    ability: { name: 'Scuttle', minLevel: 5, minMastery: 10, dmgBoost: 1.08, hpBoost: 1.1 } },
-  { slug: 'goblinbikers', name: 'Goblin Bikers', icon: '🏍️', rarity: 'epic', cost: 5, hp: 200, dmg: 55, range: 8, speed: 26, cd: 0.5, structureMult: 1.0, deployCd: 1.3, style: 'single', proj: 'slug', role: 'swarm', swarmCount: 5, winCondition: true,
-    ability: { name: 'Turbo Gang', minLevel: 7, minMastery: 15, dmgBoost: 1.12, hpBoost: 1.1 } },
-  { slug: 'nanodrones', name: 'Nano Drones', icon: '🤖', rarity: 'rare', cost: 4, hp: 135, dmg: 33, range: 13, speed: 18, cd: 0.6, structureMult: 1.0, deployCd: 1.2, style: 'double', proj: 'spark', role: 'swarm', swarmCount: 3,
-    ability: { name: 'Network Link', minLevel: 6, minMastery: 12, dmgBoost: 1.1, hpBoost: 1.08 } },
-  { slug: 'bombbeetles', name: 'Bomb Beetles', icon: '💣', rarity: 'legendary', cost: 6, hp: 240, dmg: 84, range: 8, speed: 14, cd: 0.7, structureMult: 1.2, deployCd: 1.5, style: 'splash', proj: 'shell', role: 'swarm', swarmCount: 6,
-    ability: { name: 'Chain Detonation', minLevel: 7, minMastery: 15, dmgBoost: 1.16, hpBoost: 1.08 } },
-  { slug: 'antmarch', name: 'Ant March', icon: '🐜', rarity: 'common', cost: 2, hp: 72, dmg: 15, range: 7, speed: 22, cd: 0.7, structureMult: 0.8, deployCd: 0.9, style: 'single', proj: 'slug', role: 'swarm', swarmCount: 3,
-    ability: { name: 'Column Charge', minLevel: 5, minMastery: 10, dmgBoost: 1.08, hpBoost: 1.1 } },
-  { slug: 'crickethop', name: 'Cricket Hop', icon: '🦗', rarity: 'common', cost: 2, hp: 88, dmg: 20, range: 8, speed: 30, cd: 0.6, structureMult: 0.85, deployCd: 0.95, style: 'single', proj: 'slug', role: 'swarm', swarmCount: 2,
-    ability: { name: 'Leap Spring', minLevel: 5, minMastery: 10, dmgBoost: 1.09, hpBoost: 1.09 } },
-  { slug: 'beeblitz', name: 'Bee Blitz', icon: '🐝', rarity: 'common', cost: 3, hp: 100, dmg: 20, range: 9, speed: 24, cd: 0.65, structureMult: 0.85, deployCd: 1.0, style: 'double', proj: 'spark', role: 'swarm', swarmCount: 4,
-    ability: { name: 'Sting Flurry', minLevel: 5, minMastery: 10, dmgBoost: 1.1, hpBoost: 1.07 } },
-  { slug: 'scrapbots', name: 'Scrap Bots', icon: '🪲', rarity: 'common', cost: 3, hp: 112, dmg: 27, range: 8, speed: 15, cd: 0.75, structureMult: 0.9, deployCd: 1.1, style: 'single', proj: 'slug', role: 'swarm', swarmCount: 3,
-    ability: { name: 'Salvage Mode', minLevel: 5, minMastery: 10, dmgBoost: 1.08, hpBoost: 1.12 } },
-  { slug: 'lizarddash', name: 'Lizard Dash', icon: '🦎', rarity: 'rare', cost: 3, hp: 108, dmg: 30, range: 7, speed: 28, cd: 0.55, structureMult: 0.9, deployCd: 1.05, style: 'single', proj: 'slug', role: 'swarm', swarmCount: 3,
-    ability: { name: 'Cold Blooded', minLevel: 6, minMastery: 12, dmgBoost: 1.12, hpBoost: 1.06 } },
-  { slug: 'toadtroop', name: 'Toad Troop', icon: '🐸', rarity: 'rare', cost: 4, hp: 165, dmg: 48, range: 13, speed: 13, cd: 0.85, structureMult: 1.0, deployCd: 1.2, style: 'splash', proj: 'shell', role: 'swarm', swarmCount: 3,
-    ability: { name: 'Leapfrog Volley', minLevel: 6, minMastery: 12, dmgBoost: 1.1, hpBoost: 1.1 } },
-  { slug: 'wolfpack', name: 'Wolf Pack', icon: '🐺', rarity: 'rare', cost: 5, hp: 192, dmg: 54, range: 8, speed: 25, cd: 0.8, structureMult: 1.0, deployCd: 1.3, style: 'burst', proj: 'slug', role: 'swarm', swarmCount: 3,
-    ability: { name: 'Pack Fury', minLevel: 6, minMastery: 12, dmgBoost: 1.14, hpBoost: 1.08 } },
-  { slug: 'zombiemob', name: 'Zombie Mob', icon: '🧟', rarity: 'rare', cost: 4, hp: 200, dmg: 30, range: 7, speed: 9, cd: 0.95, structureMult: 1.0, deployCd: 1.2, style: 'single', proj: 'slug', role: 'swarm', swarmCount: 5,
-    ability: { name: 'Reanimate', minLevel: 6, minMastery: 12, dmgBoost: 1.07, hpBoost: 1.16 } },
-  { slug: 'hawkstrike', name: 'Hawk Strike', icon: '🦅', rarity: 'epic', cost: 4, hp: 126, dmg: 54, range: 11, speed: 24, cd: 0.7, structureMult: 1.1, deployCd: 1.2, style: 'double', proj: 'spark', role: 'swarm', swarmCount: 3, winCondition: true,
-    ability: { name: 'Talon Dive', minLevel: 7, minMastery: 15, dmgBoost: 1.14, hpBoost: 1.08 } },
-  { slug: 'crackergang', name: 'Cracker Gang', icon: '🧨', rarity: 'epic', cost: 5, hp: 188, dmg: 60, range: 10, speed: 18, cd: 0.7, structureMult: 1.1, deployCd: 1.3, style: 'burst', proj: 'slug', role: 'swarm', swarmCount: 4,
-    ability: { name: 'Flashbang', minLevel: 7, minMastery: 15, dmgBoost: 1.12, hpBoost: 1.1 } },
-  { slug: 'flybombers', name: 'Fly Bombers', icon: '🪰', rarity: 'epic', cost: 5, hp: 180, dmg: 65, range: 8, speed: 20, cd: 0.6, structureMult: 1.15, deployCd: 1.3, style: 'splash', proj: 'shell', role: 'swarm', swarmCount: 5,
-    ability: { name: 'Kamikaze Drop', minLevel: 7, minMastery: 15, dmgBoost: 1.14, hpBoost: 1.06 } },
-  { slug: 'rabbitrush', name: 'Rabbit Rush', icon: '🐇', rarity: 'epic', cost: 5, hp: 175, dmg: 50, range: 7, speed: 29, cd: 0.55, structureMult: 1.0, deployCd: 1.25, style: 'single', proj: 'slug', role: 'swarm', swarmCount: 5, winCondition: true,
-    ability: { name: 'Burrow Blitz', minLevel: 7, minMastery: 15, dmgBoost: 1.12, hpBoost: 1.1 } },
-  { slug: 'ufofleet', name: 'UFO Fleet', icon: '🛸', rarity: 'legendary', cost: 6, hp: 220, dmg: 88, range: 18, speed: 13, cd: 1.0, structureMult: 1.6, deployCd: 1.5, style: 'beam', proj: 'beam', role: 'swarm', swarmCount: 4, winCondition: true,
-    ability: { name: 'Abduction Ray', minLevel: 7, minMastery: 15, dmgBoost: 1.16, hpBoost: 1.06 } },
-  { slug: 'dustdevils', name: 'Dust Devils', icon: '🌪️', rarity: 'legendary', cost: 6, hp: 180, dmg: 75, range: 15, speed: 22, cd: 0.85, structureMult: 1.1, deployCd: 1.45, style: 'beam', proj: 'beam', role: 'swarm', swarmCount: 3,
-    ability: { name: 'Vortex Spin', minLevel: 7, minMastery: 15, dmgBoost: 1.14, hpBoost: 1.1 } },
-  { slug: 'makoswarm', name: 'Mako Swarm', icon: '🦈', rarity: 'legendary', cost: 7, hp: 312, dmg: 114, range: 9, speed: 16, cd: 0.8, structureMult: 1.2, deployCd: 1.6, style: 'single', proj: 'slug', role: 'swarm', swarmCount: 6,
-    ability: { name: 'Feeding Frenzy', minLevel: 7, minMastery: 15, dmgBoost: 1.18, hpBoost: 1.1 } }
-];
-
-const VARIANTS = [
-  { suffix: 'Mk-I', hp: 0, dmg: 0, range: 0, speed: 0, cost: 0, cd: 0, deployCd: 0, rarityShift: 0, style: null },
-  { suffix: 'Mk-II', hp: 8, dmg: 2, range: 1, speed: 1, cost: 0, cd: -0.03, deployCd: -0.05, rarityShift: 0, style: null },
-  { suffix: 'Twin', hp: -4, dmg: 3, range: 2, speed: -1, cost: 1, cd: 0.02, deployCd: 0.03, rarityShift: 1, style: 'double' },
-  { suffix: 'Burst', hp: -7, dmg: 4, range: 0, speed: 0, cost: 1, cd: -0.08, deployCd: -0.08, rarityShift: 1, style: 'burst' },
-  { suffix: 'Core', hp: 14, dmg: 6, range: 1, speed: -2, cost: 1, cd: 0.08, deployCd: 0.08, rarityShift: 2, style: 'splash' }
-];
-
-function rarityShift(base, shift) {
-  const i = RARITY_ORDER.indexOf(base);
-  return RARITY_ORDER[Math.max(0, Math.min(RARITY_ORDER.length - 1, i + shift))] || base;
-}
-
-function buildCards() {
-  const cards = [];
-  ARCHETYPES.forEach((a) => {
-    VARIANTS.forEach((v, idx) => {
-      const id = idx === 0 ? a.slug : `${a.slug}-${v.suffix.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
-      cards.push({
-        id,
-        name: idx === 0 ? a.name : `${a.name} ${v.suffix}`,
-        icon: a.icon,
-        rarity: rarityShift(a.rarity, v.rarityShift),
-        cost: Math.max(1, Math.min(9, a.cost + v.cost)),
-        hp: Math.max(40, a.hp + v.hp),
-        dmg: Math.max(6, a.dmg + v.dmg),
-        range: Math.max(6, a.range + v.range),
-        speed: Math.max(5, a.speed + v.speed),
-        cd: Math.max(0.45, a.cd + v.cd),
-        deployCd: Math.max(0.7, a.deployCd + v.deployCd),
-        structureMult: a.structureMult,
-        style: v.style || a.style,
-        proj: a.proj,
-        role: a.role,
-        splash: (v.style === 'splash' || a.style === 'splash') ? 5 : 0,
-        winCondition: a.winCondition || false,
-        swarmCount: a.swarmCount || 1,
-        ability: a.ability
-      });
-    });
-  });
-  return cards;
-}
-
-const CARD_LIBRARY = buildCards();
-const CARD_MAP = Object.fromEntries(CARD_LIBRARY.map((c) => [c.id, c]));
-const STARTER_DECK = ['scout', 'brawler', 'siege', 'guardian', 'voltbug', 'drillcat', 'ramhog', 'flarepod'];
-const MAX_DECK = 8;
-
 const AI_PRESETS = {
   easy: {
     baseMult: 0.85,
@@ -161,7 +47,9 @@ const AI_PRESETS = {
     thinkMin: 0.85,
     thinkMax: 1.15,
     strategicChance: 0.42,
-    description: 'Easy: slower deploys and weaker structures.'
+    aggression: 0.15,
+    leakAt: 9.9,
+    description: 'Easy: slow reactions, rarely attacks, weaker towers.'
   },
   normal: {
     baseMult: 1,
@@ -169,7 +57,9 @@ const AI_PRESETS = {
     thinkMin: 0.48,
     thinkMax: 0.58,
     strategicChance: 0.7,
-    description: 'Normal: balanced deploy speed and lane targeting.'
+    aggression: 0.35,
+    leakAt: 9.3,
+    description: 'Normal: defends threats, builds tank-and-support pushes.'
   },
   hard: {
     baseMult: 1.2,
@@ -177,7 +67,9 @@ const AI_PRESETS = {
     thinkMin: 0.33,
     thinkMax: 0.46,
     strategicChance: 0.84,
-    description: 'Hard: faster deploys, better lane focus, tougher HP.'
+    aggression: 0.5,
+    leakAt: 9.0,
+    description: 'Hard: quick reactions, smarter counters, tougher towers.'
   },
   insane: {
     baseMult: 1.45,
@@ -185,7 +77,9 @@ const AI_PRESETS = {
     thinkMin: 0.22,
     thinkMax: 0.33,
     strategicChance: 0.92,
-    description: 'Insane: very fast deploys, aggressive targeting, high HP.'
+    aggression: 0.65,
+    leakAt: 8.6,
+    description: 'Insane: near-instant counters, constant pressure, high tower HP.'
   },
   custom: {
     baseMult: 1,
@@ -193,6 +87,8 @@ const AI_PRESETS = {
     thinkMin: 0.46,
     thinkMax: 0.62,
     strategicChance: 0.72,
+    aggression: 0.35,
+    leakAt: 9.3,
     description: 'Custom: uses your manual HP multipliers.'
   }
 };
@@ -200,18 +96,18 @@ const AI_PRESETS = {
 const state = {
   running: false,
   mode: 'pvp',
-  time: 0,
   lastTick: 0,
-  aiTimer: 0,
-  selectedCard: null,
+  selectedCard: null,   // { owner, type } card picked from a hand
   winner: null,
-  units: [],
-  structures: [],
-  projectiles: [],
-  nextId: 1,
-  players: { A: null, B: null },
-  hand: { A: [], B: [] },
-  handQueue: { A: [], B: [] },
+  match: null,          // local ClashSim match (local PvP and vs AI)
+  ai: null,             // AI brain in vs-AI mode
+  acc: 0,               // fixed-timestep accumulator
+  snapPrev: null,       // previous / current simulation snapshots (rendering blends them)
+  snapCur: null,
+  view: null,           // what the arena draws this frame
+  viewSource: 'local',  // 'local' or 'online'
+  goldPool: 0,
+  damageSeen: 0,
   chestOpening: false,
   chestSession: null,
   admin: {
@@ -232,7 +128,7 @@ const state = {
 
 const ui = {
   lockPanel: null, content: null, password: null, unlock: null, error: null,
-  board: null, units: null, structures: null, projectiles: null,
+  board: null, arena: null, sound: null,
   deckA: null, deckB: null, mode: null, start: null, resetUpgrades: null, log: null,
   status: {
     A: { name: null, base: null, tower: null, energy: null, gold: null },
@@ -260,7 +156,6 @@ const ui = {
 function $(id) { return document.getElementById(id); }
 function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
 function enemyOf(owner) { return owner === 'A' ? 'B' : 'A'; }
-function laneY(lane) { return lane * BOARD.laneHeight + BOARD.laneHeight / 2; }
 function costClass(c) { return c <= 2 ? 'cost-low' : c <= 4 ? 'cost-mid' : c <= 6 ? 'cost-high' : 'cost-max'; }
 
 function cardProgress(id) {
@@ -272,11 +167,16 @@ function cardProgress(id) {
 
 function unlockInitial() {
   CARD_LIBRARY.forEach((c) => cardProgress(c.id));
+  // Starter copies are a one-time gift when the card is first unlocked, not on every page load
   STARTER_DECK.forEach((id) => {
     const p = cardProgress(id);
+    if (p.unlocked) return;
     p.unlocked = true;
     p.copies += 3;
   });
+  // Everyone gets the basic defensive building so that role is available from the start
+  const turret = cardProgress('boltturret');
+  if (!turret.unlocked) { turret.unlocked = true; turret.copies += 1; }
 }
 
 function saveProgress() {
@@ -440,322 +340,133 @@ function applyAiDifficultyPreset(level) {
 }
 
 function getCardStatsAtLevel(id, level, abilityUnlocked, mastery) {
-  const card = CARD_MAP[id];
-  if (!card) return null;
-  const lvl = clamp(level || 1, 1, 14);
-  const scale = 1 + (lvl - 1) * 0.075;
-  const abilityReady = !!abilityUnlocked && lvl >= card.ability.minLevel && (mastery || 0) >= card.ability.minMastery;
-  return {
-    ...card,
-    hpScaled: Math.round(card.hp * scale * (abilityReady ? card.ability.hpBoost : 1)),
-    dmgScaled: +(card.dmg * scale * (abilityReady ? card.ability.dmgBoost : 1)).toFixed(2),
-    deployCdScaled: Math.max(0.62, card.deployCd - (lvl - 1) * 0.02),
-    abilityReady
-  };
+  return Sim.getCardStatsAtLevel(id, level, abilityUnlocked, mastery);
 }
 
 function deckFor(owner) {
   if (onlineActive) return onlineDeckIds;
-  if (owner === 'A') return state.progress.deck.filter((id) => cardProgress(id).unlocked).slice(0, MAX_DECK);
+  if (owner === 'A') return state.progress.deck.filter((id) => CARD_MAP[id] && cardProgress(id).unlocked).slice(0, MAX_DECK);
   if (state.mode === 'ai') {
-    const ai = state.progress.aiDeck.filter((id) => cardProgress(id).unlocked).slice(0, MAX_DECK);
+    const ai = state.progress.aiDeck.filter((id) => CARD_MAP[id] && cardProgress(id).unlocked).slice(0, MAX_DECK);
     if (ai.length > 0) return ai;
     const unlocked = CARD_LIBRARY.filter((c) => cardProgress(c.id).unlocked);
     return unlocked.sort((a, b) => a.cost - b.cost).slice(0, MAX_DECK).map((c) => c.id);
   }
-  return state.progress.deck.slice(0, MAX_DECK);
+  return state.progress.deck.filter((id) => CARD_MAP[id]).slice(0, MAX_DECK);
 }
 
-function createPlayer(id, mode) {
-  const b = state.progress.buildings;
-  const isB = id === 'B';
-  const aiBaseMult = mode === 'ai' && isB ? state.progress.aiHealth.baseMult : 1;
-  return {
-    id,
-    name: isB ? (mode === 'ai' ? 'Enemy AI' : 'Commander B') : 'Commander A',
-    baseHpMax: Math.round((1300 + (b.baseLevel - 1) * 120) * aiBaseMult),
-    baseHp: Math.round((1300 + (b.baseLevel - 1) * 120) * aiBaseMult),
-    energyMax: 10,
-    energy: 10,
-    energyRegen: 1.05,
-    towerDamage: 13 + (b.towerLevel - 1) * 3,
-    cooldowns: {}
-  };
+// Deck entries carry your card levels into the match
+function deckEntries(ids) {
+  return ids.map((id) => {
+    const cp = cardProgress(id);
+    return { id, level: cp.level || 1, abilityUnlocked: !!cp.abilityUnlocked, mastery: cp.mastery || 0 };
+  });
+}
+
+function aiProfile() {
+  const p = getAiProfile();
+  return { thinkMin: p.thinkMin, thinkMax: p.thinkMax, strategicChance: p.strategicChance, aggression: p.aggression, leakAt: p.leakAt };
+}
+
+function playerName(side) {
+  if (onlineActive || state.viewSource === 'online') return side === mySide ? 'You' : 'Opponent';
+  if (side === 'B') return state.mode === 'ai' ? 'Enemy AI' : 'Commander B';
+  return 'Commander A';
+}
+
+// Which side's info goes in the top / bottom nameplate and deck (online: you're always at the bottom)
+function sideAt(position) {
+  const bottom = state.viewSource === 'online' && mySide ? mySide : 'A';
+  return position === 'bottom' ? bottom : enemyOf(bottom);
 }
 
 function setupMatch() {
   state.mode = ui.mode?.value || 'pvp';
   leaveQueue();
   lastMatchWasOnline = false;
+  const b = state.progress.buildings;
+  const vsAi = state.mode === 'ai';
+  const mine = { towerLevel: b.towerLevel, kingLevel: b.baseLevel };
+  const theirs = vsAi
+    ? { ...mine, towerMult: state.progress.aiHealth.towerMult, kingMult: state.progress.aiHealth.baseMult }
+    : mine;
+  state.match = Sim.createMatch({
+    seed: Math.floor(Math.random() * 2147483647),
+    decks: { A: deckEntries(deckFor('A')), B: deckEntries(deckFor('B')) },
+    towers: { A: mine, B: theirs },
+  });
+  state.ai = vsAi ? Sim.createAi('B', aiProfile()) : null;
+  state.viewSource = 'local';
   state.running = true;
-  state.time = 0;
-  state.lastTick = performance.now();
-  state.aiTimer = 0;
   state.winner = null;
   state.selectedCard = null;
-  state.units = [];
-  state.structures = [];
-  state.projectiles = [];
-  state.nextId = 1;
-  state.players.A = createPlayer('A', state.mode);
-  state.players.B = createPlayer('B', state.mode);
-
-  const aDeck = deckFor('A');
-  state.hand.A = aDeck.slice(0, 4);
-  state.handQueue.A = [...aDeck.slice(4)];
-  const bDeck = deckFor('B');
-  state.hand.B = bDeck.slice(0, 4);
-  state.handQueue.B = [...bDeck.slice(4)];
-
-  const keys = [...new Set([...aDeck, ...bDeck])];
-  keys.forEach((k) => {
-    state.players.A.cooldowns[k] = 0;
-    state.players.B.cooldowns[k] = 0;
-  });
-
-  for (let lane = 0; lane < BOARD.laneCount; lane += 1) {
-    const towerHpBase = 320 + (state.progress.buildings.towerLevel - 1) * 28;
-    const towerHpA = towerHpBase;
-    const towerHpB = state.mode === 'ai'
-      ? Math.round(towerHpBase * state.progress.aiHealth.towerMult)
-      : towerHpBase;
-    state.structures.push({ id: `tower-A-${lane}`, owner: 'A', lane, x: BOARD.towerX.A, hpMax: towerHpA, hp: towerHpA, kind: 'tower', cd: 0 });
-    state.structures.push({ id: `tower-B-${lane}`, owner: 'B', lane, x: BOARD.towerX.B, hpMax: towerHpB, hp: towerHpB, kind: 'tower', cd: 0 });
-  }
-  state.structures.push({ id: 'base-A', owner: 'A', lane: 1, x: BOARD.baseX.A, hpMax: state.players.A.baseHpMax, hp: state.players.A.baseHp, kind: 'base', cd: 0 });
-  state.structures.push({ id: 'base-B', owner: 'B', lane: 1, x: BOARD.baseX.B, hpMax: state.players.B.baseHpMax, hp: state.players.B.baseHp, kind: 'base', cd: 0 });
-
+  state.acc = 0;
+  state.damageSeen = 0;
+  state.goldPool = 0;
+  state.snapPrev = Sim.snapshot(state.match);
+  state.snapCur = state.snapPrev;
+  state.view = state.snapCur;
   renderDecks();
   renderStatus();
-  renderStructures();
-  renderUnits();
-  renderProjectiles();
 }
 
-function livingStructures(owner, lane, kind) {
-  return state.structures.filter((s) => s.owner === owner && s.hp > 0 && (lane == null || s.lane === lane) && (!kind || s.kind === kind));
+// Gold trickles in from damage you deal in local modes (same idea as before the arena rework)
+function rewardDamage() {
+  const dealt = state.match.players.A.damageDealt;
+  state.goldPool += (dealt - state.damageSeen) * 0.014;
+  state.damageSeen = dealt;
+  if (state.goldPool >= 1) {
+    const whole = Math.floor(state.goldPool);
+    state.progress.gold += whole;
+    state.goldPool -= whole;
+  }
 }
 
-function findUnitTargets(u) {
-  const foe = enemyOf(u.owner);
-  const inRange = state.units
-    .filter((x) => x.owner === foe && x.lane === u.lane && x.hp > 0)
-    .map((x) => ({ t: x, d: Math.abs(x.x - u.x) }))
-    .filter((x) => x.d <= u.range)
-    .sort((a, b) => a.d - b.d)
-    .map((x) => x.t);
-  if (inRange.length === 0) return [];
-  return u.style === 'double' ? inRange.slice(0, 2) : [inRange[0]];
-}
-
-function primaryEnemyStructure(unit) {
-  const foe = enemyOf(unit.owner);
-  const towers = livingStructures(foe, unit.lane, 'tower');
-  if (towers.length > 0) return towers[0];
-  return livingStructures(foe, null, 'base')[0] || null;
-}
-
-function unitById(id) { return state.units.find((u) => u.id === id) || null; }
-function structureById(id) { return state.structures.find((s) => s.id === id) || null; }
-
-function dealDamage(attacker, target, amount) {
-  if (!target || target.hp <= 0 || amount <= 0) return;
-  target.hp -= amount;
-  if (attacker && attacker.owner === 'A') {
-    attacker.rewardPool = (attacker.rewardPool || 0) + amount * 0.024;
-    if (attacker.rewardPool >= 1) {
-      state.progress.gold += Math.floor(attacker.rewardPool);
-      attacker.rewardPool = 0;
+// Fixed-timestep simulation; rendering blends the last two steps so motion stays smooth
+function stepLocalMatch(dt) {
+  const m = state.match;
+  if (!m || !state.running) return;
+  state.acc = Math.min(state.acc + dt, 0.25);
+  while (state.acc >= STEP) {
+    state.acc -= STEP;
+    if (state.ai) Sim.aiUpdate(m, state.ai, STEP);
+    Sim.step(m);
+    handleFx(Sim.takeFx(m));
+    rewardDamage();
+    state.snapPrev = state.snapCur;
+    state.snapCur = Sim.snapshot(m);
+    if (!m.running) {
+      state.acc = 0;
+      onVictory(m.winner);
+      break;
     }
   }
 }
 
-function spawnProjectile(source, target, damage, targetKind) {
-  const sx = source.x;
-  const sy = laneY(source.lane) + (source.owner === 'A' ? 12 : -12);
-  const tx = target.x;
-  const ty = laneY(target.lane ?? source.lane);
-  const dx = tx - sx;
-  const dy = (ty - sy) / 12;
-  const dist = Math.max(1, Math.hypot(dx, dy));
-  const speed = source.proj === 'beam' ? 170 : source.proj === 'mortar' ? 66 : 104;
-  const ttl = dist / speed;
-
-  state.projectiles.push({
-    id: `p-${state.nextId++}`,
-    owner: source.owner,
-    x: sx,
-    y: sy,
-    vx: dx / ttl,
-    vy: dy / ttl,
-    ttl,
-    style: source.proj || 'slug',
-    damage,
-    targetId: target.id,
-    targetKind,
-    sourceId: source.id,
-    splash: source.splash || 0
-  });
+function angleLerp(a, b, t) {
+  let d = b - a;
+  while (d > Math.PI) d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  return a + d * t;
 }
 
-function hitProjectile(p) {
-  const target = p.targetKind === 'unit' ? unitById(p.targetId) : structureById(p.targetId);
-  if (!target || target.hp <= 0) return;
-  const attacker = unitById(p.sourceId);
-  dealDamage(attacker, target, p.damage);
-
-  if (p.splash > 0 && target.lane != null) {
-    state.units.forEach((u) => {
-      if (u.hp <= 0 || u.owner !== target.owner || u.id === target.id || u.lane !== target.lane) return;
-      if (Math.abs(u.x - target.x) <= p.splash) dealDamage(attacker, u, p.damage * 0.55);
-    });
-  }
-}
-
-function deployUnit(owner, cardId, lane) {
-  if (!state.running) return false;
-  const p = state.players[owner];
-  const card = getCardStats(cardId);
-  if (!p || !card) return false;
-  if (p.energy < card.cost) return false;
-  if ((p.cooldowns[cardId] || 0) > state.time) return false;
-
-  p.energy -= card.cost;
-  p.cooldowns[cardId] = state.time + card.deployCdScaled;
-
-  const count = card.swarmCount || 1;
-  // Each swarm unit is proportionally weaker so total value equals one normal unit
-  const hpPer  = Math.max(10, Math.round(card.hpScaled  / count));
-  const dmgPer = Math.max(1,  +(card.dmgScaled / count).toFixed(2));
-  const spawnX = owner === 'A' ? BOARD.spawnA : BOARD.spawnB;
-
-  for (let i = 0; i < count; i++) {
-    // Spread swarm units slightly so they don't stack on top of each other
-    const xOffset = count > 1 ? (i - (count - 1) / 2) * 1.2 : 0;
-    state.units.push({
-      id: `u-${state.nextId++}`,
-      owner,
-      lane,
-      cardId,
-      icon: card.icon,
-      rarity: card.rarity,
-      name: count > 1 ? `${card.name} #${i + 1}` : card.name,
-      hp: hpPer,
-      hpMax: hpPer,
-      dmg: dmgPer,
-      range: card.range,
-      speed: card.speed,
-      cd: card.cd,
-      atkCd: i * 0.08, // slight stagger so they don't all fire simultaneously
-      x: spawnX + xOffset,
-      style: card.style,
-      proj: card.proj,
-      splash: card.splash,
-      structureMult: card.structureMult,
-      winCondition: card.winCondition || false,
-      rewardPool: 0
-    });
-  }
-
-  const cp = cardProgress(cardId);
-  cp.mastery = (cp.mastery || 0) + 0.25;
-  cycleHand(owner, cardId);
-  saveProgress();
-  return true;
-}
-
-function cycleHand(owner, cardId) {
-  const hand = state.hand[owner];
-  const queue = state.handQueue[owner];
-  if (!hand || !queue || queue.length === 0) return;
-  const idx = hand.indexOf(cardId);
-  if (idx < 0) return;
-  const next = queue.shift();
-  hand[idx] = next;
-  queue.push(cardId);
-}
-
-function updateEnergy(dt) {
-  ['A', 'B'].forEach((id) => {
-    const p = state.players[id];
-    p.energy = clamp(p.energy + p.energyRegen * dt, 0, p.energyMax);
-  });
-}
-
-function updateUnits(dt) {
-  state.units.forEach((u) => {
-    if (u.hp <= 0) return;
-    u.atkCd -= dt;
-
-    // Win conditions ignore enemy units and march straight for structures.
-    // All other cards fight enemy units first, then advance on structures.
-    if (!u.winCondition) {
-      const targets = findUnitTargets(u);
-      if (targets.length > 0) {
-        if (u.atkCd <= 0) {
-          targets.forEach((t) => spawnProjectile(u, t, u.dmg, 'unit'));
-          if (u.style === 'burst') spawnProjectile(u, targets[0], u.dmg * 0.45, 'unit');
-          u.atkCd = u.cd;
-        }
-        return;
-      }
-    }
-
-    const structure = primaryEnemyStructure(u);
-    if (!structure) return;
-    const dist = Math.abs(structure.x - u.x);
-    if (dist <= u.range) {
-      if (u.atkCd <= 0) {
-        spawnProjectile(u, structure, u.dmg * u.structureMult, 'structure');
-        u.atkCd = u.cd;
-      }
-    } else {
-      const dir = u.owner === 'A' ? 1 : -1;
-      u.x += dir * u.speed * dt;
-    }
-  });
-
-  state.units = state.units.filter((u) => u.hp > 0 && u.x >= -3 && u.x <= 103);
-}
-
-function updateProjectiles(dt) {
-  state.projectiles.forEach((p) => {
-    p.ttl -= dt;
-    p.x += p.vx * dt;
-    p.y += p.vy * dt;
-    if (p.ttl <= 0) hitProjectile(p);
-  });
-  state.projectiles = state.projectiles.filter((p) => p.ttl > 0);
-}
-
-function updateStructures(dt) {
-  state.structures.forEach((s) => {
-    if (s.hp <= 0) return;
-    s.cd -= dt;
-    const foe = enemyOf(s.owner);
-    let target = null;
-    let best = Infinity;
-    const range = s.kind === 'base' ? 14 : 22;
-    const dmg = s.kind === 'base' ? 17 : state.players[s.owner].towerDamage;
-
-    state.units.forEach((u) => {
-      if (u.owner !== foe || u.lane !== s.lane || u.hp <= 0) return;
-      const d = Math.abs(u.x - s.x);
-      if (d <= range && d < best) { target = u; best = d; }
-    });
-
-    if (target && s.cd <= 0) {
-      spawnProjectile({ id: s.id, owner: s.owner, lane: s.lane, x: s.x, proj: s.kind === 'base' ? 'pulse' : 'shell', splash: 0 }, target, dmg, 'unit');
-      s.cd = s.kind === 'base' ? 0.72 : 0.9;
-    }
-  });
-}
-
-function syncBaseHp() {
-  const a = state.structures.find((s) => s.id === 'base-A');
-  const b = state.structures.find((s) => s.id === 'base-B');
-  state.players.A.baseHp = a ? Math.max(0, a.hp) : 0;
-  state.players.B.baseHp = b ? Math.max(0, b.hp) : 0;
+function lerpSnap(a, b, t) {
+  if (!a || !b || a === b) return b;
+  const k = clamp(t, 0, 1);
+  const lerp = (x, y) => x + (y - x) * k;
+  const prevUnits = new Map(a.units.map((u) => [u.id, u]));
+  const prevShots = new Map(a.projectiles.map((p) => [p.id, p]));
+  return {
+    ...b,
+    units: b.units.map((u) => {
+      const p = prevUnits.get(u.id);
+      return p ? { ...u, x: lerp(p.x, u.x), y: lerp(p.y, u.y), face: angleLerp(p.face, u.face, k) } : u;
+    }),
+    projectiles: b.projectiles.map((pr) => {
+      const p = prevShots.get(pr.id);
+      return p ? { ...pr, x: lerp(p.x, pr.x), y: lerp(p.y, pr.y), lob: pr.lob == null ? null : lerp(p.lob ?? pr.lob, pr.lob) } : pr;
+    }),
+  };
 }
 
 function awardChest() {
@@ -789,11 +500,15 @@ function awardWinCard() {
   return { card: pick, isUnlock: false, copies };
 }
 
-function showWinOverlay(won, cardAward, goldBonus, isOnline) {
+// result: 'win' | 'loss' | 'draw'. extra: { headline, detail }
+function showWinOverlay(result, cardAward, goldBonus, isOnline, extra) {
   if (!ui.winOverlay) return;
-  if (ui.winHeadline) ui.winHeadline.textContent = won ? 'VICTORY!' : 'DEFEAT';
-  ui.winOverlay.classList.toggle('is-loss', !won);
-  if (ui.winSubline) ui.winSubline.textContent = goldBonus ? `+${goldBonus} gold` : '';
+  const won = result === 'win';
+  const x = extra || {};
+  if (ui.winHeadline) ui.winHeadline.textContent = x.headline || (won ? 'VICTORY!' : result === 'draw' ? 'DRAW' : 'DEFEAT');
+  ui.winOverlay.classList.toggle('is-loss', result === 'loss');
+  ui.winOverlay.classList.toggle('is-draw', result === 'draw');
+  if (ui.winSubline) ui.winSubline.textContent = [x.detail, goldBonus ? `+${goldBonus} gold` : ''].filter(Boolean).join(' · ');
 
   if (won && cardAward) {
     const { card, isUnlock, copies } = cardAward;
@@ -834,12 +549,23 @@ function closeWinOverlay() {
   renderCollection();
 }
 
+function crownLine(view) {
+  if (!view) return '';
+  return `👑 ${view.players.A.crowns} – ${view.players.B.crowns}`;
+}
+
+function endReasonText(reason) {
+  return { king: 'King tower destroyed', crowns: 'More crowns at full time', overtime: 'Overtime crown', tiebreak: 'Tiebreaker: healthier towers' }[reason] || '';
+}
+
 function onVictory(winner) {
-  if (!state.running || state.winner) return;
+  if (state.winner) return;
   state.winner = winner;
   state.running = false;
+  state.selectedCard = null;
   let cardAward = null;
   let goldBonus = 0;
+  const reason = endReasonText(state.match?.endReason);
   if (winner === 'A') {
     goldBonus = 140;
     state.progress.gold += goldBonus;
@@ -849,94 +575,60 @@ function onVictory(winner) {
     const cardMsg = cardAward
       ? (cardAward.isUnlock ? ` Unlocked ${cardAward.card.name}!` : ` +${cardAward.copies} ${cardAward.card.name}.`)
       : '';
-    writeLog(`You win! +${goldBonus} gold, chest earned.${cardMsg}`);
+    writeLog(`${playerName('A')} wins! ${reason}. +${goldBonus} gold, chest earned.${cardMsg}`);
+  } else if (winner === 'draw') {
+    writeLog(`Draw. ${reason}. Press Start Match to play again.`);
   } else {
-    writeLog('Opponent wins. Press Start Match to rematch.');
+    writeLog(`${playerName('B')} wins. ${reason}. Press Start Match to rematch.`);
   }
   saveProgress();
   renderProgress();
   renderCollection();
-  showWinOverlay(winner === 'A', cardAward, goldBonus, false);
-}
-
-function updateAi(dt) {
-  if (!state.running || state.mode !== 'ai') return;
-  const profile = getAiProfile();
-  state.aiTimer -= dt;
-  if (state.aiTimer > 0) return;
-  state.aiTimer = profile.thinkMin + Math.random() * (profile.thinkMax - profile.thinkMin);
-
-  const p = state.players.B;
-  const aiHand = state.hand.B && state.hand.B.length > 0 ? state.hand.B : deckFor('B');
-  const options = aiHand.filter((id) => {
-    const c = getCardStats(id);
-    return c && p.energy >= c.cost && (p.cooldowns[id] || 0) <= state.time;
-  });
-  if (options.length === 0) return;
-
-  const laneThreat = [0, 0, 0];
-  state.units.forEach((u) => {
-    if (u.owner !== 'A' || u.hp <= 0) return;
-    laneThreat[u.lane] += (100 - u.x) * 0.09 + u.hp * 0.03;
-  });
-
-  const lane = Math.random() < profile.strategicChance
-    ? laneThreat.indexOf(Math.max(...laneThreat))
-    : Math.floor(Math.random() * 3);
-
-  const pick = state.progress.aiDifficulty === 'easy'
-    ? options.sort((a, b) => (CARD_MAP[a]?.cost || 0) - (CARD_MAP[b]?.cost || 0))[0]
-    : state.progress.aiDifficulty === 'insane'
-      ? options.sort((a, b) => (CARD_MAP[b]?.cost || 0) - (CARD_MAP[a]?.cost || 0))[0]
-      : options[Math.floor(Math.random() * options.length)];
-  deployUnit('B', pick, lane);
-}
-
-function update(dt) {
-  if (!state.running) return;
-  state.time += dt;
-  updateEnergy(dt);
-  updateAi(dt);
-  updateUnits(dt);
-  updateStructures(dt);
-  updateProjectiles(dt);
-
-  state.structures.forEach((s) => { if (s.hp < 0) s.hp = 0; });
-  syncBaseHp();
-  if (state.players.A.baseHp <= 0) onVictory('B');
-  if (state.players.B.baseHp <= 0) onVictory('A');
+  Sound.play(winner === 'A' ? 'win' : winner === 'draw' ? 'draw' : 'lose');
+  const result = winner === 'draw' ? 'draw' : winner === 'A' ? 'win' : 'loss';
+  const headline = state.mode === 'pvp' && winner !== 'draw' ? `${playerName(winner).toUpperCase()} WINS!` : null;
+  showWinOverlay(result, cardAward, goldBonus, false, { headline, detail: `${reason} · ${crownLine(state.snapCur)}` });
 }
 
 function renderStatus() {
-  const A = state.players.A;
-  const B = state.players.B;
-  if (!A || !B) return;
-
-  ['A', 'B'].forEach((id) => {
-    const p = id === 'A' ? A : B;
-    const s = ui.status[id];
-    const alive = livingStructures(id, null, 'tower').length;
-    s.name.textContent = p.name;
-    s.base.textContent = Math.ceil(p.baseHp);
-    s.tower.textContent = '⬡'.repeat(alive) + '✕'.repeat(3 - alive);
-    s.energy.textContent = p.energy.toFixed(1);
-    s.gold.textContent = id === 'A' ? `💰 ${state.progress.gold}` : (state.mode === 'ai' ? 'ENEMY AI' : '—');
-    if (ui.baseBars[id]) ui.baseBars[id].style.width = `${clamp((p.baseHp / p.baseHpMax) * 100, 0, 100)}%`;
-    if (ui.energyBars[id]) ui.energyBars[id].style.width = `${clamp((p.energy / p.energyMax) * 100, 0, 100)}%`;
+  const v = state.view;
+  if (!v) return;
+  [['bottom', 'A'], ['top', 'B']].forEach(([position, slot]) => {
+    const side = sideAt(position);
+    const p = v.players[side];
+    const s = ui.status[slot];
+    const towers = v.towers.filter((t) => t.owner === side);
+    const king = towers.find((t) => t.tower === 'king');
+    const princesses = towers.filter((t) => t.tower === 'princess').map((t) => (t.hp > 0 ? '⬡' : '✕'));
+    s.name.textContent = playerName(side);
+    s.base.textContent = Math.ceil(king.hp);
+    s.tower.textContent = `${princesses[0]}♛${princesses[1]}  👑${p.crowns}`;
+    // Like the real game, you can't see your online opponent's elixir
+    const hidden = state.viewSource === 'online' && side !== mySide;
+    s.energy.textContent = hidden ? '?' : Math.floor(p.elixir);
+    const mine = side === 'A' && state.viewSource !== 'online';
+    s.gold.textContent = mine ? `💰 ${state.progress.gold}` : (state.mode === 'ai' && state.viewSource !== 'online' && side === 'B' ? 'ENEMY AI' : '—');
+    if (ui.baseBars[slot]) ui.baseBars[slot].style.width = `${clamp((king.hp / king.hpMax) * 100, 0, 100)}%`;
+    if (ui.energyBars[slot]) ui.energyBars[slot].style.width = hidden ? '0%' : `${clamp((p.elixir / Sim.MATCH.maxElixir) * 100, 0, 100)}%`;
   });
 }
 
 function cardButton(owner, id) {
   const card = getCardStats(id);
-  if (!card) return '';
-  const p = state.players[owner];
-  const rem = Math.max(0, (p.cooldowns[id] || 0) - state.time);
+  const v = state.view;
+  if (!card || !v) return '';
+  const p = v.players[owner];
+  const rem = (p.cooldownsRemaining && p.cooldownsRemaining[id]) || 0;
   const onCd = rem > 0;
-  const disabled = !state.running || p.energy < card.cost || onCd;
-  const cdPct = onCd ? Math.round((1 - rem / card.deployCdScaled) * 100) : 100;
+  const short = p.elixir < card.cost;
+  const disabled = !v.running || onCd;
+  const cdPct = onCd ? Math.round((1 - rem / card.deployCdScaled) * 10) * 10 : 100;
+  // Quantised so the hand doesn't re-render every frame while elixir fills
+  const fill = Math.floor(clamp(p.elixir / card.cost, 0, 1) * 10) * 10;
   const selected = state.selectedCard && state.selectedCard.owner === owner && state.selectedCard.type === id;
   const cp = cardProgress(id);
-  return `<button class="card rarity-${card.rarity}${card.winCondition ? ' wc' : ''}${card.swarmCount > 1 ? ' swarm' : ''}" data-owner="${owner}" data-type="${id}" draggable="true" data-disabled="${disabled ? '1' : '0'}" data-selected="${selected ? '1' : '0'}"><span class="card-rarity">${RARITY_STYLE[card.rarity].label}${card.winCondition ? ' 👑' : ''}${card.swarmCount > 1 ? ` ×${card.swarmCount}` : ''}</span><span class="card-icon">${card.icon}</span><span class="card-cost ${costClass(card.cost)}">${card.cost}</span><span class="card-name">${card.name}</span><span class="card-meta">Lv ${cp.level} • ${card.role}</span><span class="card-cd-bar"><i style="width:${cdPct}%"></i></span></button>`;
+  const tags = `${card.winCondition ? ' 👑' : ''}${card.air ? ' ✈' : ''}${card.swarmCount > 1 ? ` ×${card.swarmCount}` : ''}`;
+  return `<button class="card rarity-${card.rarity}${card.winCondition ? ' wc' : ''}${card.swarmCount > 1 ? ' swarm' : ''}" data-owner="${owner}" data-type="${id}" data-disabled="${disabled ? '1' : '0'}" data-short="${short ? '1' : '0'}" data-selected="${selected ? '1' : '0'}" title="${card.name}: ${card.role}"><span class="card-rarity">${RARITY_STYLE[card.rarity].label}${tags}</span><span class="card-icon">${card.icon}</span><span class="card-cost ${costClass(card.cost)}">${card.cost}</span><span class="card-name">${card.name}</span><span class="card-meta">Lv ${cp.level} • ${card.role}</span><span class="card-cd-bar"><i style="width:${cdPct}%"></i></span>${short ? `<span class="card-short" style="transform:scaleX(${fill / 100})"></span>` : ''}</button>`;
 }
 
 function deckAvgCost(ids) {
@@ -952,10 +644,10 @@ function avgElixirBar(ids) {
 }
 
 function renderHandDeck(owner) {
-  const hand = state.hand[owner] && state.hand[owner].length > 0 ? state.hand[owner] : deckFor(owner).slice(0, 4);
-  const queue = state.handQueue[owner] || [];
-  const nextId = queue[0];
-  const nextCard = nextId ? CARD_MAP[nextId] : null;
+  const v = state.view;
+  const p = v && v.players[owner];
+  const hand = p && p.hand.length ? p.hand : deckFor(owner).slice(0, 4);
+  const nextCard = p && p.next ? CARD_MAP[p.next] : null;
   const nextHtml = nextCard
     ? `<div class="next-card-preview"><span class="next-label">NEXT</span><span class="next-icon">${nextCard.icon}</span><span class="next-name">${nextCard.name}</span></div>`
     : '';
@@ -963,44 +655,18 @@ function renderHandDeck(owner) {
 }
 
 function renderDecks() {
-  if (!state.players.A || !state.players.B) return;
-  if (onlineActive) {
-    const myDeck = mySide === 'A' ? ui.deckA : ui.deckB;
-    const oppDeck = mySide === 'A' ? ui.deckB : ui.deckA;
-    setHtml(myDeck, renderHandDeck(mySide));
-    setHtml(oppDeck, '<div class="note">Opponent is playing…</div>');
+  if (!state.view) return;
+  if (state.viewSource === 'online') {
+    setHtml(ui.deckA, mySide ? renderHandDeck(mySide) : '');
+    setHtml(ui.deckB, '<div class="note">Opponent is playing…</div>');
     return;
   }
-
   setHtml(ui.deckA, renderHandDeck('A'));
   if (state.mode === 'ai') {
     setHtml(ui.deckB, '<div class="note">Enemy AI controls this deck in real time.</div>');
   } else {
     setHtml(ui.deckB, renderHandDeck('B'));
   }
-}
-
-function renderStructures() {
-  setHtml(ui.structures, state.structures.map((s) => {
-    const y = laneY(s.lane);
-    const hp = clamp((s.hp / s.hpMax) * 100, 0, 100);
-    const hpNum = `${Math.max(0, Math.ceil(s.hp))}/${s.hpMax}`;
-    const team = s.owner === 'A' ? 'team-a' : 'team-b';
-    const icon = s.kind === 'base' ? '🏰' : '🗼';
-    return `<div class="structure ${team} ${s.kind}" data-alive="${s.hp > 0 ? '1' : '0'}" style="left:${s.x}%;top:${y}px"><span class="structure-icon">${icon}</span><span class="structure-hp-label">${hpNum}</span><span class="hp"><i style="width:${hp}%"></i></span></div>`;
-  }).join(''));
-}
-
-function renderUnits() {
-  setHtml(ui.units, state.units.map((u) => {
-    const y = laneY(u.lane) + (u.owner === 'A' ? 14 : -14);
-    const hp = clamp((u.hp / u.hpMax) * 100, 0, 100);
-    return `<div class="unit team-${u.owner.toLowerCase()} rarity-${u.rarity}" data-type="${u.cardId}" style="left:${u.x}%;top:${y}px"><span class="tank-art">${u.icon}</span><span class="hp"><i style="width:${hp}%"></i></span></div>`;
-  }).join(''));
-}
-
-function renderProjectiles() {
-  setHtml(ui.projectiles, state.projectiles.map((p) => `<div class="projectile ${p.style} team-${p.owner.toLowerCase()}" style="left:${p.x}%;top:${p.y}px"></div>`).join(''));
 }
 
 function writeLog(msg) { if (ui.log) ui.log.textContent = msg; }
@@ -1012,70 +678,285 @@ function setHtml(el, html) {
   el.__html = html;
 }
 
-function tryDeploy(lane) {
-  if (!state.selectedCard) return;
-  if (onlineActive) {
-    if (state.selectedCard.owner !== mySide) return;
-    socket.emit('deploy', { unit: state.selectedCard.type, lane });
-    state.selectedCard = null;
-    return;
+// ─── Sound: a tiny WebAudio synth, so no audio files are needed ─────────────
+
+const Sound = (() => {
+  let ctx = null;
+  let enabled = true;
+  try { enabled = localStorage.getItem('prototype_sound') !== 'off'; } catch (_) {}
+  const lastPlayed = {};
+
+  function unlock() {
+    if (!enabled) return;
+    try {
+      if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+      if (ctx.state === 'suspended') ctx.resume();
+    } catch (_) { ctx = null; }
   }
-  const ok = deployUnit(state.selectedCard.owner, state.selectedCard.type, lane);
-  if (ok) {
-    writeLog(`${state.players[state.selectedCard.owner].name} deployed ${CARD_MAP[state.selectedCard.type].name} in ${['Top', 'Mid', 'Bot'][lane]} lane.`);
-    state.selectedCard = null;
+
+  function tone(freq, dur, opts) {
+    const o = opts || {};
+    const t0 = ctx.currentTime + (o.delay || 0);
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = o.type || 'sine';
+    osc.frequency.setValueAtTime(freq, t0);
+    if (o.slide) osc.frequency.exponentialRampToValueAtTime(Math.max(30, freq * o.slide), t0 + dur);
+    gain.gain.setValueAtTime(o.vol || 0.05, t0);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.02);
+  }
+
+  function noise(dur, vol) {
+    const len = Math.floor(ctx.sampleRate * dur);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    const src = ctx.createBufferSource();
+    const gain = ctx.createGain();
+    gain.gain.value = vol;
+    src.buffer = buf;
+    src.connect(gain).connect(ctx.destination);
+    src.start();
+  }
+
+  const SOUNDS = {
+    deploy: () => tone(520, 0.12, { type: 'triangle', slide: 1.6, vol: 0.05 }),
+    select: () => tone(760, 0.05, { vol: 0.025 }),
+    hit: () => tone(190, 0.05, { type: 'square', vol: 0.01 }),
+    splash: () => noise(0.18, 0.04),
+    death: () => tone(240, 0.16, { type: 'sawtooth', slide: 0.4, vol: 0.02 }),
+    tower: () => { noise(0.7, 0.14); tone(90, 0.6, { slide: 0.5, vol: 0.12 }); },
+    reject: () => tone(140, 0.12, { type: 'square', vol: 0.035 }),
+    win: () => [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.25, { type: 'triangle', delay: i * 0.12, vol: 0.06 })),
+    lose: () => [392, 330, 262].forEach((f, i) => tone(f, 0.35, { type: 'triangle', delay: i * 0.16, vol: 0.05 })),
+    draw: () => [440, 440].forEach((f, i) => tone(f, 0.2, { delay: i * 0.2, vol: 0.04 })),
+  };
+  const MIN_GAP = { hit: 0.07, splash: 0.12, death: 0.08 };
+
+  function play(name) {
+    if (!enabled || !ctx || !SOUNDS[name]) return;
+    const now = ctx.currentTime;
+    if (MIN_GAP[name] && now - (lastPlayed[name] || 0) < MIN_GAP[name]) return;
+    lastPlayed[name] = now;
+    try { SOUNDS[name](); } catch (_) {}
+  }
+
+  function setEnabled(on) {
+    enabled = on;
+    try { localStorage.setItem('prototype_sound', on ? 'on' : 'off'); } catch (_) {}
+    if (on) unlock();
+  }
+
+  return { unlock, play, setEnabled, get enabled() { return enabled; } };
+})();
+
+// Battle effects from the simulation: draw them and play matching sounds
+function handleFx(list) {
+  if (!list || !list.length || !arena) return;
+  arena.addFx(list);
+  for (const f of list) {
+    if (f.type === 'deploy' || f.type === 'tower' || f.type === 'splash' || f.type === 'death' || f.type === 'hit') Sound.play(f.type);
   }
 }
 
+// ─── Card placement: drag a card onto the arena, or tap a card then tap the arena ───
+
+let drag = null;          // card being dragged from the hand
+let pointerWorld = null;  // pointer position in arena tiles (null when off the arena)
+let rejectNote = null;    // short-lived "why that didn't work" message
+let dragGhostEl = null;
+
+function canControl(owner) {
+  if (state.viewSource === 'online') return onlineActive && owner === mySide;
+  if (!state.running) return false;
+  if (state.mode === 'ai') return owner === 'A';
+  return owner === 'A' || owner === 'B';
+}
+
+function zoneCheck(owner, card, x, y) {
+  return state.viewSource === 'online'
+    ? Sim.canDeployOnSnapshot(state.view, owner, x, y, card)
+    : Sim.canDeploy(state.match, owner, x, y, card);
+}
+
+function deployCheck(owner, cardId, x, y) {
+  const card = getCardStats(cardId);
+  const v = state.view;
+  const p = v && v.players[owner];
+  if (!card || !p) return { ok: false, reason: 'Match not running' };
+  if (!v.running) return { ok: false, reason: 'Match is over' };
+  if (!zoneCheck(owner, card, x, y)) return { ok: false, reason: "Can't deploy there" };
+  if (p.elixir < card.cost) return { ok: false, reason: `Need ${card.cost} elixir` };
+  if (((p.cooldownsRemaining && p.cooldownsRemaining[cardId]) || 0) > 0) return { ok: false, reason: 'Card is recharging' };
+  return { ok: true };
+}
+
+function rejectDeploy(reason, owner, cardId) {
+  rejectNote = { text: reason, until: performance.now() + 1100 };
+  writeLog(reason);
+  Sound.play('reject');
+  const el = [...document.querySelectorAll('.card')].find((c) => c.dataset.owner === owner && c.dataset.type === cardId);
+  if (el) {
+    el.classList.remove('shake');
+    void el.offsetWidth;
+    el.classList.add('shake');
+  }
+}
+
+function tryDeployAt(owner, cardId, x, y) {
+  if (!canControl(owner)) return false;
+  const check = deployCheck(owner, cardId, x, y);
+  if (!check.ok) { rejectDeploy(check.reason, owner, cardId); return false; }
+  if (state.viewSource === 'online') {
+    socket.emit('deploy', { cardId, x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100 });
+    state.selectedCard = null;
+    Sound.play('deploy');
+    return true;
+  }
+  const res = Sim.deploy(state.match, owner, cardId, x, y);
+  if (!res.ok) { rejectDeploy(res.reason, owner, cardId); return false; }
+  if (owner === 'A') {
+    const cp = cardProgress(cardId);
+    cp.mastery = (cp.mastery || 0) + 0.25;
+    saveProgress();
+  }
+  writeLog(`${playerName(owner)} deployed ${CARD_MAP[cardId].name}.`);
+  state.selectedCard = null;
+  handleFx(Sim.takeFx(state.match));
+  state.snapCur = Sim.snapshot(state.match); // show it immediately
+  return true;
+}
+
+function placementGhost() {
+  const sel = state.selectedCard;
+  if (!sel || !pointerWorld || !canControl(sel.owner)) return null;
+  const check = deployCheck(sel.owner, sel.type, pointerWorld.x, pointerWorld.y);
+  const note = rejectNote && performance.now() < rejectNote.until ? rejectNote.text : null;
+  return { cardId: sel.type, owner: sel.owner, x: pointerWorld.x, y: pointerWorld.y, valid: check.ok, reason: check.ok ? null : (note || check.reason) };
+}
+
+function zoneOverlay() {
+  const sel = state.selectedCard;
+  const v = state.view;
+  if (!sel || !v || !canControl(sel.owner)) return null;
+  const card = getCardStats(sel.type);
+  if (!card) return null;
+  const alive = v.towers.map((t) => (t.hp > 0 ? 1 : 0)).join('');
+  const buildings = v.units.filter((u) => u.building).map((u) => u.id).join(',');
+  return { fn: (x, y) => zoneCheck(sel.owner, card, x, y), key: `${sel.owner}|${card.building ? 1 : 0}|${alive}|${buildings}` };
+}
+
+function renderArena() {
+  if (!arena) return;
+  const zones = zoneOverlay();
+  arena.render(state.view, {
+    flip: state.viewSource === 'online' && mySide === 'B',
+    zoneFn: zones && zones.fn,
+    zoneKey: zones && zones.key,
+    ghost: placementGhost(),
+  });
+}
+
 function bindBoardInput() {
-  ui.board.querySelectorAll('.lane').forEach((laneEl) => {
-    laneEl.addEventListener('dragover', (e) => { e.preventDefault(); laneEl.dataset.drop = '1'; });
-    laneEl.addEventListener('dragleave', () => { laneEl.dataset.drop = '0'; });
-    laneEl.addEventListener('drop', (e) => {
-      e.preventDefault();
-      laneEl.dataset.drop = '0';
-      const lane = Number(laneEl.dataset.lane);
-      const owner = e.dataTransfer?.getData('text/owner');
-      const type = e.dataTransfer?.getData('text/type');
-      if (!owner || !type) return;
-      if (onlineActive) {
-        if (owner !== mySide) return;
-        socket.emit('deploy', { unit: type, lane });
-        return;
-      }
-      if (state.mode === 'ai' && owner === 'B') return;
-      if (deployUnit(owner, type, lane)) writeLog(`${state.players[owner].name} deployed ${CARD_MAP[type].name}.`);
-    });
-    laneEl.addEventListener('click', () => {
-      tryDeploy(Number(laneEl.dataset.lane));
-      renderDecks();
-    });
+  const onCardDown = (e) => {
+    const el = e.target.closest('.card');
+    if (!el || e.button > 0) return;
+    Sound.unlock();
+    const owner = el.dataset.owner;
+    const cardId = el.dataset.type;
+    if (!canControl(owner) || el.dataset.disabled === '1') return;
+    drag = { owner, cardId, x0: e.clientX, y0: e.clientY, dragging: false, icon: CARD_MAP[cardId]?.icon || '' };
+    e.preventDefault();
+  };
+  ui.deckA.addEventListener('pointerdown', onCardDown);
+  ui.deckB.addEventListener('pointerdown', onCardDown);
+
+  window.addEventListener('pointermove', (e) => {
+    pointerWorld = arena ? arena.toWorld(e.clientX, e.clientY) : null;
+    if (!drag) return;
+    if (!drag.dragging && Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) > 8) {
+      drag.dragging = true;
+      state.selectedCard = { owner: drag.owner, type: drag.cardId };
+      dragGhostEl = document.createElement('div');
+      dragGhostEl.className = 'drag-ghost';
+      dragGhostEl.textContent = drag.icon;
+      document.body.appendChild(dragGhostEl);
+    }
+    if (drag.dragging && dragGhostEl) {
+      dragGhostEl.style.left = `${e.clientX}px`;
+      dragGhostEl.style.top = `${e.clientY}px`;
+      // Over the arena, the canvas draws the real placement preview instead
+      dragGhostEl.hidden = !!pointerWorld;
+    }
   });
 
-  const onDeckClick = (e) => {
-    const card = e.target.closest('.card');
-    if (!card) return;
-    if (card.dataset.disabled === '1') return;
-    const owner = card.dataset.owner;
-    const type = card.dataset.type;
-    if (onlineActive && owner !== mySide) return;
-    if (!onlineActive && state.mode === 'ai' && owner === 'B') return;
-    state.selectedCard = { owner, type };
+  const endDrag = (e, cancelled) => {
+    if (!drag) return;
+    const d = drag;
+    drag = null;
+    if (dragGhostEl) { dragGhostEl.remove(); dragGhostEl = null; }
+    if (cancelled) return;
+    if (d.dragging) {
+      const w = arena && arena.toWorld(e.clientX, e.clientY);
+      if (w) tryDeployAt(d.owner, d.cardId, w.x, w.y);
+      else state.selectedCard = null;
+    } else {
+      const sel = state.selectedCard;
+      const same = sel && sel.owner === d.owner && sel.type === d.cardId;
+      state.selectedCard = same ? null : { owner: d.owner, type: d.cardId };
+      if (!same) Sound.play('select');
+    }
     renderDecks();
   };
+  window.addEventListener('pointerup', (e) => endDrag(e, false));
+  window.addEventListener('pointercancel', (e) => endDrag(e, true));
 
-  ui.deckA.addEventListener('click', onDeckClick);
-  ui.deckB.addEventListener('click', onDeckClick);
-
-  document.addEventListener('dragstart', (e) => {
-    const card = e.target.closest('.card');
-    if (!card || card.dataset.disabled === '1') return;
-    const owner = card.dataset.owner;
-    if (onlineActive && owner !== mySide) { e.preventDefault(); return; }
-    if (!onlineActive && state.mode === 'ai' && owner === 'B') { e.preventDefault(); return; }
-    e.dataTransfer?.setData('text/owner', owner);
-    e.dataTransfer?.setData('text/type', card.dataset.type || '');
+  ui.arena.addEventListener('pointerdown', (e) => {
+    Sound.unlock();
+    pointerWorld = arena ? arena.toWorld(e.clientX, e.clientY) : null;
   });
+  ui.arena.addEventListener('click', (e) => {
+    const sel = state.selectedCard;
+    if (!sel) { writeLog('Pick a card first, then tap the arena (or drag the card onto it).'); return; }
+    const w = arena.toWorld(e.clientX, e.clientY);
+    if (w) tryDeployAt(sel.owner, sel.type, w.x, w.y);
+    renderDecks();
+  });
+  ui.arena.addEventListener('pointerleave', () => { if (!drag) pointerWorld = null; });
+
+  // Keys 1-4 pick a card from the bottom hand; Esc cancels
+  window.addEventListener('keydown', (e) => {
+    if (e.target && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+    if (e.key === 'Escape') { state.selectedCard = null; renderDecks(); return; }
+    const n = Number(e.key);
+    if (n >= 1 && n <= 4 && state.view) {
+      const side = sideAt('bottom');
+      const hand = state.view.players[side]?.hand || [];
+      if (hand[n - 1] && canControl(side)) {
+        state.selectedCard = { owner: side, type: hand[n - 1] };
+        Sound.play('select');
+        renderDecks();
+      }
+    }
+  });
+
+  if (window.ResizeObserver) new ResizeObserver(() => arena && arena.resize()).observe(ui.arena);
+  else window.addEventListener('resize', () => arena && arena.resize());
+
+  ui.sound?.addEventListener('click', () => {
+    Sound.setEnabled(!Sound.enabled);
+    updateSoundButton();
+  });
+  updateSoundButton();
+}
+
+function updateSoundButton() {
+  if (!ui.sound) return;
+  ui.sound.textContent = Sound.enabled ? '🔊 Sound' : '🔇 Muted';
+  ui.sound.setAttribute('aria-pressed', Sound.enabled ? 'true' : 'false');
 }
 
 function chestReady(c) { return Date.now() >= c.readyAt; }
@@ -1406,19 +1287,14 @@ function renderProgress() {
   if (ui.goldAmount) ui.goldAmount.textContent = String(state.progress.gold);
   if (ui.towerLevel) ui.towerLevel.textContent = String(state.progress.buildings.towerLevel);
   if (ui.baseLevel) ui.baseLevel.textContent = String(state.progress.buildings.baseLevel);
+  const bl = state.progress.buildings;
+  const towersNow = Sim.towerStats(bl.towerLevel, bl.baseLevel);
+  const towersNext = Sim.towerStats(bl.towerLevel + 1, bl.baseLevel + 1);
   if (ui.baseUpgradeInfo) {
-    const lvl = state.progress.buildings.baseLevel;
-    const nowHp = 1300 + (lvl - 1) * 120;
-    const nextHp = 1300 + lvl * 120;
-    ui.baseUpgradeInfo.textContent = `Base HP: ${nowHp} (next ${nextHp}, +120)`;
+    ui.baseUpgradeInfo.textContent = `King Tower HP/DMG: ${towersNow.kingHp} / ${towersNow.kingDmg} (next ${towersNext.kingHp} / ${towersNext.kingDmg})`;
   }
   if (ui.towerUpgradeInfo) {
-    const lvl = state.progress.buildings.towerLevel;
-    const nowHp = 320 + (lvl - 1) * 28;
-    const nextHp = 320 + lvl * 28;
-    const nowDmg = 13 + (lvl - 1) * 3;
-    const nextDmg = 13 + lvl * 3;
-    ui.towerUpgradeInfo.textContent = `Tower HP/DMG: ${nowHp} / ${nowDmg} (next ${nextHp} / ${nextDmg})`;
+    ui.towerUpgradeInfo.textContent = `Princess Tower HP/DMG: ${towersNow.princessHp} / ${towersNow.princessDmg} (next ${towersNext.princessHp} / ${towersNext.princessDmg})`;
   }
   if (ui.chestStatus) {
     const ready = state.progress.chests.filter((c) => chestReady(c)).length;
@@ -1438,12 +1314,36 @@ function renderProgress() {
   if (ui.aiBaseMultOut) ui.aiBaseMultOut.textContent = `${state.progress.aiHealth.baseMult.toFixed(2)}x`;
   if (ui.aiTowerMultOut) ui.aiTowerMultOut.textContent = `${state.progress.aiHealth.towerMult.toFixed(2)}x`;
   if (ui.aiHealthInfo) {
-    const playerBase = 1300 + (state.progress.buildings.baseLevel - 1) * 120;
-    const playerTower = 320 + (state.progress.buildings.towerLevel - 1) * 28;
-    const aiBase = Math.round(playerBase * state.progress.aiHealth.baseMult);
-    const aiTower = Math.round(playerTower * state.progress.aiHealth.towerMult);
-    ui.aiHealthInfo.textContent = `AI Base HP: ${aiBase} | AI Tower HP: ${aiTower}`;
+    const aiTowers = Sim.towerStats(bl.towerLevel, bl.baseLevel, { king: state.progress.aiHealth.baseMult, tower: state.progress.aiHealth.towerMult });
+    ui.aiHealthInfo.textContent = `AI King HP: ${aiTowers.kingHp} | AI Princess HP: ${aiTowers.princessHp}`;
   }
+}
+
+function speedLabel(c) {
+  if (c.building) return `lasts ${c.lifetime}s`;
+  if (c.speed >= 2) return 'very fast';
+  if (c.speed >= 1.4) return 'fast';
+  if (c.speed >= 0.95) return 'medium';
+  return 'slow';
+}
+
+// Plain-language summary of how a card behaves in battle
+function cardTraits(c) {
+  const parts = [c.role];
+  parts.push(c.targets === 'buildings' ? 'attacks buildings only' : c.targets === 'any' ? 'hits air & ground' : 'hits ground only');
+  if (c.air) parts.push('flying');
+  if (c.swarmCount > 1) parts.push(`${c.swarmCount} units`);
+  if (c.splash) parts.push(`splash ${c.splash} tiles`);
+  if (c.special.includes('jump')) parts.push('jumps the river');
+  if (c.special.includes('charge')) parts.push('charges for double damage');
+  if (c.special.includes('aura')) parts.push('shields nearby allies (-25% damage)');
+  if (c.special.includes('chain')) parts.push('lightning chains to 2 more');
+  if (c.special.includes('kamikaze')) parts.push('explodes on contact');
+  if (c.special.includes('deathBomb')) parts.push('drops a bomb when destroyed');
+  if (c.minRange) parts.push(`can't hit within ${c.minRange} tiles`);
+  if (c.style === 'double') parts.push('hits 2 targets');
+  if (c.style === 'burst') parts.push('bonus follow-up shot');
+  return parts.join(' • ');
 }
 
 function filterCards() {
@@ -1508,12 +1408,12 @@ function renderCollection() {
     if (unlocked) {
       const nowStats = getCardStats(c.id);
       const nextStats = cp.level < 14 ? getCardStatsAtLevel(c.id, cp.level + 1, cp.abilityUnlocked, cp.mastery || 0) : null;
-      statLine = `Lv ${cp.level} • HP ${nowStats.hpScaled} • DMG ${Math.round(nowStats.dmgScaled)} • RNG ${nowStats.range} • SPD ${nowStats.speed} • CD ${nowStats.deployCdScaled.toFixed(2)}s`;
+      statLine = `Lv ${cp.level} • HP ${nowStats.hpScaled} • DMG ${Math.round(nowStats.dmgScaled)} every ${nowStats.cd}s • Range ${nowStats.proj === 'melee' ? 'melee' : `${nowStats.range} tiles`} • ${speedLabel(nowStats)}`;
       if (nextStats) {
-        nextLine = `Next Lv: HP ${nextStats.hpScaled} • DMG ${Math.round(nextStats.dmgScaled)} • CD ${nextStats.deployCdScaled.toFixed(2)}s`;
+        nextLine = `Next Lv: HP ${nextStats.hpScaled} • DMG ${Math.round(nextStats.dmgScaled)}`;
       }
     }
-    return `<article class="collection-card ${unlocked ? '' : 'locked'} ${inDeck ? 'in-deck' : ''} ${c.winCondition ? 'win-condition' : ''} ${c.swarmCount > 1 ? 'swarm-card' : ''}" data-card="${c.id}"><header><strong>${c.icon} ${c.name}</strong><span class="rarity-${c.rarity}">${RARITY_STYLE[c.rarity].label}</span>${c.winCondition ? '<span class="wc-badge">👑 Win Condition</span>' : ''}${c.swarmCount > 1 ? `<span class="swarm-badge">🐝 ×${c.swarmCount} Swarm</span>` : ''}</header><p>${unlocked ? `Copies ${cp.copies} • Mastery ${Math.floor(cp.mastery)}` : 'Locked'}</p><p>${statLine}</p><p>${unlocked ? `Cost ${c.cost} • ${c.style} target • ${c.role}${c.swarmCount > 1 ? ` • ${c.swarmCount} units (${Math.round(c.hp / c.swarmCount)} HP / ${Math.round(c.dmg / c.swarmCount)} DMG each)` : ''}` : 'Unknown stats'}</p><p>${nextLine}</p><div class="collection-actions">${unlocked ? `<button data-select="${c.id}">${inDeck ? 'In Deck' : 'Select'}</button>` : '<button disabled>Locked</button>'}${unlocked ? `<button data-up="${c.id}" ${canUp ? '' : 'disabled'}>Level Up (${need} copies, ${upCost}g)</button>` : ''}${unlocked ? `<button data-ability="${c.id}" ${canAbility ? '' : 'disabled'}>${cp.abilityUnlocked ? `✓ ${c.ability.name}` : `${c.ability.name} (Lv${c.ability.minLevel}, ${c.ability.minMastery}M, 400g)`}</button>` : ''}</div></article>`;
+    return `<article class="collection-card ${unlocked ? '' : 'locked'} ${inDeck ? 'in-deck' : ''} ${c.winCondition ? 'win-condition' : ''} ${c.swarmCount > 1 ? 'swarm-card' : ''}" data-card="${c.id}"><header><strong>${c.icon} ${c.name}</strong><span class="rarity-${c.rarity}">${RARITY_STYLE[c.rarity].label}</span>${c.winCondition ? '<span class="wc-badge">👑 Win Condition</span>' : ''}${c.swarmCount > 1 ? `<span class="swarm-badge">🐝 ×${c.swarmCount} Swarm</span>` : ''}</header><p>${unlocked ? `Copies ${cp.copies} • Mastery ${Math.floor(cp.mastery)}` : 'Locked'}</p><p>${statLine}</p><p>${unlocked ? `Cost ${c.cost} • ${cardTraits(c)}` : 'Unknown stats'}</p><p>${nextLine}</p><div class="collection-actions">${unlocked ? `<button data-select="${c.id}">${inDeck ? 'In Deck' : 'Select'}</button>` : '<button disabled>Locked</button>'}${unlocked ? `<button data-up="${c.id}" ${canUp ? '' : 'disabled'}>Level Up (${need} copies, ${upCost}g)</button>` : ''}${unlocked ? `<button data-ability="${c.id}" ${canAbility ? '' : 'disabled'}>${cp.abilityUnlocked ? `✓ ${c.ability.name}` : `${c.ability.name} (Lv${c.ability.minLevel}, ${c.ability.minMastery}M, 400g)`}</button>` : ''}</div></article>`;
   }).join('');
 
   ui.cardCollection.querySelectorAll('[data-select]').forEach((b) => {
@@ -1665,8 +1565,16 @@ function ensureSocket() {
   socket.on('opponent_left', () => {
     state.running = false;
     onlineActive = false;
+    state.selectedCard = null;
     writeLog('Opponent disconnected.');
     if (ui.lobbyPanel) ui.lobbyPanel.hidden = false;
+  });
+
+  // The server is the referee online; if it refuses a deploy, say why
+  socket.on('deploy_rejected', ({ reason } = {}) => {
+    rejectNote = { text: reason || "Can't deploy", until: performance.now() + 1100 };
+    writeLog(reason || "Can't deploy");
+    Sound.play('reject');
   });
 }
 
@@ -1724,12 +1632,18 @@ function onlineDeckPayload() {
 }
 
 function showOnlineLobby() {
+  state.running = false; // pause the local match while you look for an opponent
   if (ui.lobbyPanel) ui.lobbyPanel.hidden = false;
   if (ui.shareBox) ui.shareBox.hidden = true;
   if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Ready. Create or join room.';
   writeLog('Online matches use your current deck.');
   // Connect now so a sleeping server starts waking up before you click anything
   ensureSocket();
+}
+
+function scrollToBattle() {
+  const wrap = document.querySelector('.battle-wrap');
+  if (wrap) wrap.scrollIntoView({ block: 'start', behavior: 'smooth' });
 }
 
 function showMatchOnline() {
@@ -1739,33 +1653,16 @@ function showMatchOnline() {
   if (ui.lobbyPanel) ui.lobbyPanel.hidden = true;
   if (ui.queueStatus) ui.queueStatus.hidden = true;
   if (ui.joinCode) ui.joinCode.value = '';
-
-  state.players.A = { name: mySide === 'A' ? 'You' : 'Opponent', baseHp: 1300, baseHpMax: 1300, energy: 0, energyMax: 10, cooldowns: {} };
-  state.players.B = { name: mySide === 'B' ? 'You' : 'Opponent', baseHp: 1300, baseHpMax: 1300, energy: 0, energyMax: 10, cooldowns: {} };
-  state.hand = { A: [], B: [] };
-  state.handQueue = { A: [], B: [] };
+  if (ui.winOverlay) ui.winOverlay.hidden = true;
+  state.running = false; // pause any local match underneath
+  state.viewSource = 'online';
   state.selectedCard = null;
+  state.view = null;
   netSnapshots = [];
   netClockOffset = null;
-  state.units = [];
-  state.structures = [];
-  state.projectiles = [];
-  state.running = true;
-  state.winner = null;
-  state.time = 0;
-  state.lastTick = performance.now();
-
-  for (let lane = 0; lane < BOARD.laneCount; lane += 1) {
-    state.structures.push({ id: `tower-A-${lane}`, owner: 'A', lane, x: BOARD.towerX.A, hpMax: 320, hp: 320, kind: 'tower' });
-    state.structures.push({ id: `tower-B-${lane}`, owner: 'B', lane, x: BOARD.towerX.B, hpMax: 320, hp: 320, kind: 'tower' });
-  }
-  state.structures.push({ id: 'base-A', owner: 'A', lane: 1, x: BOARD.baseX.A, hpMax: 1300, hp: 1300, kind: 'base' });
-  state.structures.push({ id: 'base-B', owner: 'B', lane: 1, x: BOARD.baseX.B, hpMax: 1300, hp: 1300, kind: 'base' });
-
-  writeLog(`Online match started. You are side ${mySide}.`);
-  renderDecks();
-  renderStatus();
-  renderStructures();
+  netFx = [];
+  writeLog(`Online match started. Your towers are at the bottom.`);
+  scrollToBattle();
 }
 
 function applyServerState(serverState) {
@@ -1778,32 +1675,14 @@ function applyServerState(serverState) {
   else netClockOffset += (offset - netClockOffset) * 0.02;
   netSnapshots.push(serverState);
   netSnapshots = netSnapshots.filter((s) => s.time >= serverState.time - 1);
-
-  state.structures = serverState.structures || [];
-  state.running = !!serverState.running;
-  state.winner = serverState.winner || null;
-
-  const updateP = (p, s) => {
-    if (!p || !s) return;
-    p.energy = s.energy;
-    p.energyMax = s.energyMax;
-    p.baseHp = s.baseHp;
-    p.baseHpMax = s.baseHpMax;
-    Object.keys(s.cooldownsRemaining || {}).forEach((k) => {
-      p.cooldowns[k] = state.time + s.cooldownsRemaining[k];
-    });
-  };
-  updateP(state.players.A, serverState.players?.A);
-  updateP(state.players.B, serverState.players?.B);
-  ['A', 'B'].forEach((side) => {
-    const sp = serverState.players?.[side];
-    if (!sp) return;
-    state.hand[side] = sp.hand || [];
-    state.handQueue[side] = sp.next ? [sp.next] : [];
-  });
+  // Effects are shown when the (slightly delayed) picture reaches them, so hits line up with shots
+  (serverState.fx || []).forEach((f) => netFx.push({ ...f, t: serverState.time }));
+  // A hidden tab doesn't draw, so don't let old effects pile up
+  if (netFx.length > 200) netFx = netFx.filter((f) => f.t >= serverState.time - 1);
+  if (!state.view) state.view = serverState;
 }
 
-// Place units and shots by blending the two snapshots around (now - NET_INTERP_DELAY)
+// Draw the battle as it was NET_INTERP_DELAY ago, blending the two snapshots around that moment
 function interpolateNet() {
   if (netSnapshots.length === 0 || netClockOffset === null) return;
   const renderTime = performance.now() / 1000 - netClockOffset - NET_INTERP_DELAY;
@@ -1815,30 +1694,30 @@ function interpolateNet() {
   }
   if (!a) a = b;
   if (!b) b = a;
-  const t = b.time > a.time ? clamp((renderTime - a.time) / (b.time - a.time), 0, 1) : 1;
-  const lerp = (from, to) => from + (to - from) * t;
-
-  const prevUnits = new Map((a.units || []).map((u) => [u.id, u]));
-  state.units = (b.units || []).map((u) => {
-    const card = CARD_MAP[u.cardId] || CARD_MAP.scout;
-    const prev = prevUnits.get(u.id);
-    return { ...u, x: prev ? lerp(prev.x, u.x) : u.x, icon: card.icon, rarity: card.rarity };
-  });
-
-  const prevShots = new Map((a.projectiles || []).map((p) => [p.id, p]));
-  state.projectiles = (b.projectiles || []).map((p) => {
-    const prev = prevShots.get(p.id);
-    return prev ? { ...p, x: lerp(prev.x, p.x), y: lerp(prev.y, p.y) } : p;
-  });
+  const t = b.time > a.time ? (renderTime - a.time) / (b.time - a.time) : 1;
+  state.view = lerpSnap(a, b, t);
+  if (netFx.length) {
+    const due = netFx.filter((f) => f.t <= renderTime);
+    if (due.length) {
+      netFx = netFx.filter((f) => f.t > renderTime);
+      handleFx(due);
+    }
+  }
 }
 
 function handleOnlineVictory(winner) {
   onlineActive = false;
   state.running = false;
-  state.winner = winner;
+  state.selectedCard = null;
+  // Show the final position
+  const last = netSnapshots[netSnapshots.length - 1];
+  if (last) state.view = last;
+  if (netFx.length) { handleFx(netFx); netFx = []; }
   const won = winner === mySide;
+  const draw = winner === 'draw';
   let cardAward = null;
   let goldBonus = 0;
+  const reason = endReasonText(last && last.endReason);
   if (won) {
     goldBonus = 200;
     state.progress.gold += goldBonus;
@@ -1847,14 +1726,18 @@ function handleOnlineVictory(winner) {
     const cardMsg = cardAward
       ? (cardAward.isUnlock ? ` Unlocked ${cardAward.card.name}!` : ` +${cardAward.copies} ${cardAward.card.name}.`)
       : '';
-    writeLog(`Online win! +${goldBonus} gold, chest earned.${cardMsg}`);
+    writeLog(`Online win! ${reason}. +${goldBonus} gold, chest earned.${cardMsg}`);
     saveProgress();
     renderProgress();
     renderCollection();
+  } else if (draw) {
+    writeLog(`Online draw. ${reason}.`);
   } else {
-    writeLog('Opponent wins online.');
+    writeLog(`Opponent wins online. ${reason}.`);
   }
-  showWinOverlay(won, cardAward, goldBonus, true);
+  Sound.play(won ? 'win' : draw ? 'draw' : 'lose');
+  const crowns = last ? `👑 You ${last.players[mySide].crowns} – ${last.players[enemyOf(mySide)].crowns} Opponent` : '';
+  showWinOverlay(draw ? 'draw' : won ? 'win' : 'loss', cardAward, goldBonus, true, { detail: `${reason} · ${crowns}` });
 }
 
 function joinQueue() {
@@ -1896,9 +1779,8 @@ function cacheUi() {
   ui.unlock = $('ptUnlock');
   ui.error = $('ptError');
   ui.board = $('ptBoard');
-  ui.units = $('ptUnits');
-  ui.structures = $('ptStructures');
-  ui.projectiles = $('ptProjectiles');
+  ui.arena = $('ptArena');
+  ui.sound = $('ptSound');
   ui.deckA = $('ptDeckA');
   ui.deckB = $('ptDeckB');
   ui.mode = $('ptMode');
@@ -1994,11 +1876,14 @@ function bindCore() {
   syncModeClass();
 
   ui.start?.addEventListener('click', () => {
+    Sound.unlock();
     if (ui.mode?.value === 'online') showOnlineLobby();
     else {
       onlineActive = false;
       if (ui.lobbyPanel) ui.lobbyPanel.hidden = true;
+      if (ui.winOverlay) ui.winOverlay.hidden = true;
       setupMatch();
+      scrollToBattle();
     }
   });
 
@@ -2039,6 +1924,7 @@ function unlockPrototype() {
   loadProgress();
   renderProgress();
   renderCollection();
+  arena = ArenaView.create(ui.arena);
   bindCore();
   window.addEventListener('storage', syncProgressFromOtherTab);
   setupMatch();
@@ -2046,19 +1932,17 @@ function unlockPrototype() {
 }
 
 function gameLoop(ts) {
-  if (!state.lastTick) state.lastTick = ts;
-  const dt = clamp((ts - state.lastTick) / 1000, 0, 0.045);
+  const dt = state.lastTick ? Math.min(0.1, (ts - state.lastTick) / 1000) : 0;
   state.lastTick = ts;
-  if (!onlineActive) update(dt);
-  else {
-    state.time += dt;
+  if (onlineActive) {
     interpolateNet();
+  } else if (state.viewSource === 'local' && state.match) {
+    stepLocalMatch(dt);
+    state.view = lerpSnap(state.snapPrev, state.snapCur, state.acc / STEP);
   }
   renderStatus();
   renderDecks();
-  renderStructures();
-  renderUnits();
-  renderProjectiles();
+  renderArena();
   requestAnimationFrame(gameLoop);
 }
 

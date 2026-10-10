@@ -40,6 +40,7 @@
             <option value="online">1v1 Online vs Opponent</option>
           </select>
           <button id="ptStartMatch" type="button">Start Match</button>
+          <button id="ptSound" type="button" aria-pressed="true">🔊 Sound</button>
           <button id="ptAdminToggle" type="button">Admin Panel</button>
           <button id="ptResetUpgrades" type="button">Reset Upgrades</button>
         </div>
@@ -98,13 +99,13 @@
           </div>
           <div class="np-bars">
             <div class="bar-row">
-              <span class="bar-lbl">HP</span>
+              <span class="bar-lbl">KING</span>
               <div class="bar-track"><div class="bar-fill hp-fill" id="ptBaseBarB" style="width:100%"></div></div>
               <span class="bar-num" id="ptBaseB">1300</span>
             </div>
             <div class="bar-row">
-              <span class="bar-lbl">EN</span>
-              <div class="bar-track"><div class="bar-fill en-fill" id="ptEnergyBarB" style="width:100%"></div></div>
+              <span class="bar-lbl">ELIX</span>
+              <div class="bar-track en-track"><div class="bar-fill en-fill" id="ptEnergyBarB" style="width:50%"></div></div>
               <span class="bar-num" id="ptEnergyB">10</span>
             </div>
           </div>
@@ -114,12 +115,7 @@
         <div class="deck deck-top" id="ptDeckB" aria-label="commander b deck"></div>
 
         <div class="board" id="ptBoard">
-          <div class="lane" data-lane="0"><span class="lane-label">Top Lane</span></div>
-          <div class="lane" data-lane="1"><span class="lane-label">Mid Lane</span></div>
-          <div class="lane" data-lane="2"><span class="lane-label">Bot Lane</span></div>
-          <div class="structure-layer" id="ptStructures"></div>
-          <div class="projectile-layer" id="ptProjectiles"></div>
-          <div class="unit-layer" id="ptUnits"></div>
+          <canvas id="ptArena" class="arena-canvas" aria-label="Battle arena: drag a card here or select a card and tap the arena to deploy"></canvas>
         </div>
 
         <div class="deck deck-bottom" id="ptDeckA" aria-label="commander a deck"></div>
@@ -131,13 +127,13 @@
           </div>
           <div class="np-bars">
             <div class="bar-row">
-              <span class="bar-lbl">HP</span>
+              <span class="bar-lbl">KING</span>
               <div class="bar-track"><div class="bar-fill hp-fill" id="ptBaseBarA" style="width:100%"></div></div>
               <span class="bar-num" id="ptBaseA">1300</span>
             </div>
             <div class="bar-row">
-              <span class="bar-lbl">EN</span>
-              <div class="bar-track"><div class="bar-fill en-fill" id="ptEnergyBarA" style="width:100%"></div></div>
+              <span class="bar-lbl">ELIX</span>
+              <div class="bar-track en-track"><div class="bar-fill en-fill" id="ptEnergyBarA" style="width:50%"></div></div>
               <span class="bar-num" id="ptEnergyA">10</span>
             </div>
           </div>
@@ -147,7 +143,7 @@
 
       <section class="panel progression">
         <h3>Collection Progression</h3>
-        <p class="note">Build a collection of 50 cards, level them up, and pick only 8 cards per match.</p>
+        <p class="note">Build a collection of 160 cards, level them up, and pick only 8 cards per match.</p>
         <div class="progress-grid">
           <article>
             <h4>Wallet</h4>
@@ -250,6 +246,8 @@
   </div>
 
   <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
+  <script src="clash-tanks-server/clash-tanks-server/shared/clash-sim.js"></script>
+  <script src="prototype_arena.js"></script>
   <script src="prototype_v4.js"></script>
 </body>
 </html>

@@ -430,87 +430,6 @@ select {
   background: rgba(255, 90, 50, 0.45);
 }
 
-.board {
-  position: relative;
-  overflow: hidden;
-  border: 2px solid rgba(80, 160, 120, 0.4);
-  border-radius: 12px;
-  min-height: 300px;
-  background-color: #08160e;
-  background-image:
-    linear-gradient(90deg, rgba(30, 120, 220, 0.18) 0%, rgba(30, 120, 220, 0.05) 28%, transparent 40%),
-    linear-gradient(270deg, rgba(220, 60, 60, 0.18) 0%, rgba(220, 60, 60, 0.05) 28%, transparent 40%),
-    repeating-linear-gradient(
-      180deg,
-      transparent 0px, transparent 98px,
-      rgba(80, 180, 120, 0.22) 98px, rgba(80, 180, 120, 0.22) 100px
-    ),
-    repeating-linear-gradient(
-      90deg,
-      transparent 0px, transparent 38px,
-      rgba(80, 160, 100, 0.05) 38px, rgba(80, 160, 100, 0.05) 40px
-    );
-  box-shadow:
-    0 0 24px rgba(0, 0, 0, 0.6),
-    inset 0 0 40px rgba(0, 0, 0, 0.35);
-}
-
-.board::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: calc(50% - 2px);
-  width: 4px;
-  background: linear-gradient(
-    180deg,
-    transparent,
-    rgba(60, 180, 230, 0.5) 12%,
-    rgba(80, 200, 255, 0.6) 50%,
-    rgba(60, 180, 230, 0.5) 88%,
-    transparent
-  );
-  box-shadow: 0 0 12px rgba(80, 200, 255, 0.4);
-  pointer-events: none;
-  z-index: 6;
-}
-
-.lane {
-  position: relative;
-  height: 100px;
-  border-bottom: 1px solid rgba(80, 180, 120, 0.22);
-}
-
-.lane:last-child {
-  border-bottom: 0;
-}
-
-.lane[data-drop="1"] {
-  background: rgba(142, 255, 215, 0.07);
-}
-
-.lane-label {
-  position: absolute;
-  left: 8px;
-  top: 6px;
-  font-family: "Orbitron", sans-serif;
-  font-size: 0.54rem;
-  letter-spacing: 0.12em;
-  color: rgba(120, 190, 150, 0.45);
-}
-
-.structure-layer,
-.projectile-layer,
-.unit-layer {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 2;
-}
-
-.projectile-layer { z-index: 3; }
-.unit-layer { z-index: 4; }
-
 .structure {
   position: absolute;
   display: flex;
@@ -1473,9 +1392,6 @@ body.mode-ai #ptAiDeckPanel {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .lane {
-    height: 92px;
-  }
 }
 
 .lobby-panel {
@@ -1585,4 +1501,127 @@ body.mode-ai #ptAiDeckPanel {
   letter-spacing: 0.14em;
   color: var(--accent);
   margin-top: 0.55rem;
+}
+
+/* ── Arena (canvas) ── */
+.battle-wrap {
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.board {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  border-radius: 12px;
+  background: #0b1a10;
+  padding: 4px;
+  box-shadow: 0 0 24px rgba(0, 0, 0, 0.6), inset 0 0 0 2px rgba(80, 160, 120, 0.35);
+}
+
+.arena-canvas {
+  display: block;
+  /* 18 x 32 tiles; capped by viewport height so the whole arena fits on screen */
+  width: min(100%, calc(78vh * 18 / 32));
+  aspect-ratio: 18 / 32;
+  border-radius: 8px;
+  touch-action: none;
+  cursor: crosshair;
+  user-select: none;
+}
+
+/* Elixir bar: 10 segments */
+.en-track {
+  background-image: repeating-linear-gradient(90deg, transparent 0, transparent calc(10% - 1px), rgba(0, 0, 0, 0.55) calc(10% - 1px), rgba(0, 0, 0, 0.55) 10%);
+}
+
+.en-fill {
+  background: linear-gradient(90deg, #b03cff, #e48bff);
+  box-shadow: 0 0 6px rgba(200, 90, 255, 0.45);
+}
+
+.card { touch-action: none; }
+
+/* Can't afford yet: show how close the elixir is */
+.card[data-short="1"] {
+  opacity: 0.55;
+}
+
+.card-short {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 3px;
+  background: rgba(200, 90, 255, 0.85);
+  transform-origin: left center;
+}
+
+.card.shake {
+  animation: card-shake 0.3s ease;
+}
+
+@keyframes card-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+
+.drag-ghost {
+  position: fixed;
+  z-index: 50;
+  pointer-events: none;
+  font-size: 2rem;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.6));
+}
+
+.np-crowns {
+  font-family: "Orbitron", sans-serif;
+  font-size: 0.7rem;
+  color: #ffe680;
+  min-width: 2.6rem;
+  text-align: right;
+}
+
+.win-overlay.is-draw .win-headline {
+  color: #ffe680;
+}
+
+/* Compact hand during battle so both hands and the arena fit on one screen */
+.battle-wrap .deck {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(48px, 0.55fr);
+  gap: 0.3rem;
+}
+
+.battle-wrap .deck .note {
+  grid-column: 1 / -1;
+  margin: 0.2rem 0;
+  text-align: center;
+}
+
+.battle-wrap .card {
+  min-height: 62px;
+  padding: 0.3rem 0.2rem 0;
+}
+
+.battle-wrap .card-icon { font-size: 1.3rem; }
+.battle-wrap .card-meta,
+.battle-wrap .avg-elixir { display: none; }
+
+.battle-wrap .next-card-preview {
+  min-width: 0;
+  padding: 2px 4px;
+}
+
+.battle-wrap .nameplate { padding: 0.25rem 0.55rem; }
+.battle-wrap .deck-top { margin-bottom: 0.3rem; }
+.battle-wrap .deck-bottom { margin-top: 0.3rem; }
+
+.arena-canvas {
+  width: min(100%, max(240px, calc((100vh - 300px) * 18 / 32)));
+}
+
+@media (max-width: 520px) {
+  .battle-wrap .card-rarity { display: none; }
+  .battle-wrap .card-name { font-size: 0.5rem; }
 }
