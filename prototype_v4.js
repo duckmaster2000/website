@@ -1,4 +1,4 @@
-const PROTOTYPE_PASSWORD = '1ydzpU1y!';
+const PROTOTYPE_PASSWORD = 'test';
 const ADMIN_PASSWORD = '2ydzpU2y!';
 const PROTOTYPE_KEY = 'prototype_access_v1';
 const PROGRESS_KEY = 'prototype_progress_v4';
