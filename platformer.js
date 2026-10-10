@@ -15,6 +15,102 @@ const LEVEL_COUNT = 180;
 const MAP_W = 68;
 const MAP_H = 15;
 
+// Map tile legend: # solid, L hazard pool, ^ spike, C coin, S start, E exit,
+// G walker enemy, B flyer enemy, R shooter enemy, H/J/V/M temp power-ups,
+// U spring pad (bouncy floor tile).
+const LEVELS_PER_BIOME = 30;
+const BIOMES = [
+  {
+    name: 'Astro Ruins',
+    accent: '#8dffd8',
+    sky: ['#081221', '#0d2334', '#132c3f'],
+    cloud: '102, 170, 255',
+    tileTop: '#4c7aa8',
+    tileBody: '#2a4568',
+    tileEdge: 'rgba(180, 228, 255, 0.28)',
+    hazardName: 'Coolant Surge',
+    hazard1: '255, 80, 50',
+    hazard2: '255, 170, 80',
+    spike: '#c8d7e8',
+    portal: '#9affce'
+  },
+  {
+    name: 'Volcanic Core',
+    accent: '#ff9f6e',
+    sky: ['#1a0a08', '#301108', '#421709'],
+    cloud: '255, 120, 70',
+    tileTop: '#8a4a3a',
+    tileBody: '#5a2a20',
+    tileEdge: 'rgba(255, 190, 130, 0.3)',
+    hazardName: 'Molten Lava',
+    hazard1: '255, 70, 20',
+    hazard2: '255, 200, 60',
+    spike: '#ffd7b3',
+    portal: '#ffcf8d'
+  },
+  {
+    name: 'Cryo Wastes',
+    accent: '#a6e8ff',
+    sky: ['#050d18', '#0b1e30', '#123049'],
+    cloud: '180, 225, 255',
+    tileTop: '#6fa9c9',
+    tileBody: '#2d5570',
+    tileEdge: 'rgba(210, 245, 255, 0.32)',
+    hazardName: 'Cryo Fracture',
+    hazard1: '110, 210, 255',
+    hazard2: '220, 250, 255',
+    spike: '#eafcff',
+    portal: '#c7f5ff'
+  },
+  {
+    name: 'Toxic Marsh',
+    accent: '#c4ff6e',
+    sky: ['#0a1408', '#132110', '#182b14'],
+    cloud: '150, 230, 90',
+    tileTop: '#5d7a3a',
+    tileBody: '#374d24',
+    tileEdge: 'rgba(210, 255, 150, 0.28)',
+    hazardName: 'Toxic Ooze',
+    hazard1: '140, 230, 60',
+    hazard2: '90, 255, 170',
+    spike: '#dcffb0',
+    portal: '#b8ff8a'
+  },
+  {
+    name: 'Void Reaches',
+    accent: '#e2a6ff',
+    sky: ['#0a0714', '#160a29', '#20103b'],
+    cloud: '190, 130, 255',
+    tileTop: '#6b4a91',
+    tileBody: '#3c2661',
+    tileEdge: 'rgba(225, 190, 255, 0.32)',
+    hazardName: 'Entropy Rift',
+    hazard1: '180, 60, 255',
+    hazard2: '255, 90, 220',
+    spike: '#f0d6ff',
+    portal: '#dcb3ff'
+  },
+  {
+    name: 'Solar Array',
+    accent: '#ffe27a',
+    sky: ['#140f04', '#2a1e08', '#3a2a0a'],
+    cloud: '255, 210, 110',
+    tileTop: '#a98a45',
+    tileBody: '#6b5323',
+    tileEdge: 'rgba(255, 232, 170, 0.32)',
+    hazardName: 'Plasma Flare',
+    hazard1: '255, 190, 40',
+    hazard2: '255, 240, 160',
+    spike: '#fff2c8',
+    portal: '#ffe89c'
+  }
+];
+
+function biomeForLevel(levelIndex) {
+  const idx = Math.floor(Math.max(0, levelIndex) / LEVELS_PER_BIOME) % BIOMES.length;
+  return BIOMES[idx];
+}
+
 const KEYS = {
   left: false,
   right: false,
@@ -29,7 +125,6 @@ const el = {
   level: document.getElementById('pfLevel'),
   health: document.getElementById('pfHealth'),
   lives: document.getElementById('pfLives'),
-  dashes: document.getElementById('pfDashes'),
   runCoins: document.getElementById('pfRunCoins'),
   wallet: document.getElementById('pfWallet'),
   objective: document.getElementById('pfObjective'),
@@ -38,6 +133,12 @@ const el = {
   accessoryCount: document.getElementById('pfAccessoryCount'),
   modePills: document.getElementById('pfModePills'),
   buffs: document.getElementById('pfBuffs'),
+  biome: document.getElementById('pfBiome'),
+  hpBar: document.getElementById('pfHpBar'),
+  dashPips: document.getElementById('pfDashPips'),
+  coinFill: document.getElementById('pfCoinFill'),
+  combo: document.getElementById('pfCombo'),
+  comboText: document.getElementById('pfComboText'),
   shop: document.getElementById('pfShop'),
   upgradeList: document.getElementById('pfUpgradeList'),
   cosmeticList: document.getElementById('pfCosmeticList'),
@@ -407,6 +508,11 @@ function buildProceduralLevel(seed, levelNumber, difficultyMult = 1, modeName = 
       if (!safeSet.has(`${hx},${y}`)) grid[y][hx] = '^';
     }
 
+    if (rng() < clamp(0.12 - danger * 0.008, 0.06, 0.12) && endX - x >= 3) {
+      const spx = x + 1 + Math.floor(rng() * (endX - x - 1));
+      if (grid[y][spx] === '#') grid[y][spx] = 'U';
+    }
+
     segments.push({ x0: x, x1: endX, y });
 
     const gap = 2 + Math.floor(rng() * (2 + Math.min(3, Math.floor(danger))));
@@ -539,9 +645,12 @@ const game = {
   enemyShots: [],
   particles: [],
   powerups: [],
+  springTiles: [],
   exit: null,
   start: { x: 80, y: 80 },
   camera: { x: 0, y: 0 },
+  biome: BIOMES[0],
+  combo: { count: 0, timer: 0, mult: 1 },
   runCoins: 0,
   collectedCoins: 0,
   totalCoins: 0,
@@ -753,13 +862,21 @@ function switchMode(modeKey) {
   parseLevel(startLevel, getModeLevelDef(startLevel));
 }
 
-function showOverlay(text, duration = 1.4) {
+function showOverlay(text, duration = 1.4, subtitle = '') {
   game.overlayText = text;
   game.overlayTimer = duration;
   if (el.overlay) {
-    el.overlay.textContent = text;
+    el.overlay.innerHTML = subtitle
+      ? `${escapeHtml(text)}<span class="overlay-sub">${escapeHtml(subtitle)}</span>`
+      : escapeHtml(text);
     el.overlay.classList.add('show');
   }
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, (ch) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[ch]));
 }
 
 function setStatus(text, duration = 1.6) {
@@ -776,6 +893,7 @@ function clearLevel() {
   game.enemyShots = [];
   game.particles = [];
   game.powerups = [];
+  game.springTiles = [];
   game.exit = null;
 }
 
@@ -829,7 +947,7 @@ function addEnemy(type, x, y) {
   }
 }
 
-function parseLevel(index, customDef = null) {
+function parseLevel(index, customDef = null, options = {}) {
   clearLevel();
   const maxIdx = game.mode === 'endless' ? 9998 : (LEVELS.length - 1);
   game.levelIndex = clamp(index, 0, maxIdx);
@@ -840,12 +958,25 @@ function parseLevel(index, customDef = null) {
   game.worldW = rows[0].length * TILE;
   game.worldH = rows.length * TILE;
 
+  game.biome = biomeForLevel(game.levelIndex);
+  if (typeof document !== 'undefined') {
+    document.documentElement.style.setProperty('--accent', game.biome.accent);
+  }
+  game.combo.count = 0;
+  game.combo.timer = 0;
+  game.combo.mult = 1;
+
   rows.forEach((row, ry) => {
     [...row].forEach((ch, rx) => {
       const x = rx * TILE;
       const y = ry * TILE;
 
       if (ch === '#') game.solids.push({ x, y, w: TILE, h: TILE });
+      if (ch === 'U') {
+        const tile = { x, y, w: TILE, h: TILE, spring: true, bounceT: 0 };
+        game.solids.push(tile);
+        game.springTiles.push(tile);
+      }
       if (ch === 'L') game.lava.push({ x, y, w: TILE, h: TILE });
       if (ch === '^') game.spikes.push({ x: x + 4, y: y + 12, w: TILE - 8, h: TILE - 12 });
       if (ch === 'C') game.coins.push({ x: x + 10, y: y + 10, w: 20, h: 20, taken: false, bob: Math.random() * Math.PI * 2 });
@@ -902,7 +1033,11 @@ function parseLevel(index, customDef = null) {
 
   saveModeProgress(game.levelIndex);
   setStatus(`${currentModeInfo().name} ${game.levelIndex + 1}: ${def.name}`, 2.5);
-  showOverlay(def.name, 1.4);
+  const isBiomeStart = game.levelIndex % LEVELS_PER_BIOME === 0;
+  const parts = [];
+  if (options.clearedSummary) parts.push(options.clearedSummary);
+  if (isBiomeStart) parts.push(`Entering: ${game.biome.name}`);
+  showOverlay(def.name, options.clearedSummary ? 1.9 : 1.4, parts.join('  |  '));
 }
 
 function levelSolidCollision(rect) {
@@ -910,6 +1045,11 @@ function levelSolidCollision(rect) {
     if (rectsIntersect(rect, tile)) return tile;
   }
   return null;
+}
+
+function wallProbe(p, dir) {
+  const rect = { x: dir > 0 ? p.x + p.w : p.x - 2, y: p.y + 4, w: 2, h: p.h - 8 };
+  return levelSolidCollision(rect);
 }
 
 function handleInputDown(e) {
@@ -975,15 +1115,56 @@ function emitParticles(x, y, count, color, speed = 150, life = 0.55, size = 3.5)
   }
 }
 
+function spawnPopup(x, y, text, color = '#ffe9a8') {
+  game.particles.push({
+    x,
+    y,
+    vx: (Math.random() - 0.5) * 20,
+    vy: -70,
+    life: 0.85,
+    maxLife: 0.85,
+    isText: true,
+    text,
+    color
+  });
+}
+
+const COMBO_WINDOW = 2.2;
+const COMBO_MAX_MULT = 3;
+
+function registerCombo() {
+  game.combo.count += 1;
+  game.combo.timer = COMBO_WINDOW;
+  game.combo.mult = clamp(1 + (game.combo.count - 1) * 0.18, 1, COMBO_MAX_MULT);
+}
+
+function updateCombo(dt) {
+  if (game.combo.timer > 0) {
+    game.combo.timer = Math.max(0, game.combo.timer - dt);
+    if (game.combo.timer === 0) {
+      game.combo.count = 0;
+      game.combo.mult = 1;
+    }
+  }
+}
+
+function resetCombo() {
+  game.combo.count = 0;
+  game.combo.timer = 0;
+  game.combo.mult = 1;
+}
+
 function gainCoin(amount = 1) {
-  const value = Math.max(0.01, amount * coinValue());
+  const value = Math.max(0.01, amount * coinValue() * game.combo.mult);
   game.runCoins += value;
   game.meta.wallet += value;
+  return value;
 }
 
 function hurtPlayer(amount = 1) {
   const scaledDamage = Math.max(1, Math.ceil(amount * clamp(currentModeInfo().difficultyMult * 0.92, 1, 2.2)));
   if (game.player.invuln > 0) return;
+  resetCombo();
   if (game.player.buffs.shield > 0) {
     game.player.buffs.shield = Math.max(0, game.player.buffs.shield - 2.4);
     game.player.invuln = 0.45;
@@ -1005,7 +1186,7 @@ function hurtPlayer(amount = 1) {
       setStatus(`Life lost. ${game.player.lives} left.`, 1.5);
     } else {
       game.state = 'gameover';
-      showOverlay('Run Failed', 2.2);
+      showOverlay('Run Failed', 2.2, `Collected ${game.collectedCoins}/${game.totalCoins} coins - Press R to retry`);
       setStatus('Out of lives. Press R to retry this level.', 4);
     }
   }
@@ -1031,18 +1212,22 @@ function restartLevel() {
 function nextLevel() {
   if (game.mode !== 'endless' && game.levelIndex + 1 >= LEVELS.length) {
     game.state = 'victory';
-    showOverlay('Campaign Cleared', 2.8);
+    showOverlay('Campaign Cleared', 2.8, `${LEVELS.length} sectors conquered across ${BIOMES.length} biomes`);
     setStatus('You beat all levels. Replay for more wallet coins.', 4);
     return;
   }
 
+  const clearedCoins = game.collectedCoins;
+  const clearedTotal = game.totalCoins;
   const next = game.levelIndex + 1;
   if (game.mode !== 'endless' && next + 1 > game.meta.unlockedLevel) {
     game.meta.unlockedLevel = next + 1;
     saveMeta();
   }
 
-  parseLevel(next, getModeLevelDef(next));
+  parseLevel(next, getModeLevelDef(next), {
+    clearedSummary: `Sector Clear - ${clearedCoins}/${clearedTotal} coins`
+  });
 }
 
 function updatePlayer(dt) {
@@ -1061,6 +1246,10 @@ function updatePlayer(dt) {
   p.buffs.jump = Math.max(0, p.buffs.jump - dt);
   p.buffs.magnet = Math.max(0, p.buffs.magnet - dt);
 
+  for (const spring of game.springTiles) {
+    if (spring.bounceT > 0) spring.bounceT = Math.max(0, spring.bounceT - dt);
+  }
+
   const moveSpeed = playerMoveSpeed() * (p.buffs.speed > 0 ? 1.45 : 1);
   const jumpPower = playerJumpPower() * (p.buffs.jump > 0 ? 1.28 : 1);
   p.animT = (p.animT || 0) + dt * (Math.abs(p.vx) > 20 ? 11 : 5);
@@ -1075,6 +1264,15 @@ function updatePlayer(dt) {
     if (Math.abs(p.vx) < 2) p.vx = 0;
   }
 
+  // Wall slide / wall jump detection: probe just outside the player's sides.
+  p.wallDir = 0;
+  if (!p.onGround) {
+    if (KEYS.left && wallProbe(p, -1)) p.wallDir = -1;
+    else if (KEYS.right && wallProbe(p, 1)) p.wallDir = 1;
+  }
+  const wallSliding = p.wallDir !== 0 && p.vy > 0 && p.dashTime <= 0;
+  if (wallSliding) p.airJumpsUsed = 0;
+
   if (KEYS.upPressed) {
     p.jumpBuffer = 0.14;
     KEYS.upPressed = false;
@@ -1082,19 +1280,28 @@ function updatePlayer(dt) {
 
   if (p.jumpBuffer > 0) {
     const groundedJump = p.onGround || p.coyote > 0;
+    const wallJump = !groundedJump && p.wallDir !== 0;
     const maxAirJumps = p.buffs.jump > 0 ? 2 : 1;
-    const airJump = !groundedJump && p.airJumpsUsed < maxAirJumps;
+    const airJump = !groundedJump && !wallJump && p.airJumpsUsed < maxAirJumps;
 
-    if (groundedJump || airJump) {
-      p.vy = -jumpPower;
-      p.onGround = false;
-      p.coyote = 0;
+    if (groundedJump || wallJump || airJump) {
       p.jumpBuffer = 0;
 
       if (groundedJump) {
+        p.vy = -jumpPower;
+        p.onGround = false;
+        p.coyote = 0;
         p.airJumpsUsed = 0;
         emitParticles(p.x + p.w / 2, p.y + p.h - 2, 7, '#d7f0ff', 120, 0.35, 2.8);
+      } else if (wallJump) {
+        p.vy = -jumpPower * 0.94;
+        p.vx = -p.wallDir * moveSpeed * 1.2;
+        p.facing = -p.wallDir;
+        p.wallDir = 0;
+        p.airJumpsUsed = 0;
+        emitParticles(p.x + (p.facing < 0 ? p.w : 0), p.y + p.h / 2, 10, '#c9f3ff', 190, 0.4, 3);
       } else {
+        p.vy = -jumpPower;
         p.airJumpsUsed += 1;
         emitParticles(p.x + p.w / 2, p.y + p.h / 2, 7, '#aef1ff', 130, 0.35, 2.8);
       }
@@ -1119,6 +1326,13 @@ function updatePlayer(dt) {
     p.vy = Math.min(TERMINAL_VY, p.vy + GRAVITY * dt);
   }
 
+  if (wallSliding) {
+    p.vy = Math.min(p.vy, 130);
+    if (Math.random() < dt * 14) {
+      emitParticles(p.x + (p.wallDir > 0 ? p.w - 2 : 2), p.y + p.h * 0.6, 1, '#bfe6ff', 40, 0.3, 2);
+    }
+  }
+
   // Horizontal move and collide.
   p.x += p.vx * dt;
   let hit = levelSolidCollision(p);
@@ -1132,7 +1346,19 @@ function updatePlayer(dt) {
   p.y += p.vy * dt;
   hit = levelSolidCollision(p);
   if (hit) {
-    if (p.vy > 0) {
+    if (p.vy > 0 && hit.spring) {
+      p.y = hit.y - p.h;
+      p.vy = -playerJumpPower() * 1.7;
+      p.onGround = false;
+      p.airJumpsUsed = 0;
+      p.dashCharges = MAX_DASH_CHARGES;
+      p.dashRecharge = 0;
+      hit.bounceT = 0.3;
+      game.camera.shakeT = 0.12;
+      game.camera.shakeMag = 5;
+      emitParticles(hit.x + hit.w / 2, hit.y, 14, '#8dffd8', 230, 0.4, 3.2);
+      setStatus('Spring boost!', 0.7);
+    } else if (p.vy > 0) {
       p.y = hit.y - p.h;
       p.vy = 0;
       p.onGround = true;
@@ -1192,8 +1418,10 @@ function updatePlayer(dt) {
     if (rectsIntersect(p, coin)) {
       coin.taken = true;
       game.collectedCoins += 1;
-      gainCoin(1);
+      registerCombo();
+      const gained = gainCoin(1);
       emitParticles(coin.x + coin.w / 2, coin.y + coin.h / 2, 9, '#ffd77e', 160, 0.45, 2.8);
+      spawnPopup(coin.x + coin.w / 2, coin.y - 4, `+${gained.toFixed(gained < 10 ? 1 : 0)}`, '#ffe9a8');
       setStatus('Coin collected.', 0.55);
     }
   }
@@ -1220,7 +1448,6 @@ function updatePlayer(dt) {
   // Exit.
   if (game.exit && rectsIntersect(p, game.exit)) {
     if (game.collectedCoins >= game.requiredCoins) {
-      showOverlay('Level Clear', 1.3);
       nextLevel();
     } else {
       setStatus(`Portal locked: ${game.requiredCoins - game.collectedCoins} more coin(s) needed.`, 1);
@@ -1276,9 +1503,11 @@ function updateEnemies(dt) {
         game.player.vy = -420;
         if (e.hp <= 0) {
           e.dead = true;
-          gainCoin(3);
+          registerCombo();
+          const gained = gainCoin(3);
           emitParticles(e.x + e.w / 2, e.y + e.h / 2, 12, '#ffb3a6', 220, 0.55, 3.6);
-          setStatus('Enemy defeated: +3 coins.', 0.75);
+          spawnPopup(e.x + e.w / 2, e.y - 4, `+${gained.toFixed(gained < 10 ? 1 : 0)}`, '#ffb3a6');
+          setStatus(`Enemy defeated: +${gained.toFixed(1)} coins.`, 0.75);
         }
       } else {
         hurtPlayer(1);
@@ -1308,7 +1537,7 @@ function updateEnemies(dt) {
 function updateParticles(dt) {
   for (const pt of game.particles) {
     pt.life -= dt;
-    pt.vy += 480 * dt;
+    pt.vy += (pt.isText ? -30 : 480) * dt;
     pt.x += pt.vx * dt;
     pt.y += pt.vy * dt;
     pt.vx *= 0.985;
@@ -1341,15 +1570,58 @@ function updateHud(dt = 0) {
   } else {
     el.level.textContent = `${game.levelIndex + 1} / ${levelCountForMode()}`;
   }
-  el.health.textContent = `${Math.max(0, game.player.hp)} / ${game.player.maxHp}`;
+  const hp = Math.max(0, game.player.hp);
+  el.health.textContent = `${hp} / ${game.player.maxHp}`;
   el.lives.textContent = game.player.lives;
-  if (el.dashes) el.dashes.textContent = `${game.player.dashCharges}/${MAX_DASH_CHARGES}`;
   el.runCoins.textContent = Math.round(game.runCoins);
   el.wallet.textContent = Math.round(game.meta.wallet);
   const modeObj = currentModeInfo().objective;
   el.objective.textContent = `Coins ${game.collectedCoins}/${game.requiredCoins} required (${game.totalCoins} total) | ${modeObj}`;
   el.status.textContent = game.statusText;
+  if (el.biome) el.biome.textContent = game.biome.name;
   applyModeVisualState();
+
+  if (el.hpBar) {
+    if (game._lastMaxHpRendered !== game.player.maxHp) {
+      el.hpBar.innerHTML = Array.from({ length: game.player.maxHp }, () => '<div class="hp-seg"></div>').join('');
+      game._lastMaxHpRendered = game.player.maxHp;
+    }
+    const segs = el.hpBar.children;
+    const prevHp = game._lastHpRendered != null ? game._lastHpRendered : hp;
+    for (let i = 0; i < segs.length; i += 1) {
+      segs[i].classList.toggle('filled', i < hp);
+      if (i >= hp && i < prevHp) {
+        segs[i].classList.add('hurt');
+        setTimeout(() => segs[i].classList.remove('hurt'), 400);
+      }
+    }
+    game._lastHpRendered = hp;
+  }
+
+  if (el.dashPips) {
+    if (!el.dashPips.children.length) {
+      el.dashPips.innerHTML = Array.from({ length: MAX_DASH_CHARGES }, () => '<div class="dash-pip"></div>').join('');
+    }
+    const pips = el.dashPips.children;
+    for (let i = 0; i < pips.length; i += 1) {
+      pips[i].classList.toggle('ready', i < game.player.dashCharges);
+    }
+  }
+
+  if (el.coinFill) {
+    const pct = game.requiredCoins > 0 ? clamp((game.collectedCoins / game.requiredCoins) * 100, 0, 100) : 100;
+    el.coinFill.style.width = `${pct}%`;
+    el.coinFill.classList.toggle('ready', game.collectedCoins >= game.requiredCoins);
+  }
+
+  if (el.combo && el.comboText) {
+    if (game.combo.count >= 2) {
+      el.combo.hidden = false;
+      el.comboText.textContent = `x${game.combo.mult.toFixed(1)} COMBO`;
+    } else {
+      el.combo.hidden = true;
+    }
+  }
 
   const active = [];
   if (game.player.buffs.shield > 0) active.push(`Shield ${game.player.buffs.shield.toFixed(1)}s`);
@@ -1379,42 +1651,66 @@ function updateHud(dt = 0) {
 
 function drawBackground(ctx) {
   const t = game.time;
-  ctx.fillStyle = '#081221';
+  const biome = game.biome;
+  const grad = ctx.createLinearGradient(0, 0, 0, el.canvas.height);
+  grad.addColorStop(0, biome.sky[0]);
+  grad.addColorStop(0.55, biome.sky[1]);
+  grad.addColorStop(1, biome.sky[2]);
+  ctx.fillStyle = grad;
   ctx.fillRect(0, 0, el.canvas.width, el.canvas.height);
 
   for (let i = 0; i < 4; i += 1) {
     const y = 140 + i * 90 + Math.sin(t * 0.4 + i) * 10;
     const alpha = 0.1 + i * 0.05;
-    ctx.fillStyle = `rgba(102, 170, 255, ${alpha})`;
+    ctx.fillStyle = `rgba(${biome.cloud}, ${alpha})`;
     ctx.fillRect(-200 - game.camera.x * (0.2 + i * 0.05), y, 2200, 14);
   }
 }
 
 function drawWorld(ctx) {
   const cam = game.camera;
+  const biome = game.biome;
   ctx.save();
   ctx.translate(-cam.x, -cam.y);
 
   // Tiles.
   for (const tile of game.solids) {
-    ctx.fillStyle = '#2a4568';
+    if (tile.spring) continue;
+    ctx.fillStyle = biome.tileBody;
     ctx.fillRect(tile.x, tile.y, tile.w, tile.h);
-    ctx.strokeStyle = 'rgba(180, 228, 255, 0.18)';
+    ctx.fillStyle = biome.tileTop;
+    ctx.fillRect(tile.x, tile.y, tile.w, 4);
+    ctx.strokeStyle = biome.tileEdge;
     ctx.strokeRect(tile.x + 0.5, tile.y + 0.5, tile.w - 1, tile.h - 1);
+  }
+
+  // Spring pads.
+  for (const s of game.springTiles) {
+    const squash = s.bounceT > 0 ? s.bounceT / 0.3 : 0;
+    const padH = s.h - squash * 10;
+    const glow = 0.55 + 0.45 * Math.sin(game.time * 5 + s.x * 0.04);
+    ctx.fillStyle = biome.tileBody;
+    ctx.fillRect(s.x, s.y, s.w, s.h);
+    ctx.fillStyle = `rgba(141, 255, 216, ${0.5 + glow * 0.35})`;
+    ctx.fillRect(s.x + 3, s.y + (s.h - padH), s.w - 6, padH - 4);
+    ctx.strokeStyle = biome.accent;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(s.x + 3, s.y + (s.h - padH), s.w - 6, padH - 4);
+    ctx.lineWidth = 1;
   }
 
   // Lava.
   for (const lava of game.lava) {
     const pulse = 0.5 + 0.5 * Math.sin(game.time * 6 + lava.x * 0.02);
-    ctx.fillStyle = `rgba(255, 80, 50, ${0.45 + pulse * 0.4})`;
+    ctx.fillStyle = `rgba(${biome.hazard1}, ${0.45 + pulse * 0.4})`;
     ctx.fillRect(lava.x, lava.y, lava.w, lava.h);
-    ctx.fillStyle = 'rgba(255, 170, 80, 0.45)';
+    ctx.fillStyle = `rgba(${biome.hazard2}, 0.45)`;
     ctx.fillRect(lava.x, lava.y + 3, lava.w, 6);
   }
 
   // Spikes.
   for (const s of game.spikes) {
-    ctx.fillStyle = '#c8d7e8';
+    ctx.fillStyle = biome.spike;
     const count = 4;
     const step = s.w / count;
     for (let i = 0; i < count; i += 1) {
@@ -1462,9 +1758,9 @@ function drawWorld(ctx) {
   // Exit portal.
   if (game.exit) {
     const ready = game.collectedCoins >= game.requiredCoins;
-    const c = ready ? '#9affce' : '#5f89bf';
+    const c = ready ? biome.portal : '#5f89bf';
     const pulse = 0.6 + 0.4 * Math.sin(game.time * 5);
-    ctx.fillStyle = ready ? `rgba(154, 255, 206, ${0.24 + pulse * 0.3})` : 'rgba(90, 130, 195, 0.33)';
+    ctx.fillStyle = ready ? `${biome.portal}${Math.round((0.24 + pulse * 0.3) * 255).toString(16).padStart(2, '0')}` : 'rgba(90, 130, 195, 0.33)';
     ctx.beginPath();
     ctx.ellipse(game.exit.x + 16, game.exit.y + 16, 18, 14, 0, 0, Math.PI * 2);
     ctx.fill();
@@ -1596,7 +1892,14 @@ function drawWorld(ctx) {
   for (const pt of game.particles) {
     const alpha = clamp(pt.life / pt.maxLife, 0, 1);
     ctx.fillStyle = `${pt.color}${Math.round(alpha * 255).toString(16).padStart(2, '0')}`;
-    ctx.fillRect(pt.x - pt.size / 2, pt.y - pt.size / 2, pt.size, pt.size);
+    if (pt.isText) {
+      ctx.font = 'bold 13px Orbitron, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(pt.text, pt.x, pt.y);
+      ctx.textAlign = 'left';
+    } else {
+      ctx.fillRect(pt.x - pt.size / 2, pt.y - pt.size / 2, pt.size, pt.size);
+    }
   }
 
   ctx.restore();
@@ -1705,6 +2008,7 @@ function step(dt) {
   updateEnemies(dt);
   updateParticles(dt);
   updateCamera(dt);
+  updateCombo(dt);
 }
 
 let last = performance.now();

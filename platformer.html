@@ -10,30 +10,52 @@
   <link rel="stylesheet" href="platformer.css" />
 </head>
 <body>
+  <svg style="display:none" aria-hidden="true">
+    <defs>
+      <symbol id="icon-heart" viewBox="0 0 24 24"><path d="M12 21s-7.2-4.6-10-9.2C.4 8.7 1.8 5 5.4 4.2c2-.4 3.9.5 5 2.1a5.7 5.7 0 0 1 1.6-2C13.7 3 17 2.9 19 5.4c2.3 2.9 1 6.6-1.9 9.4C14.9 17.6 12 21 12 21z"/></symbol>
+      <symbol id="icon-bolt" viewBox="0 0 24 24"><path d="M13 2 3 14h7l-1 8 11-14h-7l0-6z"/></symbol>
+      <symbol id="icon-coin" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.2c-2 0-3.4 1-3.4 2.3 0 3 6.4 1.6 6.4 4.9 0 1.4-1.6 2.4-3.5 2.4-1.6 0-3-.7-3.6-1.8M12 6v1.2M12 16.8V18" stroke="#10243d" stroke-width="1.1" fill="none" stroke-linecap="round"/></symbol>
+      <symbol id="icon-wallet" viewBox="0 0 24 24"><path d="M3 6.5A2.5 2.5 0 0 1 5.5 4h11A2.5 2.5 0 0 1 19 6.5V8h-2.5A3.5 3.5 0 0 0 13 11.5v1A3.5 3.5 0 0 0 16.5 16H19v.5A2.5 2.5 0 0 1 16.5 19h-11A2.5 2.5 0 0 1 3 16.5v-10z"/><circle cx="16.3" cy="12" r="1.3" fill="#10243d"/></symbol>
+      <symbol id="icon-clone" viewBox="0 0 24 24"><rect x="4" y="4" width="12" height="12" rx="2"/><path d="M8 16v1.5A2.5 2.5 0 0 0 10.5 20H18a2.5 2.5 0 0 0 2.5-2.5V10a2.5 2.5 0 0 0-2.5-2.5H16" fill="none" stroke-width="2" stroke="currentColor"/></symbol>
+      <symbol id="icon-flame" viewBox="0 0 24 24"><path d="M12 2c1 3-2.5 4-2.5 7.3 0 1.3.9 2.2 2 2.2.9 0 1.6-.6 1.8-1.4.8.9 1.2 2 1.2 3.2 0 2.9-2.4 5.2-5.2 5.2S3.1 17.2 3.1 14.3c0-4.3 3.4-6 5-9.2.9-1.8 1.6-2.4 3.9-3.1z"/></symbol>
+      <symbol id="icon-flag" viewBox="0 0 24 24"><path d="M6 3v18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M6 4h12l-3 3.5L18 11H6z"/></symbol>
+      <symbol id="icon-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M3 12h18M12 3c2.6 2.6 4 5.7 4 9s-1.4 6.4-4 9c-2.6-2.6-4-5.7-4-9s1.4-6.4 4-9z" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+    </defs>
+  </svg>
   <div class="bg-noise" aria-hidden="true"></div>
   <main class="wrap">
     <header class="panel topbar hero">
       <div>
         <p class="eyebrow">ULTRA PLATFORMER</p>
         <h1>Astro Ruins Platformer</h1>
-        <p class="sub">WASD/Arrows move, Space jump, Shift dash, B open shop, R restart level. On mobile, use the touch controls under the game.</p>
+        <p class="sub">WASD/Arrows move, Space jump, Shift dash, B open shop, R restart level. Hold toward a wall while airborne to slide down it, then jump again to wall-kick off. Chain coins and stomps quickly for a combo multiplier, and look for glowing spring pads for a huge bounce. On mobile, use the touch controls under the game.</p>
       </div>
       <a class="home-link" href="index.html">Back Home</a>
     </header>
 
     <section class="panel hud">
       <div class="hud-row">
-        <span>Level: <strong id="pfLevel">1</strong></span>
-        <span>Health: <strong id="pfHealth">3</strong></span>
-        <span>Lives: <strong id="pfLives">3</strong></span>
-        <span>Dashes: <strong id="pfDashes">2</strong></span>
-        <span>Coins (run): <strong id="pfRunCoins">0</strong></span>
-        <span>Wallet Coins: <strong id="pfWallet">0</strong></span>
+        <span class="stat-chip"><svg class="icon"><use href="#icon-flag"></use></svg>Level <strong id="pfLevel">1</strong></span>
+        <span class="stat-chip biome-chip"><svg class="icon"><use href="#icon-globe"></use></svg><strong id="pfBiome">Astro Ruins</strong></span>
+        <span class="stat-chip"><svg class="icon"><use href="#icon-clone"></use></svg>Lives <strong id="pfLives">3</strong></span>
+        <span class="stat-chip"><svg class="icon"><use href="#icon-coin"></use></svg>Run <strong id="pfRunCoins">0</strong></span>
+        <span class="stat-chip"><svg class="icon"><use href="#icon-wallet"></use></svg>Wallet <strong id="pfWallet">0</strong></span>
+      </div>
+      <div class="hud-row vitals-row">
+        <div class="vital">
+          <span class="vital-label"><svg class="icon small"><use href="#icon-heart"></use></svg>Hull <strong id="pfHealth">3/3</strong></span>
+          <div class="hp-bar" id="pfHpBar"></div>
+        </div>
+        <div class="vital">
+          <span class="vital-label"><svg class="icon small"><use href="#icon-bolt"></use></svg>Dash</span>
+          <div class="dash-pips" id="pfDashPips"></div>
+        </div>
       </div>
       <div class="hud-row small">
         <span>Objective: <strong id="pfObjective">Collect coins and reach the portal.</strong></span>
         <span>Status: <strong id="pfStatus">Ready</strong></span>
       </div>
+      <div class="coin-progress"><div class="coin-progress-fill" id="pfCoinFill"></div></div>
       <div class="hud-row mode-row">
         <span>Mode: <strong id="pfModeLabel">Level</strong></span>
         <span>Accessories: <strong id="pfAccessoryCount">0/5</strong></span>
@@ -51,6 +73,10 @@
     <section class="panel game-panel">
       <canvas id="pfCanvas" width="960" height="540" aria-label="Platformer game canvas"></canvas>
       <div class="overlay" id="pfOverlay"></div>
+      <div class="combo-badge" id="pfCombo" hidden>
+        <svg class="icon"><use href="#icon-flame"></use></svg>
+        <span id="pfComboText">x2</span>
+      </div>
       <div class="touch-controls" aria-label="Mobile controls for platformer">
         <div class="touch-row">
           <button type="button" class="touch-btn" data-touch="left">Left</button>

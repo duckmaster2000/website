@@ -13,6 +13,13 @@ let mySide = null;
 let onlineActive = false;
 let inQueue = false;
 let lastMatchWasOnline = false;
+let onlineDeckIds = [];
+
+// Online smoothing: the server sends ~20 snapshots/sec. We draw slightly in the
+// past and blend between the two snapshots around that moment so units glide.
+const NET_INTERP_DELAY = 0.1; // seconds
+let netSnapshots = [];
+let netClockOffset = null; // client clock (s) minus server match time
 
 const BOARD = {
   laneCount: 3,
@@ -144,7 +151,6 @@ function buildCards() {
 
 const CARD_LIBRARY = buildCards();
 const CARD_MAP = Object.fromEntries(CARD_LIBRARY.map((c) => [c.id, c]));
-const ONLINE_CARD_IDS = ['scout', 'brawler', 'siege', 'guardian'];
 const STARTER_DECK = ['scout', 'brawler', 'siege', 'guardian', 'voltbug', 'drillcat', 'ramhog', 'flarepod'];
 const MAX_DECK = 8;
 
@@ -446,7 +452,7 @@ function getCardStatsAtLevel(id, level, abilityUnlocked, mastery) {
 }
 
 function deckFor(owner) {
-  if (onlineActive) return ONLINE_CARD_IDS;
+  if (onlineActive) return onlineDeckIds;
   if (owner === 'A') return state.progress.deck.filter((id) => cardProgress(id).unlocked).slice(0, MAX_DECK);
   if (state.mode === 'ai') {
     const ai = state.progress.aiDeck.filter((id) => cardProgress(id).unlocked).slice(0, MAX_DECK);
@@ -958,43 +964,50 @@ function renderDecks() {
   if (onlineActive) {
     const myDeck = mySide === 'A' ? ui.deckA : ui.deckB;
     const oppDeck = mySide === 'A' ? ui.deckB : ui.deckA;
-    myDeck.innerHTML = ONLINE_CARD_IDS.map((id) => cardButton(mySide, id)).join('') + avgElixirBar(ONLINE_CARD_IDS);
-    oppDeck.innerHTML = '<div class="note">Opponent is playing…</div>';
+    setHtml(myDeck, renderHandDeck(mySide));
+    setHtml(oppDeck, '<div class="note">Opponent is playing…</div>');
     return;
   }
 
-  ui.deckA.innerHTML = renderHandDeck('A');
+  setHtml(ui.deckA, renderHandDeck('A'));
   if (state.mode === 'ai') {
-    ui.deckB.innerHTML = '<div class="note">Enemy AI controls this deck in real time.</div>';
+    setHtml(ui.deckB, '<div class="note">Enemy AI controls this deck in real time.</div>');
   } else {
-    ui.deckB.innerHTML = renderHandDeck('B');
+    setHtml(ui.deckB, renderHandDeck('B'));
   }
 }
 
 function renderStructures() {
-  ui.structures.innerHTML = state.structures.map((s) => {
+  setHtml(ui.structures, state.structures.map((s) => {
     const y = laneY(s.lane);
     const hp = clamp((s.hp / s.hpMax) * 100, 0, 100);
     const hpNum = `${Math.max(0, Math.ceil(s.hp))}/${s.hpMax}`;
     const team = s.owner === 'A' ? 'team-a' : 'team-b';
     const icon = s.kind === 'base' ? '🏰' : '🗼';
     return `<div class="structure ${team} ${s.kind}" data-alive="${s.hp > 0 ? '1' : '0'}" style="left:${s.x}%;top:${y}px"><span class="structure-icon">${icon}</span><span class="structure-hp-label">${hpNum}</span><span class="hp"><i style="width:${hp}%"></i></span></div>`;
-  }).join('');
+  }).join(''));
 }
 
 function renderUnits() {
-  ui.units.innerHTML = state.units.map((u) => {
+  setHtml(ui.units, state.units.map((u) => {
     const y = laneY(u.lane) + (u.owner === 'A' ? 14 : -14);
     const hp = clamp((u.hp / u.hpMax) * 100, 0, 100);
     return `<div class="unit team-${u.owner.toLowerCase()} rarity-${u.rarity}" data-type="${u.cardId}" style="left:${u.x}%;top:${y}px"><span class="tank-art">${u.icon}</span><span class="hp"><i style="width:${hp}%"></i></span></div>`;
-  }).join('');
+  }).join(''));
 }
 
 function renderProjectiles() {
-  ui.projectiles.innerHTML = state.projectiles.map((p) => `<div class="projectile ${p.style} team-${p.owner.toLowerCase()}" style="left:${p.x}%;top:${p.y}px"></div>`).join('');
+  setHtml(ui.projectiles, state.projectiles.map((p) => `<div class="projectile ${p.style} team-${p.owner.toLowerCase()}" style="left:${p.x}%;top:${p.y}px"></div>`).join(''));
 }
 
 function writeLog(msg) { if (ui.log) ui.log.textContent = msg; }
+
+// Only touch the DOM when the markup actually changed (avoids rebuilding every frame)
+function setHtml(el, html) {
+  if (!el || el.__html === html) return;
+  el.innerHTML = html;
+  el.__html = html;
+}
 
 function tryDeploy(lane) {
   if (!state.selectedCard) return;
@@ -1573,7 +1586,8 @@ function bindProgressUi() {
 }
 
 function ensureSocket() {
-  if (socket && socket.connected) return;
+  // Keep a socket that is connected or still connecting (server may be waking up)
+  if (socket && (socket.connected || socket.active)) return;
   // If we have a dead socket, destroy it so we build a fresh one
   if (socket) {
     socket.removeAllListeners();
@@ -1582,10 +1596,12 @@ function ensureSocket() {
   }
   if (typeof io === 'undefined') { writeLog('Socket.io not loaded.'); return; }
 
-  socket = io(SERVER_URL, { transports: ['websocket', 'polling'], reconnection: false });
+  // Free Render instances sleep when idle and can take ~60s to wake, so allow a long connect timeout
+  socket = io(SERVER_URL, { transports: ['websocket', 'polling'], reconnection: false, timeout: 75000 });
+  if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Connecting to game server (can take up to a minute if it was asleep)...';
 
   socket.on('connect', () => {
-    if (ui.lobbyStatus && ui.lobbyStatus.textContent.startsWith('Cannot reach')) {
+    if (ui.lobbyStatus && /^(Cannot reach|Connecting to game server)/.test(ui.lobbyStatus.textContent)) {
       ui.lobbyStatus.textContent = 'Connected. Ready to play!';
     }
   });
@@ -1656,7 +1672,7 @@ function joinRoomByCode(code) {
   if (!c) { if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Enter room code first.'; return; }
   ensureSocket();
   if (!socket) return;
-  socket.emit('join_room', { code: c });
+  socket.emit('join_room', { code: c, deck: onlineDeckPayload() });
   if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Joining...';
 }
 
@@ -1664,7 +1680,7 @@ function bindLobby() {
   ui.createRoom?.addEventListener('click', () => {
     ensureSocket();
     if (!socket) return;
-    socket.emit('create_room');
+    socket.emit('create_room', { deck: onlineDeckPayload() });
     if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Creating room...';
   });
 
@@ -1693,11 +1709,24 @@ function bindLobby() {
   });
 }
 
+// The deck you bring online: your saved deck (unlocked cards only), at your card levels
+function onlineDeckPayload() {
+  let ids = state.progress.deck.filter((id) => CARD_MAP[id] && cardProgress(id).unlocked).slice(0, MAX_DECK);
+  if (ids.length === 0) ids = [...STARTER_DECK];
+  onlineDeckIds = ids;
+  return ids.map((id) => {
+    const cp = cardProgress(id);
+    return { id, level: cp.level || 1, abilityUnlocked: !!cp.abilityUnlocked, mastery: cp.mastery || 0 };
+  });
+}
+
 function showOnlineLobby() {
   if (ui.lobbyPanel) ui.lobbyPanel.hidden = false;
   if (ui.shareBox) ui.shareBox.hidden = true;
   if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Ready. Create or join room.';
-  writeLog('Online uses balanced starter cards. Collection systems are active in local and AI modes.');
+  writeLog('Online matches use your current deck.');
+  // Connect now so a sleeping server starts waking up before you click anything
+  ensureSocket();
 }
 
 function showMatchOnline() {
@@ -1708,8 +1737,13 @@ function showMatchOnline() {
   if (ui.queueStatus) ui.queueStatus.hidden = true;
   if (ui.joinCode) ui.joinCode.value = '';
 
-  state.players.A = { name: mySide === 'A' ? 'You' : 'Opponent', baseHp: 1300, baseHpMax: 1300, energy: 0, energyMax: 10, cooldowns: { scout: 0, brawler: 0, siege: 0, guardian: 0 } };
-  state.players.B = { name: mySide === 'B' ? 'You' : 'Opponent', baseHp: 1300, baseHpMax: 1300, energy: 0, energyMax: 10, cooldowns: { scout: 0, brawler: 0, siege: 0, guardian: 0 } };
+  state.players.A = { name: mySide === 'A' ? 'You' : 'Opponent', baseHp: 1300, baseHpMax: 1300, energy: 0, energyMax: 10, cooldowns: {} };
+  state.players.B = { name: mySide === 'B' ? 'You' : 'Opponent', baseHp: 1300, baseHpMax: 1300, energy: 0, energyMax: 10, cooldowns: {} };
+  state.hand = { A: [], B: [] };
+  state.handQueue = { A: [], B: [] };
+  state.selectedCard = null;
+  netSnapshots = [];
+  netClockOffset = null;
   state.units = [];
   state.structures = [];
   state.projectiles = [];
@@ -1733,11 +1767,16 @@ function showMatchOnline() {
 
 function applyServerState(serverState) {
   if (!onlineActive) return;
+
+  // Track how far the server's match clock is from ours. Take the smallest gap
+  // seen (least network delay) and let it drift up slowly if the server falls behind.
+  const offset = performance.now() / 1000 - serverState.time;
+  if (netClockOffset === null || offset < netClockOffset) netClockOffset = offset;
+  else netClockOffset += (offset - netClockOffset) * 0.02;
+  netSnapshots.push(serverState);
+  netSnapshots = netSnapshots.filter((s) => s.time >= serverState.time - 1);
+
   state.structures = serverState.structures || [];
-  state.units = (serverState.units || []).map((u) => {
-    const card = CARD_MAP[u.type] || CARD_MAP.scout;
-    return { ...u, icon: card.icon, hpMax: u.hpMax, rarity: card.rarity };
-  });
   state.running = !!serverState.running;
   state.winner = serverState.winner || null;
 
@@ -1753,6 +1792,41 @@ function applyServerState(serverState) {
   };
   updateP(state.players.A, serverState.players?.A);
   updateP(state.players.B, serverState.players?.B);
+  ['A', 'B'].forEach((side) => {
+    const sp = serverState.players?.[side];
+    if (!sp) return;
+    state.hand[side] = sp.hand || [];
+    state.handQueue[side] = sp.next ? [sp.next] : [];
+  });
+}
+
+// Place units and shots by blending the two snapshots around (now - NET_INTERP_DELAY)
+function interpolateNet() {
+  if (netSnapshots.length === 0 || netClockOffset === null) return;
+  const renderTime = performance.now() / 1000 - netClockOffset - NET_INTERP_DELAY;
+  let a = null;
+  let b = null;
+  for (const s of netSnapshots) {
+    if (s.time <= renderTime) a = s;
+    else { b = s; break; }
+  }
+  if (!a) a = b;
+  if (!b) b = a;
+  const t = b.time > a.time ? clamp((renderTime - a.time) / (b.time - a.time), 0, 1) : 1;
+  const lerp = (from, to) => from + (to - from) * t;
+
+  const prevUnits = new Map((a.units || []).map((u) => [u.id, u]));
+  state.units = (b.units || []).map((u) => {
+    const card = CARD_MAP[u.cardId] || CARD_MAP.scout;
+    const prev = prevUnits.get(u.id);
+    return { ...u, x: prev ? lerp(prev.x, u.x) : u.x, icon: card.icon, rarity: card.rarity };
+  });
+
+  const prevShots = new Map((a.projectiles || []).map((p) => [p.id, p]));
+  state.projectiles = (b.projectiles || []).map((p) => {
+    const prev = prevShots.get(p.id);
+    return prev ? { ...p, x: lerp(prev.x, p.x), y: lerp(prev.y, p.y) } : p;
+  });
 }
 
 function handleOnlineVictory(winner) {
@@ -1786,11 +1860,10 @@ function joinQueue() {
   inQueue = true;
   if (ui.queueStatus) ui.queueStatus.hidden = false;
   if (ui.findMatch) ui.findMatch.disabled = true;
-  if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Connecting...';
+  if (!socket.connected && ui.lobbyStatus) ui.lobbyStatus.textContent = 'Connecting to game server (can take up to a minute if it was asleep)...';
   const doJoin = () => {
     if (!inQueue) return; // cancelled while connecting
-    const skillRating = state.progress.gold > 0 ? Math.round(1000 + state.progress.gold * 0.05) : 1000;
-    socket.emit('join_queue', { skillRating, latency: 99 });
+    socket.emit('join_queue', { deck: onlineDeckPayload() });
     if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Searching for opponent...';
   };
   if (socket.connected) {
@@ -1963,7 +2036,10 @@ function gameLoop(ts) {
   const dt = clamp((ts - state.lastTick) / 1000, 0, 0.045);
   state.lastTick = ts;
   if (!onlineActive) update(dt);
-  else state.time += dt;
+  else {
+    state.time += dt;
+    interpolateNet();
+  }
   renderStatus();
   renderDecks();
   renderStructures();
