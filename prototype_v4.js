@@ -383,27 +383,30 @@ function bindAdminUi() {
   });
 }
 
+function applySavedProgress(saved) {
+  if (saved && typeof saved === 'object') {
+    state.progress.gold = clamp(Number(saved.gold || 800), 0, 9999999);
+    state.progress.deck = Array.isArray(saved.deck) ? saved.deck.slice(0, MAX_DECK) : [...STARTER_DECK];
+    state.progress.aiDeck = Array.isArray(saved.aiDeck) ? saved.aiDeck.slice(0, MAX_DECK) : [...STARTER_DECK];
+    state.progress.collection = saved.collection && typeof saved.collection === 'object' ? saved.collection : {};
+    state.progress.chests = Array.isArray(saved.chests) ? saved.chests.slice(0, 4) : [];
+    state.progress.buildings = {
+      towerLevel: clamp(Number(saved.buildings?.towerLevel || 1), 1, 20),
+      baseLevel: clamp(Number(saved.buildings?.baseLevel || 1), 1, 20)
+    };
+    state.progress.aiHealth = {
+      baseMult: clamp(Number(saved.aiHealth?.baseMult || 1), 0.6, 2.2),
+      towerMult: clamp(Number(saved.aiHealth?.towerMult || 1), 0.6, 2.2)
+    };
+    state.progress.aiDifficulty = Object.prototype.hasOwnProperty.call(AI_PRESETS, saved.aiDifficulty)
+      ? saved.aiDifficulty
+      : 'normal';
+  }
+}
+
 function loadProgress() {
   try {
-    const saved = JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}');
-    if (saved && typeof saved === 'object') {
-      state.progress.gold = clamp(Number(saved.gold || 800), 0, 9999999);
-      state.progress.deck = Array.isArray(saved.deck) ? saved.deck.slice(0, MAX_DECK) : [...STARTER_DECK];
-      state.progress.aiDeck = Array.isArray(saved.aiDeck) ? saved.aiDeck.slice(0, MAX_DECK) : [...STARTER_DECK];
-      state.progress.collection = saved.collection && typeof saved.collection === 'object' ? saved.collection : {};
-      state.progress.chests = Array.isArray(saved.chests) ? saved.chests.slice(0, 4) : [];
-      state.progress.buildings = {
-        towerLevel: clamp(Number(saved.buildings?.towerLevel || 1), 1, 20),
-        baseLevel: clamp(Number(saved.buildings?.baseLevel || 1), 1, 20)
-      };
-      state.progress.aiHealth = {
-        baseMult: clamp(Number(saved.aiHealth?.baseMult || 1), 0.6, 2.2),
-        towerMult: clamp(Number(saved.aiHealth?.towerMult || 1), 0.6, 2.2)
-      };
-      state.progress.aiDifficulty = Object.prototype.hasOwnProperty.call(AI_PRESETS, saved.aiDifficulty)
-        ? saved.aiDifficulty
-        : 'normal';
-    }
+    applySavedProgress(JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}'));
   } catch (_) {}
   unlockInitial();
   if (!Array.isArray(state.progress.aiDeck) || state.progress.aiDeck.length === 0) {
@@ -2020,6 +2023,16 @@ function bindCore() {
   });
 }
 
+// Another tab saved progress (e.g. you changed your deck there). Pick it up here so this
+// tab doesn't play with, or later save over, an out-of-date deck.
+function syncProgressFromOtherTab(e) {
+  if (e.key !== PROGRESS_KEY || !e.newValue || state.admin.active || state.chestOpening) return;
+  try { applySavedProgress(JSON.parse(e.newValue)); } catch (_) { return; }
+  renderProgress();
+  renderCollection();
+  renderDecks();
+}
+
 function unlockPrototype() {
   if (ui.lockPanel) ui.lockPanel.hidden = true;
   if (ui.content) ui.content.hidden = false;
@@ -2027,6 +2040,7 @@ function unlockPrototype() {
   renderProgress();
   renderCollection();
   bindCore();
+  window.addEventListener('storage', syncProgressFromOtherTab);
   setupMatch();
   requestAnimationFrame(gameLoop);
 }
