@@ -115,7 +115,7 @@ function generateCode() {
 
 // Each player's deck is stored on their socket when they create/join a room or queue
 function deckOf(socketId) {
-  return io.sockets.sockets.get(socketId)?.data.deck || Sim.normalizeDeck(null);
+  return io.sockets.sockets.get(socketId)?.data.deck || Sim.normalizeDeck(null, Sim.EVO_RULES.slots.online);
 }
 
 // What clients need to know about the match that is starting. The id is unique per match, so a
@@ -183,7 +183,7 @@ io.on('connection', socket => {
   console.log(`connect  ${socket.id}`);
 
   socket.on('create_room', ({ deck } = {}) => {
-    socket.data.deck = Sim.normalizeDeck(deck);
+    socket.data.deck = Sim.normalizeDeck(deck, Sim.EVO_RULES.slots.online);
     leaveCurrentRoom(socket);
     const code = generateCode();
     const room = {
@@ -208,7 +208,7 @@ io.on('connection', socket => {
     const room = rooms.get(upper);
     if (!room) { socket.emit('room_error', { msg: 'Room not found. Check your code.' }); return; }
     if (room.players.length >= 2) { socket.emit('room_error', { msg: 'Room is full.' }); return; }
-    socket.data.deck = Sim.normalizeDeck(deck);
+    socket.data.deck = Sim.normalizeDeck(deck, Sim.EVO_RULES.slots.online);
     leaveCurrentRoom(socket);
     room.players.push(socket.id);
     room.sockets.B = socket.id;
@@ -260,7 +260,7 @@ io.on('connection', socket => {
   });
 
   socket.on('join_queue', ({ deck } = {}) => {
-    socket.data.deck = Sim.normalizeDeck(deck);
+    socket.data.deck = Sim.normalizeDeck(deck, Sim.EVO_RULES.slots.online);
     leaveCurrentRoom(socket);
     addToMatchQueue(socket.id);
     socket.emit('queue_waiting', {});

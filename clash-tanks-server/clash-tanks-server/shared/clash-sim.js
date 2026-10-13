@@ -256,6 +256,7 @@
     { slug: 'hangardrone', name: 'Hangar Drone', icon: '🚁', rarity: 'common', cost: 0, role: 'spawned drone', air: true, hp: 110, dmg: 38, cd: 1.0, range: 2.5, speed: 1.6, targets: 'any', proj: 'spark', radius: 0.35 },
     { slug: 'cryptskel', name: 'Skeleton', icon: '💀', rarity: 'common', cost: 0, role: 'spawned skeleton', hp: 55, dmg: 50, cd: 1.0, range: 0.5, speed: 1.5, targets: 'ground', proj: 'melee', radius: 0.32 },
     { slug: 'rockshard', name: 'Rock Shard', icon: '🧱', rarity: 'common', cost: 0, role: 'titan fragment', hp: 650, dmg: 65, cd: 1.5, range: 0.6, speed: 0.75, targets: 'buildings', proj: 'melee', radius: 0.6 },
+    { slug: 'bonegiant', name: 'Bone Giant', icon: '☠️', rarity: 'common', cost: 0, role: 'crypt guardian', hp: 520, dmg: 90, cd: 1.4, range: 0.6, speed: 0.9, targets: 'ground', proj: 'melee', radius: 0.6 },
     { slug: 'stormsprite', name: 'Storm Sprite', icon: '🌩', rarity: 'common', cost: 0, role: 'zeppelin sprite', air: true, hp: 110, dmg: 42, cd: 1.2, range: 2.0, speed: 1.5, targets: 'any', proj: 'spark', splash: 0.8, radius: 0.35 },
   ];
 
@@ -274,6 +275,133 @@
     bombbeetles: 8, makoswarm: 8,
   };
   const VARIANT_ARENA_SHIFT = [0, 0, 1, 1, 2];
+
+  // ─── Card Evolutions ─────────────────────────────────────────────────────
+  //
+  // An Evolution is an upgraded form of a card family (keyed by slug, so it covers that card's
+  // Mk-II/Twin/Burst/Core variants too). It changes how the card behaves, not just its numbers.
+  //
+  //   cycles   normal plays needed before the next play comes out evolved (then it resets)
+  //   hp/dmg   small stat multipliers for the evolved form (most stay at 1)
+  //   mech     troop/building mechanics, handled by the evolution hooks (see "Evolution mechanics")
+  //   spell    spell mechanics, handled in castSpell
+  //   counter  how an opponent beats it (shown in the collection)
+  //
+  // To add one: add an entry here, reuse an existing mechanic or add a new one to the hooks,
+  // and add a test. See CLASH_TANKS.md, "Adding an Evolution".
+  const EVO_RULES = {
+    slots: { pvp: 2, ai: 2, online: 2 },   // evolution slots per deck, per mode
+    maxSlots: 2,                           // the engine never allows more than this
+    startCharged: false,                   // true = the first play of an evolved card is already evolved
+  };
+
+  const EVOLUTIONS = {
+    brawler: {
+      name: 'Juggernaut', cycles: 2, hp: 1.08, dmg: 1, role: 'melee', theme: 'steel',
+      ability: 'Quake Fist',
+      desc: 'Every 3rd punch slams the ground: splash damage around its target and a shockwave that knocks ground troops back.',
+      counter: 'Fight it with ranged or air troops, or spread out. The quake only hits ground troops near its target.',
+      mech: { shockwave: { every: 3, radius: 1.6, dmgMult: 0.6, knock: 1.0 } },
+    },
+    drillcat: {
+      name: 'Diamond Drill', cycles: 1, hp: 1, dmg: 1, role: 'melee', theme: 'diamond',
+      ability: 'Bore Through',
+      desc: 'Each hit in a row on the same target drills 45% deeper (up to +135%). Switching targets or being stunned resets the drill.',
+      counter: 'Distract it with cheap troops or a building to force target swaps; stuns and freezes reset the drill.',
+      mech: { stackHits: { per: 0.45, max: 3 } },
+    },
+    guardian: {
+      name: 'Bastion', cycles: 2, hp: 1, dmg: 1, role: 'tank', theme: 'shield',
+      ability: 'Aegis Pulse',
+      desc: 'When it lands and every 8 seconds, wraps the 4 nearest other friendly troops in a 110 HP energy shield, on top of its damage-reduction aura.',
+      counter: 'Splash damage and spells strip shields fast. Kill the Bastion and the shields stop coming.',
+      mech: { allyShield: { every: 8, amount: 110, radius: 3, max: 4 } },
+    },
+    siege: {
+      name: 'Earthshaker', cycles: 2, hp: 1, dmg: 1, role: 'tank', theme: 'quake',
+      ability: 'Crater Shells',
+      desc: 'Every shell leaves a crater for 3 seconds that slows enemy troops and buildings in it by 50%.',
+      counter: 'Flyers ignore craters. Swarm it up close, or freeze it.',
+      mech: { impactZone: { kind: 'slow', slow: 0.5, dur: 3, radius: 1.8 } },
+    },
+    voltbug: {
+      name: 'Storm Bug', cycles: 1, hp: 1, dmg: 1, role: 'ranged', theme: 'storm',
+      ability: 'Thunderhead',
+      desc: 'Its lightning arcs to 3 more enemies (instead of 2), and the first target is jolted for 0.25 s, cancelling its wind-up.',
+      counter: 'Tanky single troops shrug it off; spread swarms so the arc runs out of jumps.',
+      mech: { chain: { count: 3, stunPrimary: 0.25 } },
+    },
+    raylance: {
+      name: 'Prism Lance', cycles: 2, hp: 1, dmg: 1, role: 'ranged', theme: 'prism',
+      ability: 'Refraction',
+      desc: 'Its beam pierces in a straight line to full range, hitting every enemy (air or ground) in the way. Enemies behind the first take 60%.',
+      counter: 'Come at it from the side instead of in a line, or dive it with fast melee.',
+      mech: { pierceLine: { width: 0.55, falloff: 0.6 } },
+    },
+    flarepod: {
+      name: 'Cluster Pod', cycles: 2, hp: 1, dmg: 0.9, role: 'ranged', theme: 'ember',
+      ability: 'Scatter Shot',
+      desc: 'Each fireball bursts into 3 bomblets that scatter around the impact. No enemy can be hit by more than one bomblet per shot.',
+      counter: 'Tanks barely notice the bomblets. Reach it with a fast troop or a spell.',
+      mech: { cluster: { count: 3, spread: 1.5, dmgMult: 0.4, radius: 0.9 } },
+    },
+    junkpack: {
+      name: 'Scrap Rally', cycles: 1, hp: 1, dmg: 1, role: 'swarm', theme: 'rage',
+      ability: 'Grudge',
+      desc: 'When a pack member falls, the survivors fight harder: +35% move and attack speed per fallen member, up to 2 stacks.',
+      counter: 'Splash that kills the whole pack at once denies the rally.',
+      mech: { rally: { per: 0.35, max: 2 } },
+    },
+    hawkstrike: {
+      name: 'Dive Hawks', cycles: 2, hp: 1, dmg: 1, role: 'air', theme: 'sky',
+      ability: 'Talon Dive',
+      desc: 'Each hawk opens on a new target with a diving strike for 2.5× damage, then has to climb for 4 seconds before it can dive again.',
+      counter: 'Anti-air splash (Flak, Flare Pod, Rocket Rain) catches the flock. Feed it a cheap decoy to waste the dives.',
+      mech: { dive: { mult: 2.5, cd: 4 } },
+    },
+    boltturret: {
+      name: 'Arc Turret', cycles: 1, hp: 1, dmg: 1, role: 'building', theme: 'arc',
+      ability: 'Discharge',
+      desc: 'Every 3rd shot also releases an electric pulse that damages and knocks back ground troops within 2.5 tiles.',
+      counter: 'Building-only troops and flyers ignore the pulse; tanks soak it. Spell it from range.',
+      mech: { pulse: { every: 3, radius: 2.5, dmgMult: 0.9, knock: 1.1 } },
+    },
+    bonecrypt: {
+      name: 'Crypt of Legions', cycles: 1, hp: 1, dmg: 1, role: 'building', theme: 'bone',
+      ability: 'Last Rites',
+      desc: 'When destroyed or expired, a Bone Giant (520 HP) bursts out instead of 3 skeletons.',
+      counter: 'Let it expire somewhere useless, or be ready for the Giant with a high-damage troop.',
+      mech: { deathSummon: { card: 'bonegiant', count: 1, replaces: true } },
+    },
+    medicbot: {
+      name: 'Field Surgeon', cycles: 1, hp: 1.1, dmg: 1, role: 'support', theme: 'medic',
+      ability: 'Triage',
+      desc: 'Heals badly hurt allies (under 40% HP) 2.2× faster, removes slows from allies and makes stuns and freezes on them wear off faster.',
+      counter: 'Burst the push down fast, or snipe the Surgeon first: even evolved it is a 500 HP backliner.',
+      mech: { cleanse: true, triage: { below: 0.4, mult: 2.2 } },
+    },
+    firebomb: {
+      name: 'Napalm Bomb', cycles: 2, role: 'spell', theme: 'napalm',
+      ability: 'Burning Ground',
+      desc: 'After the blast, the ground burns for 3 seconds, dealing another 35% of the damage to enemies standing in it (towers 30%).',
+      counter: 'Move troops out of the fire; fast units cross it quickly.',
+      spell: { afterZone: { kind: 'dot', dur: 3, tick: 0.5, dmgMult: 0.35, radius: 2.0 } },
+    },
+    shock: {
+      name: 'Overload', cycles: 2, role: 'spell', theme: 'storm',
+      ability: 'Aftershock',
+      desc: '0.8 s after the zap, a second pulse hits the same spot for 60% damage and a longer 0.8 s stun.',
+      counter: 'Troops that walk out of the circle in time escape the aftershock.',
+      spell: { echo: { delay: 0.8, dmgMult: 0.6, stun: 0.8 } },
+    },
+    rocketrain: {
+      name: 'Homing Barrage', cycles: 2, role: 'spell', theme: 'rocket',
+      ability: 'Lock-On',
+      desc: 'Fires 6 rockets that each lock on to a different enemy in the area (spares fly to the centre). Small splash, great against scattered troops.',
+      counter: 'Tough troops take little from each rocket; it can only lock on to what is in the circle when it is cast.',
+      spell: { seek: { count: 6, dmgMult: 0.3, radius: 1.2 } },
+    },
+  };
   const MAX_ARENA = 9;
 
   // One-line descriptions for the original cards (the newer ones carry their own)
@@ -439,23 +567,37 @@
 
   // Accepts ['id', ...] or [{ id, level, abilityUnlocked, mastery }, ...]; drops unknown
   // cards and duplicates, caps at 8, and falls back to the starter deck if nothing is valid.
-  function normalizeDeck(raw) {
+  function evolutionOf(cardId) {
+    const c = CARD_MAP[cardId];
+    return c && !c.token ? EVOLUTIONS[c.slug] || null : null;
+  }
+
+  /**
+   * Accepts ['id', ...] or [{ id, level, abilityUnlocked, mastery, evo }, ...]. `evo: true` equips the
+   * card's Evolution; only cards that have one keep the flag, and at most `evoSlots` of them do.
+   */
+  function normalizeDeck(raw, evoSlots) {
     const out = [];
     const seen = new Set();
+    const slots = clamp(Math.floor(evoSlots == null ? EVO_RULES.maxSlots : evoSlots), 0, EVO_RULES.maxSlots);
+    let evos = 0;
     (Array.isArray(raw) ? raw : []).forEach((entry) => {
       if (out.length >= MAX_DECK || !entry) return;
       const e = typeof entry === 'string' ? { id: entry } : entry;
       const id = String(e.id || '');
       if (!CARD_MAP[id] || CARD_MAP[id].token || seen.has(id)) return;
       seen.add(id);
+      const evo = !!e.evo && !!evolutionOf(id) && evos < slots;
+      if (evo) evos++;
       out.push({
         id,
         level: clamp(Math.floor(Number(e.level) || 1), 1, 14),
         abilityUnlocked: !!e.abilityUnlocked,
         mastery: Math.max(0, Number(e.mastery) || 0),
+        evo,
       });
     });
-    if (out.length === 0) return STARTER_DECK.map((id) => ({ id, level: 1, abilityUnlocked: false, mastery: 0 }));
+    if (out.length === 0) return STARTER_DECK.map((id) => ({ id, level: 1, abilityUnlocked: false, mastery: 0, evo: false }));
     return out;
   }
 
@@ -773,9 +915,12 @@
     const ids = deck.map((c) => c.id);
     const cards = {};
     const cooldowns = {};
+    const evo = {}; // equipped Evolutions: cardId -> { need, charge }
     deck.forEach((c) => {
       cards[c.id] = getCardStatsAtLevel(c.id, c.level, c.abilityUnlocked, c.mastery);
       cooldowns[c.id] = 0;
+      const def = c.evo && evolutionOf(c.id);
+      if (def) evo[c.id] = { need: def.cycles, charge: EVO_RULES.startCharged ? def.cycles : 0 };
     });
     return {
       side,
@@ -787,7 +932,28 @@
       cooldowns,
       damageDealt: 0,
       cardsPlayed: 0,
+      evoPlayed: 0,
+      evo,
       emoteLog: [],
+    };
+  }
+
+  // Is this player's next play of cardId going to be evolved?
+  function evoReady(p, cardId) {
+    const e = p && p.evo[cardId];
+    return !!e && e.charge >= e.need;
+  }
+
+  // Stats for the evolved form: the base card at its level, plus the Evolution's tweaks
+  function evolvedStats(stats) {
+    const def = EVOLUTIONS[stats.slug];
+    if (!def) return stats;
+    return {
+      ...stats,
+      hpScaled: Math.round(stats.hpScaled * (def.hp || 1)),
+      dmgScaled: +(stats.dmgScaled * (def.dmg || 1)).toFixed(2),
+      evo: def,
+      evoSlug: stats.slug,
     };
   }
 
@@ -966,6 +1132,9 @@
       stunT: 0,
       // Mechanics and status effects (see the Mechanics section)
       mech: stats.mech || null,
+      evo: stats.evo ? stats.evoSlug : null,     // evolved form (slug of its Evolution)
+      em: stats.evo ? stats.evo.mech || null : null,
+      evoHits: 0, stack: 0, stackTarget: null, diveCd: 0, divedAt: -9, rally: 0, pack: null, shieldT: 0,
       level: stats.level || 1,
       lvlScale: stats.lvlScale || 1,
       crownMult: stats.crownMult || 1,
@@ -1035,13 +1204,24 @@
     p.cooldowns[cardId] = state.time + stats.deployCdScaled;
     p.cardsPlayed += 1;
 
+    // Evolution cycle: only a play that passed every check above counts. A charged card comes
+    // out evolved and starts charging again; otherwise this play adds one charge.
+    const cycle = p.evo[cardId];
+    let evolved = false;
+    if (cycle) {
+      if (cycle.charge >= cycle.need) { evolved = true; cycle.charge = 0; p.evoPlayed += 1; }
+      else cycle.charge += 1;
+    }
+    const play = evolved ? evolvedStats(stats) : stats;
+    if (evolved) pushFx(state, { type: 'evolve', x: px, y: py, owner: side, cardId, name: play.evo.name });
+
     if (stats.spell) {
-      castSpell(state, side, stats, px, py);
+      castSpell(state, side, play, px, py);
       state.castLog.push({ seq: state.nextId++, owner: side, cost: stats.cost, cardId });
       if (state.castLog.length > 24) state.castLog.shift();
       cycleHand(p, cardId);
-      pushFx(state, { type: 'cast', x: px, y: py, owner: side, r: stats.splash, cardId, cost: stats.cost });
-      return { ok: true, units: [] };
+      pushFx(state, { type: 'cast', x: px, y: py, owner: side, r: stats.splash, cardId, cost: stats.cost, evo: evolved ? 1 : 0 });
+      return { ok: true, units: [], evolved };
     }
 
     const count = stats.swarmCount || 1;
@@ -1058,12 +1238,14 @@
         const cy = py + Math.sin(ang) * ring;
         if (stats.air || walkablePoint(state.nav, cx, cy, false)) { sx = cx; sy = cy; }
       }
-      units.push(spawnUnit(state, side, stats, clamp(sx, 0.4, W - 0.4), clamp(sy, 0.4, H - 0.4), MATCH.deployTime + tunnel + i * 0.05, stats.cost / count));
+      units.push(spawnUnit(state, side, play, clamp(sx, 0.4, W - 0.4), clamp(sy, 0.4, H - 0.4), MATCH.deployTime + tunnel + i * 0.05, stats.cost / count));
     }
+    // Swarm members of one play know each other (for pack mechanics like Scrap Rally)
+    if (count > 1) units.forEach((u) => { u.pack = units[0].id; });
     if (stats.building) rebuildObstacles(state);
     cycleHand(p, cardId);
-    pushFx(state, { type: 'deploy', x: px, y: py, owner: side, r: count > 1 ? 1.4 : 1, cardId, cost: stats.cost });
-    return { ok: true, units };
+    pushFx(state, { type: 'deploy', x: px, y: py, owner: side, r: count > 1 ? 1.4 : 1, cardId, cost: stats.cost, evo: evolved ? 1 : 0 });
+    return { ok: true, units, evolved };
   }
 
   // ─── Spells ──────────────────────────────────────────────────────────────
@@ -1075,10 +1257,17 @@
   function castSpell(state, side, stats, x, y) {
     if (stats.zone) { addZone(state, side, stats, x, y); return; }
     const spec = spellSpec(stats);
+    const evoSpell = stats.evo && stats.evo.spell;
+    if (evoSpell && evoSpell.seek) { castSeekingBarrage(state, side, stats, x, y, evoSpell.seek, spec); return; }
+    if (evoSpell && evoSpell.afterZone) spec.afterZone = { ...evoSpell.afterZone, total: stats.dmgScaled * evoSpell.afterZone.dmgMult, level: stats.level };
     const waves = stats.waves || 1;
     const dmg = stats.dmgScaled / waves;
     if (stats.instant || stats.proj === 'shock') {
       applySpell(state, side, spec, x, y, stats.splash, dmg);
+      if (evoSpell && evoSpell.echo) {
+        // Overload: a second pulse after a short delay, at the same spot
+        makeZone(state, { kind: 'echo', owner: side, cardId: stats.id, x, y, r: stats.splash, delay: evoSpell.echo.delay, total: dmg * evoSpell.echo.dmgMult, stun: evoSpell.echo.stun, towerMult: stats.towerMult, evo: 1 });
+      }
       return;
     }
     const king = state.towers.find((t) => t.owner === side && t.tower === 'king');
@@ -1115,6 +1304,7 @@
     e.charging = false;
     e.runDist = 0;
     e.rampT = 0;
+    e.stack = 0;
     if (e.mech && e.mech.chargeShot) e.atkCd = e.cd;
     if (e.dashing) { e.dashing = null; e.invuln = false; }
   }
@@ -1134,7 +1324,39 @@
       else if (spec.stun > 0) stunEntity(e, spec.stun, false);
       if (spec.knockback > 0 && e.kind === 'troop' && e.hp > 0) knockBack(state, e, x, y, spec.knockback * (1 - 0.4 * Math.min(1, dist(x, y, e.x, e.y) / radius)));
     }
-    pushFx(state, { type: 'spell', kind: spec.kind, x, y, r: radius, owner });
+    if (spec.afterZone) {
+      // Napalm: the impact leaves burning ground (damage over time, enemies only)
+      const az = spec.afterZone;
+      makeZone(state, { kind: az.kind, owner, cardId: 'firebomb', x, y, r: az.radius, dur: az.dur, tick: az.tick, total: az.total, towerMult: spec.towerMult, level: az.level || 1, evo: 1 });
+    }
+    pushFx(state, { type: 'spell', kind: spec.kind, x, y, r: radius, owner, evo: spec.evo ? 1 : 0 });
+  }
+
+  // Homing Barrage: rockets lock on to different enemies in the area (toughest first); spares hit the centre
+  function castSeekingBarrage(state, side, stats, x, y, cfg, spec) {
+    const king = state.towers.find((t) => t.owner === side && t.tower === 'king');
+    const fromX = king ? king.x : x;
+    const fromY = king ? king.y : y;
+    // Scan everything directly (not the spatial hash, which is only rebuilt each step and would
+    // miss troops that arrived since)
+    const targets = [];
+    for (const e of state.units.concat(state.towers)) {
+      if (e.hp <= 0 || e.owner === side || e.hidden) continue;
+      const gap = e.kind === 'tower' ? boxDist(x, y, e) : dist(x, y, e.x, e.y) - e.radius;
+      if (gap <= stats.splash) targets.push(e);
+    }
+    targets.sort((a, b) => b.hp - a.hp);
+    const dmg = stats.dmgScaled * cfg.dmgMult;
+    for (let i = 0; i < cfg.count; i++) {
+      const t = targets[i] || null;
+      state.projectiles.push({
+        id: `p${state.nextId++}`, owner: side, source: { id: null, owner: side, structureMult: 1 }, style: 'rocket',
+        x: fromX, y: fromY, sx: fromX, sy: fromY, tx: t ? t.x : x, ty: t ? t.y : y,
+        targetId: t ? t.id : null, homing: !!t, lob: true, speed: PROJ_SPEED.rocket,
+        dmg, splash: cfg.radius, canHitAir: true, chain: false, delay: i * 0.12,
+        spell: { ...spec, evo: 1 }, evo: true,
+      });
+    }
   }
 
   function knockBack(state, e, fromX, fromY, amount) {
@@ -1383,6 +1605,12 @@
           }
           break;
         }
+        case 'echo': {
+          // Overload's aftershock (fires once, after its delay)
+          applySpell(state, z.owner, { kind: 'shock', towerMult: z.towerMult, knockback: 0, stun: z.stun, freeze: 0, cost: 0, evo: 1 }, z.x, z.y, z.r, z.total);
+          z.done = true;
+          break;
+        }
         case 'spawn': {
           const interval = z.dur / Math.max(1, z.count);
           while (z.spawned < z.count && z.age >= z.spawned * interval) {
@@ -1554,15 +1782,17 @@
     pushFx(state, { type: 'kingWake', x: king.x, y: king.y, owner: king.owner });
   }
 
-  function splashDamage(state, source, x, y, radius, amount, canHitAir) {
+  function splashDamage(state, source, x, y, radius, amount, canHitAir, exclude) {
     const hit = [];
     queryHash(state, x, y, radius, (e) => {
       if (e.hp <= 0 || e.owner === source.owner || e.hidden) return;
+      if (exclude && exclude.has(e.id)) return;
       if (e.air && !canHitAir) return;
       const gap = e.kind === 'tower' ? boxDist(x, y, e) : dist(x, y, e.x, e.y) - e.radius;
       if (gap <= radius) hit.push(e);
     });
     hit.forEach((e) => applyDamage(state, source, e, amount));
+    if (exclude) hit.forEach((e) => exclude.add(e.id));
     pushFx(state, { type: 'splash', x, y, r: radius, owner: source.owner });
     return hit;
   }
@@ -1620,6 +1850,12 @@
       chain: !!o.chain,
       delay: o.delay || 0,
       slow: o.slow || null,
+      chainN: o.chainN || 0,
+      chainStun: o.chainStun || 0,
+      impactZone: o.impactZone || null,
+      cluster: o.cluster || null,
+      exclude: o.exclude || null,   // shared hit set (cluster bomblets: one bomblet per enemy)
+      evo: !!(shooter.evo),
     });
   }
 
@@ -1632,6 +1868,15 @@
     u.lastAtkT = state.time;
     const src = damageSource(u);
     const canHitAir = u.targets === 'any' || u.targets === 'air';
+    const em = u.em;
+    if (em) {
+      dmg *= evoDamageMult(state, u, t);
+      if (u.divedAt === state.time) heavy = true;
+      u.evoHits += 1;
+      // Building pulse: every Nth shot also discharges around itself (the normal shot still fires)
+      if (em.pulse && u.evoHits % em.pulse.every === 0) shockwave(state, u, u.x, u.y, em.pulse, 'pulse');
+      if (em.pierceLine) { pierceLine(state, u, t, dmg); return; }
+    }
 
     // Ramp-up beam: hits instantly, harder the longer it has held this target
     if (m && m.ramp) {
@@ -1662,6 +1907,8 @@
         applyDamage(state, src, t, dmg, heavy);
         pushFx(state, { type: 'hit', x: t.x, y: t.y, owner: u.owner, style: 'melee' });
       }
+      // Melee shockwave every Nth hit, centred on the target
+      if (em && em.shockwave && u.evoHits % em.shockwave.every === 0) shockwave(state, u, t.x, t.y, em.shockwave, 'shockwave');
       if (u.style === 'double') {
         const second = secondTarget(state, u, t);
         if (second) applyDamage(state, src, second, dmg);
@@ -1670,7 +1917,14 @@
       return;
     }
 
-    launchProjectile(state, u, t, dmg, { chain: u.special.includes('chain'), slow: m && m.slowOnHit });
+    launchProjectile(state, u, t, dmg, {
+      chain: u.special.includes('chain'),
+      slow: m && m.slowOnHit,
+      chainN: em && em.chain ? em.chain.count : 0,
+      chainStun: em && em.chain ? em.chain.stunPrimary : 0,
+      impactZone: em && em.impactZone,
+      cluster: em && em.cluster,
+    });
     if (u.style === 'double') {
       const second = secondTarget(state, u, t);
       if (second) launchProjectile(state, u, second, dmg);
@@ -1698,7 +1952,7 @@
 
   // Slows and haste scale how fast a unit moves and attacks
   function timeScale(u) {
-    return (u.slowT > 0 ? u.slowMult : 1) * (u.hasteT > 0 ? u.hasteMult : 1);
+    return (u.slowT > 0 ? u.slowMult : 1) * (u.hasteT > 0 ? u.hasteMult : 1) * (1 + (u.rally || 0));
   }
 
   function updateUnit(state, u, dt) {
@@ -1715,6 +1969,7 @@
     if (u.hasteT > 0) u.hasteT -= dt;
     if (u.frozenT > 0) u.frozenT -= dt;
     if (u.dashCd > 0) u.dashCd -= dt;
+    if (u.diveCd > 0) u.diveCd -= dt;
     if (u.stunT > 0) {
       u.stunT -= dt;
       u.vx = 0;
@@ -1725,6 +1980,7 @@
 
     const k = timeScale(u);
     const m = u.mech;
+    if (u.em) updateEvolvedUnit(state, u, dt);
     if (m) {
       if (m.spawner) updateSpawner(state, u, dt * k);
       if (m.elixir) updateElixirPump(state, u, dt);
@@ -1783,6 +2039,140 @@
     if (!u.building && t) moveToward(state, u, t, dt, k);
   }
 
+  // ─── Evolution mechanics ─────────────────────────────────────────────────
+  //
+  // Each evolved unit carries `u.em` (its Evolution's mech config). These hooks are called from the
+  // normal update/attack/projectile/death code, so evolved behaviour goes through the same damage,
+  // targeting and status rules as everything else.
+
+  // Periodic effects of an evolved unit (called while it is active and not stunned)
+  function updateEvolvedUnit(state, u, dt) {
+    const em = u.em;
+    if (em.allyShield) {
+      u.shieldT -= dt;
+      if (u.shieldT <= 0) {
+        u.shieldT = em.allyShield.every;
+        bastionPulse(state, u, em.allyShield);
+      }
+    }
+  }
+
+  // Bastion: shield the nearest friendly troops (never more than `max`, never stacking past `amount`)
+  function bastionPulse(state, u, cfg) {
+    const amount = Math.round(cfg.amount * u.lvlScale);
+    const near = [];
+    queryHash(state, u.x, u.y, cfg.radius, (e) => {
+      if (e === u || e.owner !== u.owner || e.kind !== 'troop' || e.hp <= 0) return; // allies only
+      const d = dist(u.x, u.y, e.x, e.y);
+      if (d <= cfg.radius) near.push({ e, d });
+    });
+    near.sort((a, b) => a.d - b.d);
+    const pts = [];
+    near.slice(0, cfg.max).forEach(({ e }) => {
+      e.shield = Math.max(e.shield || 0, amount);
+      e.shieldMax = Math.max(e.shieldMax || 0, e.shield);
+      pts.push({ x: r2(e.x), y: r2(e.y) });
+    });
+    pushFx(state, { type: 'bastion', x: u.x, y: u.y, owner: u.owner, r: cfg.radius, pts });
+  }
+
+  // Damage multiplier for this hit from stacking drills and opening dives
+  function evoDamageMult(state, u, t) {
+    const em = u.em;
+    let mult = 1;
+    if (em.stackHits) {
+      if (u.stackTarget === t.id) u.stack = Math.min(em.stackHits.max, u.stack + 1);
+      else { u.stack = 0; u.stackTarget = t.id; }
+      mult *= 1 + em.stackHits.per * u.stack;
+    }
+    if (em.dive && u.diveCd <= 0) {
+      mult *= em.dive.mult;
+      u.diveCd = em.dive.cd;
+      u.divedAt = state.time;
+      pushFx(state, { type: 'dive', x: u.x, y: u.y, x2: t.x, y2: t.y, owner: u.owner });
+    }
+    return mult;
+  }
+
+  // Splash + knockback ring (Juggernaut's quake around its target, Arc Turret's pulse around itself).
+  // Ground troops only; buildings and towers take the damage but don't move.
+  function shockwave(state, u, x, y, cfg, fxType) {
+    const hit = splashDamage(state, damageSource(u), x, y, cfg.radius, u.dmg * cfg.dmgMult, false);
+    hit.forEach((e) => {
+      if (e.kind === 'troop' && !e.air && e.hp > 0 && cfg.knock) knockBack(state, e, x, y, cfg.knock);
+    });
+    pushFx(state, { type: fxType, x, y, r: cfg.radius, owner: u.owner });
+  }
+
+  // Prism Lance: instant beam through every enemy on the line from the shooter to full range.
+  // Each enemy is hit at most once; the first takes full damage, the rest `falloff`.
+  function pierceLine(state, u, t, dmg) {
+    const cfg = u.em.pierceLine;
+    const dx = t.x - u.x;
+    const dy = t.y - u.y;
+    const d = Math.hypot(dx, dy) || 1;
+    const ux = dx / d;
+    const uy = dy / d;
+    const len = u.range + u.radius + 0.6;
+    const ex = u.x + ux * len;
+    const ey = u.y + uy * len;
+    const hits = [];
+    queryHash(state, (u.x + ex) / 2, (u.y + ey) / 2, len / 2 + 1, (e) => {
+      if (!canTarget(u, e)) return;
+      const along = (e.x - u.x) * ux + (e.y - u.y) * uy;
+      if (along < -0.3 || along > len + (e.half || e.radius)) return;
+      const off = Math.abs((e.x - u.x) * uy - (e.y - u.y) * ux);
+      if (off - (e.half || e.radius) > cfg.width) return;
+      hits.push({ e, along });
+    });
+    hits.sort((a, b) => a.along - b.along);
+    const src = damageSource(u);
+    hits.forEach(({ e }, i) => applyDamage(state, src, e, i === 0 ? dmg : dmg * cfg.falloff));
+    pushFx(state, { type: 'pierce', x: u.x, y: u.y, x2: ex, y2: ey, owner: u.owner });
+  }
+
+  // Cluster Pod: the fireball's impact scatters bomblets; a shared hit set means one bomblet per enemy
+  function scatterCluster(state, p) {
+    const cfg = p.cluster;
+    const exclude = new Set();
+    const base = Math.atan2(p.ty - p.sy, p.tx - p.sx);
+    for (let i = 0; i < cfg.count; i++) {
+      const a = base + ((i - (cfg.count - 1) / 2) * Math.PI * 2) / cfg.count;
+      const tx = clamp(p.tx + Math.cos(a) * cfg.spread, 0.3, W - 0.3);
+      const ty = clamp(p.ty + Math.sin(a) * cfg.spread, 0.3, H - 0.3);
+      state.projectiles.push({
+        id: `p${state.nextId++}`, owner: p.owner, source: p.source, style: 'bomblet',
+        x: p.tx, y: p.ty, sx: p.tx, sy: p.ty, tx, ty, targetId: null,
+        homing: false, lob: true, speed: 7, dmg: p.dmg * cfg.dmgMult / (1), splash: cfg.radius,
+        canHitAir: p.canHitAir, chain: false, delay: 0, slow: null, chainN: 0, chainStun: 0,
+        impactZone: null, cluster: null, exclude, evo: true,
+      });
+    }
+  }
+
+  // A zone made by an Evolution (craters, burning ground, aftershocks). Same fields as addZone.
+  function makeZone(state, z) {
+    const zone = Object.assign({
+      id: `z${state.nextId++}`, kind: 'slow', owner: 'A', cardId: null, x: 0, y: 0, r: 1,
+      dur: 0, age: 0, delay: 0, tick: 0, tickT: 0, ticks: 0, total: 0, towerMult: 0.3,
+      slow: 0, haste: 0, pull: 0, stun: 0, knockback: 0, maxTargets: 0, count: 0, card: null,
+      spawned: 0, level: 1, hit: null, done: false, evo: 0,
+    }, z);
+    state.zones.push(zone);
+    return zone;
+  }
+
+  // Scrap Rally: when a pack member dies, its living packmates get a speed stack
+  function rallyPack(state, dead) {
+    const cfg = dead.em.rally;
+    const mates = state.units.filter((o) => o.pack === dead.pack && o !== dead && o.hp > 0 && !o.dead);
+    mates.forEach((o) => {
+      const stacks = Math.min(cfg.max, Math.round((o.rally || 0) / cfg.per) + 1);
+      o.rally = stacks * cfg.per;
+    });
+    if (mates.length) pushFx(state, { type: 'rally', x: dead.x, y: dead.y, owner: dead.owner, pts: mates.map((o) => ({ x: r2(o.x), y: r2(o.y) })) });
+  }
+
   // ─── Mechanics ───────────────────────────────────────────────────────────
 
   // Spawner buildings: a token every `every` seconds (the first one comes a little sooner)
@@ -1822,11 +2212,19 @@
     u.healT = 0.5;
     const h = u.mech.heal;
     const amount = h.perSec * 0.5 * u.lvlScale;
+    const em = u.em;
     let healed = false;
     queryHash(state, u.x, u.y, h.radius, (e) => {
       if (e.owner !== u.owner || e.kind !== 'troop' || e.hp <= 0 || e.deployT > 0) return;
       if (dist(u.x, u.y, e.x, e.y) > h.radius) return;
-      if (healEntity(state, e, e === u ? amount * 0.5 : amount) > 0) healed = true;
+      let amt = e === u ? amount * 0.5 : amount;
+      // Field Surgeon: triage the badly hurt, clear slows, and shake off stuns/freezes faster
+      if (em && em.triage && e.hp < e.hpMax * em.triage.below) amt *= em.triage.mult;
+      if (em && em.cleanse && e !== u) {
+        if (e.slowT > 0) { e.slowT = 0; healed = true; }
+        if (e.stunT > 0) { e.stunT = Math.max(0, e.stunT - 0.25); e.frozenT = Math.max(0, (e.frozenT || 0) - 0.25); }
+      }
+      if (healEntity(state, e, amt) > 0) healed = true;
     });
     if (healed) u.healedAt = state.time;
   }
@@ -2085,13 +2483,19 @@
       if (p.spell) {
         applySpell(state, p.owner, p.spell, p.tx, p.ty, p.splash, p.dmg);
       } else if (p.splash > 0) {
-        const hit = splashDamage(state, p.source, p.tx, p.ty, p.splash, p.dmg, p.canHitAir);
+        const hit = splashDamage(state, p.source, p.tx, p.ty, p.splash, p.dmg, p.canHitAir, p.exclude);
         if (p.slow) hit.forEach((e) => setSlow(e, p.slow.mult, p.slow.dur));
+        if (p.cluster) scatterCluster(state, p);
       } else if (t && t.hp > 0) {
         applyDamage(state, p.source, t, p.dmg);
         if (p.slow) setSlow(t, p.slow.mult, p.slow.dur);
+        if (p.chainStun) stunEntity(t, p.chainStun, false);
         pushFx(state, { type: 'hit', x: p.tx, y: p.ty, owner: p.owner, style: p.style });
         if (p.chain) chainLightning(state, p, t);
+      }
+      if (p.impactZone) {
+        const iz = p.impactZone;
+        makeZone(state, { kind: iz.kind, owner: p.owner, cardId: 'siege', x: p.tx, y: p.ty, r: iz.radius, dur: iz.dur, slow: iz.slow, evo: 1 });
       }
     }
     state.projectiles = state.projectiles.filter((p) => !p.done);
@@ -2100,7 +2504,7 @@
   function chainLightning(state, p, first) {
     const hit = new Set([first.id]);
     let from = first;
-    for (let n = 0; n < 2; n++) {
+    for (let n = 0; n < (p.chainN || 2); n++) {
       let next = null;
       let bestD = Infinity;
       queryHash(state, from.x, from.y, 2.5, (e) => {
@@ -2134,11 +2538,16 @@
         if (u.special.includes('deathBomb') && !u.kamikazed) {
           splashDamage(state, damageSource(u), u.x, u.y, 1.5, u.dmg * 0.6, false);
         }
+        if (u.em && u.em.rally && u.pack) rallyPack(state, u);
+        if (u.em && u.em.deathSummon) {
+          spawns.push({ u, card: u.em.deathSummon.card, count: u.em.deathSummon.count });
+          pushFx(state, { type: 'evolve', x: u.x, y: u.y, owner: u.owner, cardId: u.em.deathSummon.card, small: 1 });
+        }
         const m = u.mech;
         if (!m) continue;
         if (m.deathSplash) splashDamage(state, damageSource(u), u.x, u.y, m.deathSplash.radius, m.deathSplash.dmg * u.lvlScale, false);
         if (m.deathSpawn) spawns.push({ u, card: m.deathSpawn.card, count: m.deathSpawn.count });
-        if (m.spawner && m.spawner.onDeath) spawns.push({ u, card: m.spawner.card, count: m.spawner.onDeath });
+        if (m.spawner && m.spawner.onDeath && !(u.em && u.em.deathSummon && u.em.deathSummon.replaces)) spawns.push({ u, card: m.spawner.card, count: m.spawner.onDeath });
         if (m.elixir && m.elixir.onDeath) giveElixir(state, u.owner, m.elixir.onDeath, u.x, u.y);
       }
       // Spawn after the scan so the list isn't modified while we walk it. A destroyed building
@@ -2264,6 +2673,9 @@
         cooldownsRemaining,
         dmg: Math.round(p.damageDealt),
         played: p.cardsPlayed,
+        evoPlayed: p.evoPlayed,
+        // Evolution charge per equipped card: [charge, need]. Both players see both (like the real game).
+        evo: Object.fromEntries(Object.keys(p.evo).map((id) => [id, [p.evo[id].charge, p.evo[id].need]])),
       };
     };
     const since = (t) => r2(Math.min(9, state.time - t));
@@ -2299,6 +2711,10 @@
         tgt: u.mech && u.mech.ramp && u.rampTarget && state.time - u.lastAtkT < 0.6 ? u.rampTarget : undefined,
         rmp: u.mech && u.mech.ramp ? r2(Math.min(1, u.rampT / u.mech.ramp)) : undefined,
         hl: state.time - u.healedAt < 0.5 ? 1 : undefined,
+        evo: u.evo ? 1 : undefined,
+        dv: u.evo && state.time - u.divedAt < 0.5 ? 1 : undefined,
+        stk: u.em && u.em.stackHits && u.stack ? u.stack : undefined,
+        rly: u.rally ? r2(u.rally) : undefined,
       })),
       towers: state.towers.map((t) => ({
         id: t.id, owner: t.owner, tower: t.tower, x: t.x, y: t.y,
@@ -2311,6 +2727,7 @@
         x: r2(z.x), y: r2(z.y), r: z.r,
         age: r2(z.age), dur: r2(z.dur || 0), wait: z.delay > 0 ? r2(z.delay) : 0,
         back: z.returning ? 1 : undefined,
+        evo: z.evo ? 1 : undefined,
       })),
       projectiles: state.projectiles.filter((p) => !(p.delay > 0)).map((p) => {
         const total = dist(p.sx, p.sy, p.tx, p.ty) || 1;
@@ -2318,6 +2735,7 @@
           id: p.id, owner: p.owner, style: p.style,
           x: r2(p.x), y: r2(p.y),
           lob: p.lob ? r2(clamp(1 - dist(p.x, p.y, p.tx, p.ty) / total, 0, 1)) : null,
+          evo: p.evo ? 1 : undefined,
           tx: p.spell ? r2(p.tx) : undefined,
           ty: p.spell ? r2(p.ty) : undefined,
         };
@@ -2434,7 +2852,8 @@
     const threats = state.units.filter((u) => u.owner === foe && u.hp > 0 && !u.building && inLane(u)
       && (side === 'A' ? u.y > RIVER.y0 - 3 : u.y < RIVER.y1 + 3));
     const defenders = state.units.filter((u) => u.owner === side && u.hp > 0 && inLane(u) && ownHalf(side, u.y) && u.targets !== 'buildings');
-    const value = (list) => list.reduce((s, u) => s + u.costShare * (u.hp / u.hpMax), 0);
+    // Evolved enemies are worth more attention than their elixir cost suggests
+    const value = (list) => list.reduce((s, u) => s + u.costShare * (u.hp / u.hpMax) * (u.evo ? 1.35 : 1), 0);
     let lead = null;
     threats.forEach((u) => { if (!lead || (side === 'A' ? u.y > lead.y : u.y < lead.y)) lead = u; });
     return {
@@ -2498,6 +2917,7 @@
         s -= Math.abs(c.cost - lane.threatValue) * 0.6;
       }
       s -= c.cost * 0.25;
+      if (smart && evoReady(state.players[brain.side], c.id)) s += 1.2; // an evolved defender is worth more
       s += brain.rand() * (smart ? 0.8 : 4);
       if (s > bestScore) { bestScore = s; best = c; }
     });
@@ -2632,7 +3052,8 @@
       }
       for (const pt of points) {
         const { value: raw, count } = spellValue(state, brain, c, pt, ctx);
-        let value = raw;
+        // An evolved spell does more (burning ground, aftershock, homing rockets)
+        let value = raw * (evoReady(state.players[side], c.id) ? 1.25 : 1);
         // Prefer clearing threats on our own side of the river
         if (ownHalf(side, pt.y) && kind !== 'spawn') value *= 1.15;
         const need = c.cost * (smart ? 1.05 : 1.5);
@@ -2738,7 +3159,9 @@
       if (spot) return { cardId: siege.id, x: spot.x, y: spot.y };
     }
 
-    const winCons = troops.filter((c) => !c.building && c.targets !== 'air' && (c.winCondition || c.hpScaled >= 600)).sort((a, b) => b.cost - a.cost);
+    // Lead with an evolved win condition when one is ready
+    const winCons = troops.filter((c) => !c.building && c.targets !== 'air' && (c.winCondition || c.hpScaled >= 600))
+      .sort((a, b) => (evoReady(p, b.id) ? 1 : 0) - (evoReady(p, a.id) ? 1 : 0) || b.cost - a.cost);
     if (winCons.length && !tank) {
       const c = winCons[0];
       let spot;
@@ -2756,7 +3179,9 @@
     }
     if (leaking) {
       // Avoid wasting elixir: cycle the cheapest useful card at the back
-      const cheap = troops.filter((c) => !c.building && c.targets !== 'air').sort((a, b) => a.cost - b.cost)[0];
+      // Prefer cards that charge an Evolution, so it comes round sooner
+      const charging = (c) => (p.evo[c.id] && p.evo[c.id].charge < p.evo[c.id].need ? 1.5 : 0);
+      const cheap = troops.filter((c) => !c.building && c.targets !== 'air').sort((a, b) => (a.cost - charging(a)) - (b.cost - charging(b)))[0];
       if (cheap) {
         const spot = findDeploySpot(state, side, cheap, cheap.targets === 'buildings' ? BRIDGES[attackLane].cx : laneX, cheap.targets === 'buildings' ? bridgeY : toward(side, TOWER_LAYOUT.princessY[side], 2.8));
         if (spot) return { cardId: cheap.id, x: spot.x, y: spot.y };
@@ -2821,6 +3246,11 @@
     return deck.map((c) => c.id);
   }
 
+  // Which cards of an AI deck get Evolutions (the ones that have one, preferring the most impactful)
+  function aiEvoPicks(deckIds, slots) {
+    return deckIds.filter((id) => evolutionOf(id)).sort((a, b) => CARD_MAP[b].cost - CARD_MAP[a].cost).slice(0, Math.max(0, slots || 0));
+  }
+
   /** Call every frame with the step size; returns the deploy result when the AI plays a card. */
   function aiUpdate(state, brain, dt) {
     aiEmotes(state, brain, dt);
@@ -2860,7 +3290,8 @@
     createMatch, step, deploy, canDeploy, canDeployOnSnapshot, inDeployZone, snapshot, takeFx, timeLeft,
     isRiverPoint, walkablePoint: (state, x, y, jump) => walkablePoint(state.nav, x, y, jump),
     findPath, enemyOf,
-    createAi, aiUpdate, aiDecide, buildAiDeck,
+    createAi, aiUpdate, aiDecide, buildAiDeck, aiEvoPicks,
     TOKEN_CARDS, MAX_ARENA,
+    EVOLUTIONS, EVO_RULES, evolutionOf, evoReady, evolvedStats,
   };
 });

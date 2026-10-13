@@ -209,6 +209,15 @@
           <div class="deck-slots" id="ptDeckSlots"></div>
         </div>
 
+        <div class="evo-panel">
+          <div class="evo-head">
+            <h4>✦ Evolutions</h4>
+            <div class="evo-header" id="ptEvoHeader"></div>
+          </div>
+          <p class="note">Collect 6 shards to unlock an Evolution, then equip it on that card in your deck. In battle, play the card enough times (its cycles) and the next one comes out evolved.</p>
+          <div class="evo-grid" id="ptEvoCollection"></div>
+        </div>
+
         <div class="deck-builder" id="ptAiDeckPanel">
           <h4>Practice AI Deck</h4>
           <p class="note">Used in vs AI when 🏆 Ranked is off. Ranked AI brings its own deck from your arena.</p>
@@ -273,6 +282,14 @@
     </div>
   </div>
 
+  <div class="evo-overlay" id="ptEvoOverlay" hidden>
+    <div class="evo-modal" role="dialog" aria-modal="true" aria-label="Evolution unlocked">
+      <div class="evo-burst" aria-hidden="true"></div>
+      <div class="evo-reveal"></div>
+      <button type="button" class="btn-primary" data-evo-close>Awesome!</button>
+    </div>
+  </div>
+
   <div class="road-overlay" id="ptRoadOverlay" hidden>
     <div class="road-modal" role="dialog" aria-modal="true" aria-label="Trophy Road">
       <button type="button" class="road-close" id="ptRoadClose" aria-label="Close">✕</button>
@@ -287,9 +304,11 @@
   <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
   <script src="clash-tanks-server/clash-tanks-server/shared/clash-sim.js"></script>
   <script src="clash-tanks-server/clash-tanks-server/shared/trophy-road.js"></script>
+  <script src="clash-tanks-server/clash-tanks-server/shared/evo-progress.js"></script>
   <script src="prototype_emotes.js"></script>
   <script src="prototype_arena.js"></script>
   <script src="prototype_road.js"></script>
+  <script src="prototype_evo.js"></script>
   <script src="prototype_v4.js"></script>
 </body>
 </html>

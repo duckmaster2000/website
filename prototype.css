@@ -2260,3 +2260,105 @@ body.road-open { overflow: hidden; }
 }
 /* Cost bubble sits inside the card header (the scrolling grid would clip it outside) */
 .collection-card .cc-cost { position: static; flex: none; }
+
+/* ═══════════════════════ Card Evolutions ═══════════════════════ */
+/* One visual language: violet-to-gold for "evolved", gold glow for "ready", violet pips for charging */
+:root { --evo1: #b45cff; --evo2: #ffcf3a; --evoGlow: rgba(190, 110, 255, 0.55); }
+.theme-evo-steel { --ev: #9fb4d6; } .theme-evo-diamond { --ev: #7ff3ff; } .theme-evo-shield { --ev: #7fe8ff; }
+.theme-evo-quake { --ev: #d9a066; } .theme-evo-storm { --ev: #9ff3ff; } .theme-evo-prism { --ev: #ff9cf3; }
+.theme-evo-ember { --ev: #ffb347; } .theme-evo-rage { --ev: #ff6b6b; } .theme-evo-sky { --ev: #bfe0ff; }
+.theme-evo-arc { --ev: #8ad8ff; } .theme-evo-bone { --ev: #e8e2d0; } .theme-evo-medic { --ev: #7dff9a; }
+.theme-evo-napalm { --ev: #ff7a2e; } .theme-evo-rocket { --ev: #ffd36b; }
+
+.evo-panel { margin-top: 0.7rem; border: 1px solid rgba(180, 92, 255, 0.4); border-radius: 10px; padding: 0.6rem; background: linear-gradient(160deg, rgba(40, 14, 60, 0.75), rgba(8, 16, 30, 0.8)); }
+.evo-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.evo-head h4 { margin: 0; color: #e7c6ff; }
+.evo-header { display: flex; flex-wrap: wrap; gap: 0.6rem; font-size: 0.74rem; color: var(--muted); }
+.evo-count { color: #e7c6ff; }
+.evo-wild { color: #ffd6ff; }
+.evo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 0.55rem; margin-top: 0.5rem; max-height: 560px; overflow: auto; padding: 2px 0.25rem 2px 2px; }
+.evo-tile { position: relative; border-radius: 12px; padding: 0.55rem; border: 1px solid rgba(255, 255, 255, 0.12); background: rgba(14, 18, 32, 0.9); }
+.evo-tile.unlocked { border-color: color-mix(in srgb, var(--ev) 55%, transparent); }
+.evo-tile.equipped { border-color: var(--evo2); box-shadow: 0 0 0 1px var(--evo2), 0 0 16px rgba(255, 207, 58, 0.25); }
+.evo-tile.locked .evo-art .evolved { filter: grayscale(0.7) brightness(0.7); }
+.evo-tile.new::after { content: "NEW"; position: absolute; top: -7px; right: 10px; padding: 0 6px; border-radius: 6px; background: var(--evo1); color: #fff; font: 700 0.6rem "Orbitron", sans-serif; }
+.evo-tile header { display: grid; grid-template-columns: auto 1fr auto; gap: 0.5rem; align-items: center; }
+.evo-art { display: flex; align-items: center; gap: 0.1rem; }
+.evo-art span { position: relative; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; font-size: 1.4rem; background: rgba(255, 255, 255, 0.06); }
+.evo-art .base { width: 30px; height: 30px; font-size: 1rem; opacity: 0.75; }
+.evo-art .evolved { background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--ev) 45%, transparent), rgba(80, 20, 120, 0.85)); box-shadow: 0 0 0 2px var(--evo1), 0 0 12px var(--evoGlow); }
+.evo-crest { position: absolute; top: -6px; right: -6px; font-style: normal; font-size: 0.7rem; color: var(--evo2); text-shadow: 0 0 6px var(--evo1); }
+.evo-title b { display: block; font-family: "Orbitron", sans-serif; font-size: 0.82rem; color: #f3e6ff; }
+.evo-title small { font-size: 0.66rem; color: var(--muted); }
+.evo-status { font: 700 0.58rem "Orbitron", sans-serif; color: var(--muted); }
+.evo-tile.unlocked .evo-status { color: #e7c6ff; }
+.evo-tile.equipped .evo-status { color: var(--evo2); }
+.evo-shards { position: relative; height: 16px; margin-top: 0.45rem; border-radius: 8px; background: rgba(0, 0, 0, 0.45); overflow: hidden; border: 1px solid rgba(180, 92, 255, 0.35); }
+.evo-shards-fill { height: 100%; background: linear-gradient(90deg, var(--evo1), #ff7ad9); transition: width 0.5s ease; }
+.evo-shards span { position: absolute; inset: 0; display: grid; place-items: center; font-size: 0.62rem; color: #fff; text-shadow: 0 1px 2px #000; }
+.evo-tile p { margin: 0.35rem 0 0; font-size: 0.7rem; color: var(--muted); }
+.evo-tile p.evo-ability { color: var(--text); }
+.evo-tile p.evo-counter b { color: #ffb0b0; }
+.evo-pips { display: inline-flex; gap: 3px; vertical-align: middle; }
+.evo-pips i { width: 8px; height: 8px; border-radius: 2px; transform: rotate(45deg); border: 1px solid var(--evo1); background: rgba(0, 0, 0, 0.4); }
+.evo-pips i.on { background: var(--evo1); box-shadow: 0 0 5px var(--evo1); }
+.evo-compare { width: 100%; margin-top: 0.35rem; border-collapse: collapse; font-size: 0.66rem; }
+.evo-compare th { text-align: left; color: var(--muted); font-weight: 600; padding: 0.1rem 0.2rem; }
+.evo-compare td { padding: 0.12rem 0.2rem; border-top: 1px solid rgba(255, 255, 255, 0.06); }
+.evo-compare td.up { color: #e7c6ff; font-weight: 700; }
+.evo-actions { margin-top: 0.45rem; display: flex; gap: 0.35rem; align-items: center; }
+.evo-actions button { font-size: 0.66rem; padding: 0.3rem 0.55rem; border-color: var(--evo1); }
+.evo-actions button.on { background: linear-gradient(135deg, #6a2aa0, #a55a10); border-color: var(--evo2); }
+.evo-hint { font-size: 0.66rem; color: var(--muted); }
+
+/* Deck slots and collection */
+.ds-evo { position: absolute; top: -7px; right: -6px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 0.75rem; cursor: pointer; border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(20, 20, 30, 0.95); color: #8a7a9a; opacity: 1 !important; }
+.ds-evo.avail { color: #e7c6ff; border-color: var(--evo1); animation: evoNudge 1.8s ease-in-out infinite; }
+.ds-evo.on { color: #fff; background: linear-gradient(135deg, var(--evo1), #ff7ad9); border-color: var(--evo2); box-shadow: 0 0 8px var(--evoGlow); }
+.deck-slot.evo-on { background: linear-gradient(160deg, rgba(90, 30, 140, 0.85), rgba(24, 40, 64, 0.9)); box-shadow: inset 0 0 0 1px var(--evo1), 0 0 10px var(--evoGlow); }
+.deck-slot .ds-evoname { color: #ffd6ff !important; font-size: 0.56rem !important; }
+@keyframes evoNudge { 50% { box-shadow: 0 0 10px var(--evoGlow); } }
+.evo-slot-summary { color: #e7c6ff; display: inline-flex; align-items: center; gap: 0.3rem; }
+.evo-slot-pips { display: inline-flex; gap: 3px; }
+.evo-slot-pips i { width: 9px; height: 9px; transform: rotate(45deg); border: 1px solid var(--evo1); }
+.evo-slot-pips i.on { background: var(--evo1); }
+.evo-avail-hint { color: #ffd6ff; }
+.evo-badge { color: #c9a6e8; }
+.evo-badge.on { color: #ffd6ff; background: rgba(180, 92, 255, 0.25) !important; }
+.reward-pill.evo-shards { color: #e7c6ff; border-color: rgba(180, 92, 255, 0.6); }
+
+/* Battle hand */
+.card .card-evo { position: absolute; left: 4px; bottom: 9px; display: inline-flex; align-items: center; gap: 3px; font-size: 0.62rem; color: #e7c6ff; text-shadow: 0 1px 2px #000; pointer-events: none; }
+.card .card-evo .evo-pips i { width: 6px; height: 6px; }
+.card .card-evo.ready { left: 50%; transform: translateX(-50%); padding: 1px 6px; border-radius: 6px; background: linear-gradient(90deg, var(--evo1), #ff7ad9); color: #fff; font: 800 0.55rem "Orbitron", sans-serif; white-space: nowrap; }
+.card.evo-ready { box-shadow: 0 0 0 2px var(--evo2), 0 0 16px var(--evoGlow) !important; animation: evoReady 1.2s ease-in-out infinite; }
+.card.evo-charging { box-shadow: inset 0 0 0 1px rgba(180, 92, 255, 0.55); }
+@keyframes evoReady { 50% { box-shadow: 0 0 0 2px var(--evo2), 0 0 26px rgba(255, 122, 217, 0.75); } }
+
+/* Unlock celebration */
+.evo-overlay[hidden] { display: none; }
+.evo-overlay { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 12px; background: radial-gradient(circle at 50% 40%, rgba(180, 92, 255, 0.35), rgba(4, 2, 10, 0.92) 60%); backdrop-filter: blur(4px); }
+.evo-modal { position: relative; width: min(440px, 100%); text-align: center; padding: 1.2rem 1rem 1rem; border-radius: 18px; border: 1px solid var(--evo1); background: linear-gradient(180deg, rgba(40, 14, 60, 0.98), rgba(12, 8, 24, 0.98)); box-shadow: 0 0 40px var(--evoGlow); overflow: hidden; }
+.evo-burst { position: absolute; inset: -40%; background: repeating-conic-gradient(from 0deg, rgba(255, 207, 58, 0.12) 0 8deg, transparent 8deg 20deg); animation: evoSpin 9s linear infinite; pointer-events: none; }
+@keyframes evoSpin { to { transform: rotate(360deg); } }
+.evo-reveal { position: relative; }
+.evo-kicker { margin: 0; font: 700 0.66rem "Orbitron", sans-serif; letter-spacing: 0.2em; color: var(--evo2); }
+.evo-modal h3 { margin: 0.4rem 0 0.2rem; font: 900 1.4rem "Orbitron", sans-serif; background: linear-gradient(90deg, #f3e6ff, var(--evo2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.evo-morph { display: flex; align-items: center; justify-content: center; gap: 0.7rem; margin-top: 0.8rem; }
+.evo-card { position: relative; width: 84px; height: 104px; border-radius: 12px; display: grid; place-items: center; align-content: center; gap: 0.2rem; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.2); }
+.evo-card span { font-size: 2.2rem; }
+.evo-card small { font-size: 0.62rem; color: var(--muted); }
+.evo-card.evolved { background: radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--ev) 50%, transparent), rgba(80, 20, 120, 0.9)); border-color: var(--evo2); box-shadow: 0 0 22px var(--evoGlow); }
+.evo-card.evolved small { color: #ffd6ff; }
+.evo-card .evo-crest { top: -8px; right: -8px; font-size: 1.1rem; }
+.evo-arrow { color: var(--evo2); font-size: 1.3rem; }
+.evo-overlay.play .evo-card.base { animation: evoBaseOut 0.9s ease-in both; }
+.evo-overlay.play .evo-card.evolved { animation: evoIn 0.9s cubic-bezier(.2,1.6,.4,1) both 0.5s; }
+.evo-overlay.play .evo-arrow { animation: evoArrow 0.6s ease-out both 0.3s; }
+@keyframes evoBaseOut { 60% { transform: scale(1.05); filter: brightness(1.8); } to { transform: scale(0.92); opacity: 0.6; } }
+@keyframes evoIn { from { transform: scale(0.2) rotate(-12deg); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes evoArrow { from { opacity: 0; transform: translateX(-10px); } }
+.evo-modal p { position: relative; font-size: 0.8rem; margin: 0.4rem 0; }
+.evo-modal .evo-tip { color: var(--muted); font-size: 0.72rem; }
+.evo-modal button { position: relative; margin-top: 0.5rem; }
+@media (max-width: 640px) { .evo-grid { grid-template-columns: 1fr; max-height: none; } }

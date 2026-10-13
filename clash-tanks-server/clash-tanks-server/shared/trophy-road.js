@@ -44,6 +44,29 @@
     8: ['rocktitan', 'orbitallaser'],
   };
 
+  // Evolution Shards on the road: [trophies, reward]. These stops sit between the regular ones, so
+  // adding them never changes a milestone a player has already claimed. The first Evolution is a
+  // complete one early on, so everyone gets to try the system.
+  const EVO_STOPS = [
+    [120, { type: 'shards', slug: 'brawler', amount: 6 }],
+    [340, { type: 'wild', amount: 2 }],
+    [560, { type: 'shards', slug: 'junkpack', amount: 4 }],
+    [760, { type: 'wild', amount: 2 }],
+    [980, { type: 'shards', slug: 'firebomb', amount: 4 }],
+    [1260, { type: 'wild', amount: 2 }],
+    [1460, { type: 'shards', slug: 'boltturret', amount: 4 }],
+    [1730, { type: 'wild', amount: 3 }],
+    [2150, { type: 'shards', slug: 'guardian', amount: 4 }],
+    [2480, { type: 'wild', amount: 3 }],
+    [2790, { type: 'shards', slug: 'rocketrain', amount: 4 }],
+    [3140, { type: 'wild', amount: 3 }],
+    [3600, { type: 'shards', slug: 'flarepod', amount: 4 }],
+    [4250, { type: 'wild', amount: 4 }],
+    [4600, { type: 'shards', slug: 'raylance', amount: 4 }],
+    [5330, { type: 'wild', amount: 4 }],
+    [6000, { type: 'wild', amount: 6 }],
+  ];
+
   // Emotes unlocked on the road (the rest come from achievements)
   const ROAD_EMOTES = { 0: 'heart', 3: 'thinking', 6: 'sleepy', 9: 'trophy' };
 
@@ -170,6 +193,7 @@
         add(at, [reward]);
       });
     });
+    EVO_STOPS.forEach(([at, reward]) => add(at, [reward]));
     out.sort((a, b) => a.trophies - b.trophies);
     return out;
   }
@@ -284,7 +308,7 @@
   }
 
   return {
-    MAX_TROPHIES, ARENAS, NEW_CARDS, ROAD_EMOTES, AI_RULES, ONLINE_WIN, LOSS_BY_ARENA, MILESTONES, MILESTONE_MAP,
+    MAX_TROPHIES, ARENAS, NEW_CARDS, ROAD_EMOTES, EVO_STOPS, AI_RULES, ONLINE_WIN, LOSS_BY_ARENA, MILESTONES, MILESTONE_MAP,
     arenaFor, nextArena, rankOf, lossFor, trophyChange,
     freshRoad, normalize, applyMatch, beginRanked, cancelPending, resolvePending,
     isClaimed, claimable, claim, unlockedThemes, activeTheme, cardArena,

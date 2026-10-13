@@ -27,6 +27,12 @@ let arena = null;          // canvas renderer (prototype_arena.js)
 // Cards, arena rules and the match simulation are shared with the server (clash-sim.js)
 const Sim = window.ClashSim;
 const Road = window.TrophyRoad;
+const Evo = window.EvoProgress;
+const EVO_SLUGS = Object.keys(Sim.EVOLUTIONS);
+// The Evolution family of a card (its slug) if it has one
+function evoSlug(id) { return Sim.evolutionOf(id) ? CARD_MAP[id].slug : null; }
+// Evolution slots for a mode ('pvp' | 'ai' | 'online')
+function evoSlotsFor(mode) { return Sim.EVO_RULES.slots[mode] != null ? Sim.EVO_RULES.slots[mode] : Sim.EVO_RULES.maxSlots; }
 const CARD_LIBRARY = Sim.CARD_LIBRARY;
 const CARD_MAP = Sim.CARD_MAP;
 const STARTER_DECK = Sim.STARTER_DECK;
@@ -56,10 +62,12 @@ const ACHIEVEMENTS = [
   { id: 'online_champ', icon: '🌐', name: 'Online Champion', desc: 'Win an online match', gold: 250, progress: (s) => [s.onlineWins, 1] },
   { id: 'spell_slinger', icon: '☄️', name: 'Spell Slinger', desc: 'Cast 25 spells', gold: 120, progress: (s) => [s.spells, 25] },
   { id: 'commander', icon: '🃏', name: 'Commander', desc: 'Play 200 cards', gold: 150, progress: (s) => [s.cards, 200] },
+  { id: 'evolved', icon: '✦', name: 'Evolved', desc: 'Unlock an Evolution', gold: 150, wild: 1, progress: (s) => [s.evoUnlocks || 0, 1] },
+  { id: 'evo_master', icon: '🧬', name: 'Evolution Master', desc: 'Deploy 15 evolved cards', gold: 250, wild: 2, progress: (s) => [s.evoDeploys || 0, 15] },
 ];
 
 function freshStats() {
-  return { matches: 0, wins: 0, losses: 0, draws: 0, towers: 0, threeCrowns: 0, hardWins: 0, onlineWins: 0, spells: 0, cards: 0, emotes: 0 };
+  return { matches: 0, wins: 0, losses: 0, draws: 0, towers: 0, threeCrowns: 0, hardWins: 0, onlineWins: 0, spells: 0, cards: 0, emotes: 0, evoUnlocks: 0, evoDeploys: 0 };
 }
 
 const AI_PRESETS = {
@@ -153,7 +161,8 @@ const state = {
     decks: [[...STARTER_DECK], [...STARTER_DECK], [...STARTER_DECK]],
     activeDeck: 0,
     rankedAi: true,           // vs AI counts for trophies (arena AI deck, preset difficulty)
-    roadEmotes: {}            // emotes unlocked on the Trophy Road
+    roadEmotes: {},           // emotes unlocked on the Trophy Road
+    evo: Evo.fresh()          // Evolution shards, unlocks and equipped slots
   }
 };
 
@@ -357,6 +366,7 @@ function applySavedProgress(saved) {
     state.progress.decks = decks;
     state.progress.deck = decks[state.progress.activeDeck].length ? decks[state.progress.activeDeck] : state.progress.deck;
     state.progress.rankedAi = saved.rankedAi !== false;
+    state.progress.evo = Evo.normalize(saved.evo, EVO_SLUGS, evoSlug);
     state.progress.roadEmotes = {};
     if (saved.roadEmotes && typeof saved.roadEmotes === 'object') {
       Object.keys(saved.roadEmotes).forEach((id) => { if (Sim.EMOTE_IDS.includes(id)) state.progress.roadEmotes[id] = true; });
@@ -423,11 +433,23 @@ function deckFor(owner) {
 }
 
 // Deck entries carry your card levels into the match
-function deckEntries(ids) {
+function deckEntries(ids, evoIds) {
+  const evo = new Set(evoIds || []);
   return ids.map((id) => {
     const cp = cardProgress(id);
-    return { id, level: cp.level || 1, abilityUnlocked: !!cp.abilityUnlocked, mastery: cp.mastery || 0 };
+    return { id, level: cp.level || 1, abilityUnlocked: !!cp.abilityUnlocked, mastery: cp.mastery || 0, evo: evo.has(id) };
   });
+}
+
+// The Evolutions switched on for the active deck, checked against unlocks and the mode's slots
+function equippedEvos(deckIds, mode) {
+  return Evo.validEquipped(state.progress.evo, state.progress.activeDeck, deckIds, evoSlug, evoSlotsFor(mode));
+}
+
+// AI opponents get Evolutions as you climb (none in the first arenas)
+function aiEvoSlots() {
+  const a = Road.arenaFor(state.progress.road.trophies).id;
+  return Math.min(evoSlotsFor('ai'), a >= 5 ? 2 : a >= 2 ? 1 : 0);
 }
 
 function aiProfile() {
@@ -494,14 +516,19 @@ function setupMatch() {
       ? { ...mine, towerMult: preset.towerMult, kingMult: preset.baseMult }
       : { ...mine, towerMult: state.progress.aiHealth.towerMult, kingMult: state.progress.aiHealth.baseMult };
   const myDeck = deckFor('A');
-  let aiDeck = deckEntries(deckFor('B'));
+  const myEvos = state.admin.active ? myDeck.filter(evoSlug).slice(0, evoSlotsFor(state.mode)) : equippedEvos(myDeck, state.mode);
+  const bIds = deckFor('B');
+  // Local PvP: both players use the same deck, so both get the same Evolutions
+  let aiDeck = deckEntries(bIds, vsAi ? Sim.aiEvoPicks(bIds, aiEvoSlots()) : myEvos);
   if (ranked) {
     const lvl = averageDeckLevel(myDeck);
-    aiDeck = Sim.buildAiDeck(Road.arenaFor(road.trophies).id, Math.random).map((id) => ({ id, level: lvl, abilityUnlocked: false, mastery: 0 }));
+    const ids = Sim.buildAiDeck(Road.arenaFor(road.trophies).id, Math.random);
+    const evos = new Set(Sim.aiEvoPicks(ids, aiEvoSlots()));
+    aiDeck = ids.map((id) => ({ id, level: lvl, abilityUnlocked: false, mastery: 0, evo: evos.has(id) }));
   }
   state.match = Sim.createMatch({
     seed: Math.floor(Math.random() * 2147483647),
-    decks: { A: deckEntries(myDeck), B: aiDeck },
+    decks: { A: deckEntries(myDeck, myEvos), B: aiDeck },
     towers: { A: mine, B: theirs },
   });
   state.ai = vsAi ? Sim.createAi('B', ranked ? presetProfile(difficulty) : aiProfile()) : null;
@@ -680,7 +707,7 @@ function showWinOverlay(result, cardAward, goldBonus, isOnline, extra) {
     ui.winStats.innerHTML = (x.stats || []).map(([label, value]) => `<div><strong>${value}</strong><span>${label}</span></div>`).join('');
   }
   if (ui.winAch) {
-    ui.winAch.innerHTML = (x.achievements || []).map((a) => `<div class="win-ach-row"><span>${a.icon}</span><b>${a.name}</b><em>+${a.gold} gold${a.emote ? ' · new emote!' : ''}</em></div>`).join('');
+    ui.winAch.innerHTML = (x.achievements || []).map((a) => `<div class="win-ach-row"><span>${a.icon}</span><b>${a.name}</b><em>+${a.gold} gold${a.wild ? ' · Wild Shards' : ''}${a.emote ? ' · new emote!' : ''}</em></div>`).join('');
   }
   renderWinTrophies(x.trophy, x.friendly);
   if (ui.confetti) {
@@ -767,6 +794,7 @@ function onVictory(winner) {
     result,
     crowns: me ? me.crowns : 0,
     kingKill: winner === 'A' && state.match?.endReason === 'king',
+    evoPlayed: me ? me.evoPlayed || 0 : 0,
     hardAi: state.mode === 'ai' && ['hard', 'insane'].includes(state.progress.aiDifficulty),
     online: false,
   });
@@ -827,6 +855,7 @@ function recordMatch(r) {
   else if (r.result === 'loss') st.losses += 1;
   else st.draws += 1;
   st.towers += Math.min(3, r.crowns || 0);
+  st.evoDeploys = (st.evoDeploys || 0) + (r.evoPlayed || 0);
   if (r.kingKill) st.threeCrowns += 1;
   if (r.result === 'win' && r.hardAi) st.hardWins += 1;
   if (r.result === 'win' && r.online) st.onlineWins += 1;
@@ -842,11 +871,12 @@ function checkAchievements() {
     if (cur < goal) return;
     state.progress.achievements[a.id] = Date.now();
     state.progress.gold += a.gold;
+    if (a.wild) grantWildShards(a.wild);
     earned.push(a);
   });
   earned.forEach((a, i) => setTimeout(() => {
     const em = a.emote && EmoteArt.EMOTES.find((e) => e.id === a.emote);
-    toast(a.icon, `Achievement: ${a.name}`, `+${a.gold} gold${em ? ` · Emote unlocked: ${em.name}` : ''}`);
+    toast(a.icon, `Achievement: ${a.name}`, `+${a.gold} gold${a.wild ? ` · +${a.wild} Wild Shard${a.wild > 1 ? 's' : ''}` : ''}${em ? ` · Emote unlocked: ${em.name}` : ''}`);
     Sound.play('achievement');
   }, 2300 + i * 900));
   if (earned.length) { buildEmoteGrid(); renderAchievements(); }
@@ -863,7 +893,7 @@ function renderAchievements() {
     const [cur, goal] = a.progress(st);
     const pct = clamp((cur / goal) * 100, 0, 100);
     const em = a.emote && EmoteArt.EMOTES.find((e) => e.id === a.emote);
-    return `<li class="${got ? 'done' : ''}"><span class="ach-icon">${a.icon}</span><div class="ach-body"><b>${a.name}</b><small>${a.desc} · ${a.gold}g${em ? ` + “${em.name}” emote` : ''}</small><span class="ach-bar"><i style="width:${pct}%"></i></span></div><span class="ach-state">${got ? '✓' : `${Math.min(cur, goal)}/${goal}`}</span></li>`;
+    return `<li class="${got ? 'done' : ''}"><span class="ach-icon">${a.icon}</span><div class="ach-body"><b>${a.name}</b><small>${a.desc} · ${a.gold}g${a.wild ? ` + ${a.wild} Wild Shard${a.wild > 1 ? 's' : ''}` : ''}${em ? ` + “${em.name}” emote` : ''}</small><span class="ach-bar"><i style="width:${pct}%"></i></span></div><span class="ach-state">${got ? '✓' : `${Math.min(cur, goal)}/${goal}`}</span></li>`;
   }).join('');
 }
 
@@ -1102,7 +1132,8 @@ function cardButton(owner, id) {
   const cp = cardProgress(id);
   const tags = `${card.spell ? ' ✦ Spell' : ''}${card.winCondition ? ' 👑' : ''}${card.air ? ' ✈' : ''}${card.swarmCount > 1 ? ` ×${card.swarmCount}` : ''}`;
   const entering = (handEnter[owner] && handEnter[owner][id] || 0) > performance.now();
-  return `<button class="card rarity-${card.rarity}${card.winCondition ? ' wc' : ''}${card.swarmCount > 1 ? ' swarm' : ''}${card.spell ? ' spell' : ''}${entering ? ' card-enter' : ''}" data-owner="${owner}" data-type="${id}" data-disabled="${disabled ? '1' : '0'}" data-short="${short ? '1' : '0'}" data-selected="${selected ? '1' : '0'}" title="${card.name}: ${card.role}"><span class="card-rarity">${RARITY_STYLE[card.rarity].label}${tags}</span><span class="card-icon">${card.icon}</span><span class="card-cost ${costClass(card.cost)}">${card.cost}</span><span class="card-name">${card.name}</span><span class="card-meta">Lv ${cp.level} • ${card.role}</span><span class="card-cd-bar"><i style="width:${cdPct}%"></i></span>${short ? `<span class="card-short" style="transform:scaleX(${fill / 100})"></span>` : ''}</button>`;
+  const evoB = handEvoBadge(p, id);
+  return `<button class="card rarity-${card.rarity}${card.winCondition ? ' wc' : ''}${card.swarmCount > 1 ? ' swarm' : ''}${card.spell ? ' spell' : ''}${entering ? ' card-enter' : ''}${evoB.cls}" data-owner="${owner}" data-type="${id}" data-disabled="${disabled ? '1' : '0'}" data-short="${short ? '1' : '0'}" data-selected="${selected ? '1' : '0'}" title="${card.name}: ${card.role}"><span class="card-rarity">${RARITY_STYLE[card.rarity].label}${tags}</span><span class="card-icon">${card.icon}</span><span class="card-cost ${costClass(card.cost)}">${card.cost}</span><span class="card-name">${card.name}</span><span class="card-meta">Lv ${cp.level} • ${card.role}</span><span class="card-cd-bar"><i style="width:${cdPct}%"></i></span>${short ? `<span class="card-short" style="transform:scaleX(${fill / 100})"></span>` : ''}${evoB.html}</button>`;
 }
 
 function deckAvgCost(ids) {
@@ -1260,8 +1291,16 @@ const Sound = (() => {
     trophyUp: () => [523, 659, 784, 1046, 1318].forEach((f, i) => tone(f, 0.1, { type: 'triangle', delay: i * 0.05, vol: 0.04 })),
     trophyDown: () => [392, 349, 311].forEach((f, i) => tone(f, 0.14, { type: 'triangle', delay: i * 0.08, vol: 0.035 })),
     arena: () => [392, 523, 659, 784, 1046, 1318, 1568].forEach((f, i) => tone(f, 0.18, { type: 'triangle', delay: i * 0.09, vol: 0.05 })),
+    evolve: () => { [330, 494, 659, 988].forEach((f, i) => tone(f, 0.16, { type: 'sawtooth', delay: i * 0.05, vol: 0.025 })); tone(1976, 0.4, { type: 'triangle', delay: 0.2, slide: 0.5, vol: 0.03 }); },
+    evoUnlock: () => [262, 392, 523, 659, 784, 1046, 1568, 2093].forEach((f, i) => tone(f, 0.22, { type: 'triangle', delay: i * 0.08, vol: 0.05 })),
+    shockwave: () => { noise(0.3, 0.09); tone(70, 0.35, { slide: 0.5, vol: 0.1 }); },
+    pulse: () => { tone(900, 0.2, { type: 'square', slide: 0.3, vol: 0.03 }); noise(0.15, 0.05); },
+    pierce: () => tone(2400, 0.18, { type: 'sawtooth', slide: 0.4, vol: 0.025 }),
+    dive: () => tone(1400, 0.22, { type: 'triangle', slide: 0.3, vol: 0.035 }),
+    rally: () => tone(180, 0.25, { type: 'sawtooth', slide: 1.6, vol: 0.03 }),
+    bastion: () => [523, 784].forEach((f, i) => tone(f, 0.18, { type: 'sine', delay: i * 0.06, vol: 0.035 })),
   };
-  const MIN_GAP = { hit: 0.07, splash: 0.12, death: 0.08, rocket: 0.1, horn: 0.5, drop: 0.15, elixir: 0.2, taunt: 1, popup: 0.3, dash: 0.2 };
+  const MIN_GAP = { hit: 0.07, splash: 0.12, death: 0.08, rocket: 0.1, horn: 0.5, drop: 0.15, elixir: 0.2, taunt: 1, popup: 0.3, dash: 0.2, shockwave: 0.15, pulse: 0.2, pierce: 0.1, dive: 0.15, rally: 0.3, bastion: 0.5 };
 
   function play(name, arg) {
     if (!enabled || !ctx || !SOUNDS[name]) return;
@@ -1292,6 +1331,7 @@ function handleFx(list) {
       case 'spell': Sound.play(f.kind === 'shock' ? 'shock' : f.kind === 'firebomb' ? 'boom' : f.kind === 'frost' ? 'freeze' : 'rocket'); break;
       case 'laser': Sound.play('laser'); break;
       case 'drop': case 'elixir': case 'shieldBreak': case 'popup': case 'dash': case 'taunt': Sound.play(f.type); break;
+      case 'evolve': case 'shockwave': case 'pulse': case 'pierce': case 'dive': case 'rally': case 'bastion': Sound.play(f.type); break;
       case 'crown': Sound.play('crown'); break;
       case 'kingWake': Sound.play('horn'); break;
       case 'emote': Sound.play('emote', f.emote); break;
@@ -1376,7 +1416,9 @@ function tryDeployAt(owner, cardId, x, y) {
     saveProgress();
   }
   countPlay(owner, cardId);
-  writeLog(`${playerName(owner)} ${CARD_MAP[cardId].spell ? 'cast' : 'deployed'} ${CARD_MAP[cardId].name}.`);
+  writeLog(res.evolved
+    ? `✦ ${playerName(owner)} played the EVOLVED ${Sim.evolutionOf(cardId).name}!`
+    : `${playerName(owner)} ${CARD_MAP[cardId].spell ? 'cast' : 'deployed'} ${CARD_MAP[cardId].name}.`);
   state.selectedCard = null;
   handleFx(Sim.takeFx(state.match));
   state.snapCur = Sim.snapshot(state.match); // show it immediately
@@ -1609,6 +1651,9 @@ function grantTierRewards(tier) {
     const bonus = Math.max(1, Math.round(baseCopies * (0.45 + Math.random() * 0.9) * mult));
     cardProgress(c.id).copies += bonus;
   }
+
+  const evoText = chestEvoShards(tier);
+  if (evoText) unlockedName = unlockedName ? `${unlockedName}; ${evoText}` : evoText;
 
   return {
     gold,
@@ -1941,10 +1986,12 @@ function cardTraits(c) {
 // The deck editor and collection grid live in prototype_road.js
 function renderCollection() {
   renderDeckEditor();
+  renderEvoCollection();
 }
 
 function bindProgressUi() {
   bindDeckEditor();
+  bindEvo();
   bindRoad();
   ui.ranked?.addEventListener('change', () => {
     state.progress.rankedAi = !!ui.ranked.checked;
@@ -2149,10 +2196,7 @@ function onlineDeckPayload() {
   let ids = state.progress.deck.filter((id) => CARD_MAP[id] && cardProgress(id).unlocked).slice(0, MAX_DECK);
   if (ids.length === 0) ids = [...STARTER_DECK];
   onlineDeckIds = ids;
-  return ids.map((id) => {
-    const cp = cardProgress(id);
-    return { id, level: cp.level || 1, abilityUnlocked: !!cp.abilityUnlocked, mastery: cp.mastery || 0 };
-  });
+  return deckEntries(ids, equippedEvos(ids, 'online'));
 }
 
 function showOnlineLobby() {
@@ -2274,7 +2318,7 @@ function handleOnlineVictory(winner, info, forfeit) {
   const result = draw ? 'draw' : won ? 'win' : 'loss';
   const trophy = om && om.ranked ? settleRanked({ id: om.matchId, result, mode: 'online' }) : null;
   const mine = last ? last.players[mySide] : null;
-  const newAch = recordMatch({ result, crowns: mine ? mine.crowns : 0, kingKill: won && last?.endReason === 'king', hardAi: false, online: true });
+  const newAch = recordMatch({ result, crowns: mine ? mine.crowns : 0, kingKill: won && last?.endReason === 'king', hardAi: false, online: true, evoPlayed: mine ? mine.evoPlayed || 0 : 0 });
   saveProgress();
   renderProgress();
   renderCollection();
@@ -2347,6 +2391,9 @@ function cacheUi() {
   ui.status.B.tower = $('ptTowerB');
   ui.status.B.energy = $('ptEnergyB');
   ui.status.B.gold = $('ptGoldB');
+  ui.evoCollection = $('ptEvoCollection');
+  ui.evoHeader = $('ptEvoHeader');
+  ui.evoOverlay = $('ptEvoOverlay');
   ui.rank.A = $('ptRankA');
   ui.rank.B = $('ptRankB');
   ui.roadBtn = $('ptRoadBtn');
@@ -2481,7 +2528,8 @@ function bindCore() {
       decks: [[...STARTER_DECK], [...STARTER_DECK], [...STARTER_DECK]],
       activeDeck: 0,
       rankedAi: true,
-      roadEmotes: {}
+      roadEmotes: {},
+      evo: Evo.fresh()
     };
     unlockInitial();
     state.progress.aiDeck = [...AI_DEFAULT_DECK];

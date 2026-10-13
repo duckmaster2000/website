@@ -12,10 +12,12 @@ Notes on the prototype tank game at `caleb-liu.com/prototype.html`: what was cha
 | **Trophy Road rules**: arenas, trophy gains/losses, milestones, anti-exploit guards | `clash-tanks-server/clash-tanks-server/shared/trophy-road.js` | Browser (tested in Node) |
 | Arena renderer (canvas drawing, arena themes, effects, HUD, placement preview, announcements, emote bubbles) | `prototype_arena.js` | Browser |
 | Trophy Road screen, rank display, deck editor | `prototype_road.js` | Browser |
+| **Evolution progression rules**: shards, Wild Shards, unlocks, slot validation | `clash-tanks-server/clash-tanks-server/shared/evo-progress.js` | Browser (tested in Node) |
+| Evolution collection, unlock celebration, deck-slot toggles, hand indicator | `prototype_evo.js` | Browser |
 | Emote artwork (animated faces drawn with canvas paths) | `prototype_emotes.js` | Browser |
 | Page logic (menus, progression, chests, decks, lobby, input, sound) | `prototype_v4.js`, `prototype.html`, `prototype.css` | Browser |
 | Online server (matchmaking, rooms, runs the engine) | `clash-tanks-server/clash-tanks-server/server.js` | Render |
-| Tests | `clash-tanks-server/clash-tanks-server/test/sim.test.js`, `test/trophy.test.js` | `npm test` |
+| Tests | `clash-tanks-server/clash-tanks-server/test/*.test.js` (sim, trophy, evolution, evo-progress) | `npm test` |
 
 **One engine for every mode.** Local PvP, vs AI and Online all use the same `clash-sim.js`, so they always play by identical rules. Change gameplay **only** in that file. Don't put a second copy of the rules in the server.
 
@@ -36,7 +38,9 @@ The page loads the engine straight from the server folder (`<script src="clash-t
 1. Commit and push everything in GitHub Desktop. Make sure these are included:
    - `prototype_arena.js`
    - `prototype_emotes.js`
-   - `prototype_road.js` (new)
+   - `prototype_road.js`
+   - `prototype_evo.js` (new)
+   - `clash-tanks-server/clash-tanks-server/shared/evo-progress.js` (new)
    - `clash-tanks-server/clash-tanks-server/shared/`
    - `clash-tanks-server/clash-tanks-server/test/`
 2. Render redeploys the server by itself.
@@ -252,10 +256,55 @@ New engine systems behind them: lingering zones (`state.zones`), status effects 
 
 **Balance:** tuned from ~5,000 AI-vs-AI matches with random arena-9 decks. New cards land between about 42% and 64% win rate when included (the expensive tanks, Rock Titan and Storm Zeppelin, are at the top). Some older swarm cards (Bomb Beetles, Rabbit Rush, Goblin Bikers) sit at 35–40% and were left as they were.
 
+### 11. Card Evolutions
+All battle rules are in the shared engine, so Evolutions work identically in **Local PvP, vs AI and Online**, and online the server decides when a card evolves.
+
+**How it works for the player**
+- **Shards:** every Evolution has its own shard bar; **6 shards** unlock it (`EvoProgress.RULES.SHARDS_TO_UNLOCK`). **Wild Shards** go into any locked Evolution. Shards for an Evolution you already own become Wild Shards (cap 12); past the cap each converts to 150 gold, so nothing is lost or wasted.
+- **Where shards come from:** 17 Trophy Road stops (a complete Juggernaut at 120 🏆 so everyone can try the system, then shards and Wild Shards up to 6000), chests (12% × tier chance, prefers Evolutions of cards you own), and two achievements (Evolved, Evolution Master) that pay Wild Shards.
+- **Unlocking:** a celebration screen (base card morphs into the evolved card, ability shown). Several unlocks queue one after another. Unlocks are saved immediately and can only happen once.
+- **Equipping:** each deck has **2 Evolution slots** (`Sim.EVO_RULES.slots`, per mode). Tap ✦ on a deck slot (or Equip in the Evolutions panel). Locked, not-in-deck and slots-full attempts are refused with a message. The deck summary shows the slots and points out unlocked-but-unequipped Evolutions.
+- **In battle (the cycle):** an equipped card counts its plays. After `cycles` normal plays, the card in hand glows gold with **✦ EVOLVE**, and the next play is evolved; then it starts charging again. Charging pips show on the card. Only plays that pass every check count (no elixir, bad spot, recharging, not in hand, match over: no progress). Both players' charge is in the snapshot; the opponent's nameplate warns "✦ Evo ready!".
+
+**The Evolutions** (all values live in `EVOLUTIONS` in `clash-sim.js`; mirror-match edge in brackets)
+| Card → Evolution | Role | Cycles | What changes | Counterplay |
+|---|---|---|---|---|
+| Brawler → **Juggernaut** | melee | 2 | Every 3rd punch: splash + knockback quake around its target | Ranged/air troops; spread out |
+| Drill Cat → **Diamond Drill** | melee | 1 | +45% per consecutive hit on one target (max +135%); resets on target swap or stun | Distractions, stuns |
+| Guardian → **Bastion** | tank | 2 | On landing and every 8 s, 110 HP shields on the 4 nearest allies (not itself) | Splash/spells strip shields; kill the Bastion |
+| Siege → **Earthshaker** | tank | 2 | Shells leave 3 s craters that slow enemies 50% | Flyers; swarm it |
+| Volt Bug → **Storm Bug** | ranged | 1 | Chain to 3 (from 2); 0.25 s jolt on the first target | Spread out; tanky singles |
+| Ray Lance → **Prism Lance** | ranged | 2 | Beam pierces every enemy in a line to full range (others take 60%) | Approach from the side; dive it |
+| Flare Pod → **Cluster Pod** | ranged | 2 | Fireballs scatter 3 bomblets; one bomblet per enemy per shot | Tanks; reach it fast |
+| Junk Pack → **Scrap Rally** | swarm | 1 | Survivors +35% speed per fallen packmate (max 2) | Splash that kills all at once |
+| Hawk Strike → **Dive Hawks** | air | 2 | Opening dive for 2.5×, then a 4 s climb | Anti-air splash; cheap decoys |
+| Bolt Turret → **Arc Turret** | building | 1 | Every 3rd shot also pulses: damage + knockback around it (ground) | Flyers, building-targeters, spells |
+| Bone Crypt → **Crypt of Legions** | building | 1 | Dies into a 520 HP Bone Giant instead of 3 skeletons | Let it expire in a bad spot |
+| Medic Bot → **Field Surgeon** | support | 1 | Triage (2.2× heal under 40% HP), clears slows, shortens stuns/freezes | Burst the push; snipe the Surgeon |
+| Fire Bomb → **Napalm Bomb** | spell | 2 | Leaves burning ground for 3 s (35% more damage, towers 30%) | Walk out of the fire |
+| Shock → **Overload** | spell | 2 | Aftershock 0.8 s later: 60% damage, 0.8 s stun | Leave the circle |
+| Rocket Rain → **Homing Barrage** | spell | 2 | 6 rockets lock on to different enemies in the circle | Tough troops; it only locks on at cast |
+
+Mirror matches (same deck both sides, only one side has the Evolution, 240 AI-vs-AI matches each) put the evolved side at roughly **50–60%**: a real upgrade, never an auto-win. Bastion started at 69% and was cut (shields allies only, smaller and slower).
+
+**AI:** knows when its Evolutions are ready (prefers an evolved defender, leads pushes with an evolved win condition, values evolved spells 25% higher), cycles cheap cards to charge Evolutions when leaking, and treats enemy evolved units as 35% more threatening. Ranked AI gets 1 Evolution from Frost Pass and 2 from Volcano Forge. No hidden elixir or stat advantages.
+
+**Online:** decks carry an `evo` flag per card; the server keeps it only for cards that have an Evolution and caps it at the online slot count, then tracks every cycle itself.
+
+#### Adding an Evolution
+1. Add an entry to `EVOLUTIONS` in `shared/clash-sim.js` (key = the card's slug): `name`, `cycles`, `ability`, `desc`, `counter`, `role`, `theme`, optional `hp`/`dmg` multipliers, and either `mech` (troops/buildings) or `spell`.
+2. Reuse an existing mechanic if one fits: `shockwave`, `pulse`, `stackHits`, `dive`, `allyShield`, `impactZone`, `chain`, `pierceLine`, `cluster`, `rally`, `deathSummon`, `cleanse`/`triage` (troops and buildings); `afterZone`, `echo`, `seek` (spells). They're all in the "Evolution mechanics" section, called from the normal attack, projectile, death and heal code.
+3. For a new mechanic, add a config key and handle it in that section (or the matching hook in `fireAttack`, `updateProjectiles`, `processDeaths`, `castSpell`). Route damage through `applyDamage`/`splashDamage` so shields, invulnerability, crown multipliers and hidden units still apply.
+4. Optional: a `theme-evo-<theme>` colour in `prototype.css`, an effect in `prototype_arena.js` (`addFx`/`drawEffects`), and a sound in `Sound` (`prototype_v4.js`).
+5. Optional: shards on the Trophy Road (`EVO_STOPS` in `shared/trophy-road.js`, at an unused trophy count).
+6. Add a test in `test/evolution.test.js` and run the mirror-match check (see Testing) to keep it around 50–60%.
+
 ### 10. Fix: placing a swarm froze the game
 Swarm members land a moment apart, which made the drop-in animation compute a negative shadow size; the canvas threw and the frame loop stopped. The renderer now clamps it, and the frame loop keeps running even if a frame throws (the error is logged).
 
 ## Testing done
+
+- **Step 11 (Evolutions):** 87 automated tests (`npm test`): the cycle (exact evolve pattern, reset, independent charges, failed plays never advance it, unequipped never evolves, fresh per match), deck slot limits, one test per Evolution ability, core-rule interactions (air targeting, freeze, building expiry), a heavy battle with every Evolution at once (stays fast, no runaway spawns), shard/Wild Shard/unlock/overflow/equip rules, save clean-up, and Trophy Road shard stops. Headless Chrome: claim → unlock celebration → equip (locked, full and success feedback) → ranked match charging → ready glow → evolved deploy → saved across reload; a staged battle with all 15 Evolutions and evolved spells (no errors); an AI match with Evolutions on both sides; online: server caps a tampered 3-Evolution deck at 2, both clients see charges, and the third Brawler comes out evolved on the server. Earlier sweeps (Trophy Road, all cards, swarm freeze) re-run clean.
 
 - **59 automated tests** (`npm test`). Added in step 9: one test per new card mechanic (freeze, damage-over-time, slow/haste, heal, pull, laser, boulder, paratroopers, anti-air, ramp-up, siege range, hidden building, spawners, elixir pump, taunt, healer, death spawns, charge reset, shield, slow on hit, dash, pierce, deploy-anywhere with matching online preview, stun chain), the AI deck builder at every arena, AI-vs-AI matches with the new cards (legal moves only, spells and buildings used), and 10 Trophy Road tests (trophy maths, floors, AI ceilings, duplicate results, milestone claims, abandoned matches, save clean-up, every new card on the road once in its own arena).
 - **Headless Chrome (this round):** ranked AI win with arena promotion, forfeit by restarting and by reloading, practice and local PvP give no trophies, Trophy Road claim/claim-all/double-claim/theme switch, every card (all 191) deployed and drawn for both sides, a staged battle with every new effect, the deck editor (tabs, filters, slot swap, saved), two-window online (ranked queue start, forfeit win +30, friendly room with no trophies), and a 375 px phone screen (no horizontal scrolling). No console errors.
@@ -284,6 +333,10 @@ Swarm members land a moment apart, which made the drop-in animation compute a ne
 ---
 
 ## Still to do
+
+- **Evolution unlocks are client-side** (like all progress). The server checks that a card *has* an Evolution and enforces the slot limit, but it can't know whether you unlocked it. That needs accounts.
+- **Evolution balance** comes from AI-vs-AI mirror matches, which don't play like people (they rarely save an Evolution for the right moment). Expect to retune from real play.
+- **Evolved art** reuses the card's emoji with a violet/gold aura, rim and crest, plus ability-specific effects; there is no separate evolved sprite.
 
 - **Trophies live in the browser** (localStorage), like the rest of progress. There are no accounts, so someone could edit their save, or play themselves online in two windows to farm wins. Real protection needs server-side accounts.
 - **Online card levels** are whatever the client sends (unchanged from before).

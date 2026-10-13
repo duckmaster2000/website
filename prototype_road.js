@@ -23,12 +23,18 @@ function rankLine(side) {
   const online = state.viewSource === 'online';
   const isMe = online ? side === mySide : side === 'A';
   if (online) {
-    if (!isMe) return onlineMatch && onlineMatch.ranked ? '🏆 Ranked' : 'Friendly';
+    if (!isMe) return `${onlineMatch && onlineMatch.ranked ? '🏆 Ranked' : 'Friendly'}${evoWarn(side)}`;
     return `🏆 ${road.trophies} · ${Road.rankOf(road.trophies).label}`;
   }
   if (state.mode === 'pvp') return 'Friendly · no trophies';
   if (isMe) return `🏆 ${road.trophies} · ${Road.rankOf(road.trophies).label}`;
-  return state.aiTag || '';
+  return `${state.aiTag || ''}${evoWarn(side)}`;
+}
+
+// The opponent's Evolution is charged: worth knowing before you commit
+function evoWarn(side) {
+  const v = state.view;
+  return v && anyEvoReady(v.players[side]) ? ' · ✦ Evo ready!' : '';
 }
 
 function claimableCount() {
@@ -106,6 +112,13 @@ function rewardLabel(r) {
       const a = Road.ARENAS[r.arena];
       return { icon: a.icon, text: `${a.name} unlocked`, cls: 'arena' };
     }
+    case 'shards': {
+      const def = Sim.EVOLUTIONS[r.slug];
+      const c = CARD_MAP[r.slug];
+      return { icon: `${c ? c.icon : ''}✦`, text: r.amount >= Evo.RULES.SHARDS_TO_UNLOCK ? `${def.name} Evolution!` : `${r.amount} ${def.name} shards`, cls: 'evo-shards', sub: 'Evolution' };
+    }
+    case 'wild':
+      return { icon: '🔮', text: `${r.amount} Wild Shards`, cls: 'evo-shards', sub: 'Any Evolution' };
     default: return { icon: '❔', text: '', cls: '' };
   }
 }
@@ -244,6 +257,10 @@ function grantRoadReward(r) {
     }
     case 'arena':
       return `${Road.ARENAS[r.arena].name} battlefield unlocked`;
+    case 'shards':
+      return grantEvoShards(r.slug, r.amount);
+    case 'wild':
+      return grantWildShards(r.amount);
     default:
       return '';
   }
@@ -351,7 +368,9 @@ function setActiveDeck(i) {
 function deckSlotHtml(id, idx, picked) {
   const c = CARD_MAP[id];
   const cp = cardProgress(id);
-  return `<button type="button" class="deck-slot rarity-${c.rarity} ${picked ? 'picked' : ''}" data-slot="${idx}" title="${escapeHtml(`${c.name}: ${c.desc}`)}"><span class="ds-cost ${costClass(c.cost)}">${c.cost}</span><span class="ds-icon">${c.icon}</span><span class="ds-name">${escapeHtml(c.name)}</span><small>Lv ${cp.level}</small></button>`;
+  const ev = deckSlotEvo(id);
+  const evoName = ev.cls.includes('evo-on') ? `<small class="ds-evoname">✦ ${escapeHtml(Sim.evolutionOf(id).name)}</small>` : `<small>Lv ${cp.level}</small>`;
+  return `<button type="button" class="deck-slot rarity-${c.rarity} ${picked ? 'picked' : ''}${ev.cls}" data-slot="${idx}" title="${escapeHtml(`${c.name}: ${c.desc}`)}"><span class="ds-cost ${costClass(c.cost)}">${c.cost}</span>${ev.html}<span class="ds-icon">${c.icon}</span><span class="ds-name">${escapeHtml(c.name)}</span>${evoName}</button>`;
 }
 
 function statLineFor(c) {
@@ -369,6 +388,16 @@ function statLineFor(c) {
   if (s.targets === 'none') return `HP ${s.hpScaled} • ${speedLabel(s)}`;
   const count = s.swarmCount > 1 ? `${s.swarmCount}× ` : '';
   return `${count}HP ${s.hpScaled} • DMG ${Math.round(s.dmgScaled)} / ${s.cd}s • ${s.proj === 'melee' ? 'melee' : `range ${s.range}`} • ${speedLabel(s)}`;
+}
+
+function evoBadge(c) {
+  const slug = evoSlug(c.id);
+  if (!slug) return '';
+  const def = Sim.EVOLUTIONS[slug];
+  const ev = state.progress.evo;
+  return Evo.isUnlocked(ev, slug)
+    ? `<span class="evo-badge on" title="${escapeHtml(def.name)}: ${escapeHtml(def.desc)}">✦ ${escapeHtml(def.name)}</span>`
+    : `<span class="evo-badge" title="${escapeHtml(def.name)}: ${escapeHtml(def.desc)}">✦ Evo ${Evo.shardsOf(ev, slug)}/${Evo.RULES.SHARDS_TO_UNLOCK}</span>`;
 }
 
 function filteredCollection() {
@@ -406,7 +435,7 @@ function renderDeckEditor() {
     const cards = deck.map((id) => CARD_MAP[id]);
     const n = (t) => cards.filter((c) => cardType(c) === t).length;
     const warn = deckWarnings(deck);
-    ui.deckSummary.innerHTML = `${avgElixirBar(deck)}<span class="ds-counts">⚔️ ${n('troop')} troops · ✦ ${n('spell')} spells · 🏯 ${n('building')} buildings</span>${warn.length ? `<ul class="deck-warn">${warn.map((w) => `<li>⚠️ ${escapeHtml(w)}</li>`).join('')}</ul>` : '<span class="deck-ok">✓ Balanced deck</span>'}`;
+    ui.deckSummary.innerHTML = `${avgElixirBar(deck)}${evoSlotsSummary(deck)}<span class="ds-counts">⚔️ ${n('troop')} troops · ✦ ${n('spell')} spells · 🏯 ${n('building')} buildings</span>${warn.length ? `<ul class="deck-warn">${warn.map((w) => `<li>⚠️ ${escapeHtml(w)}</li>`).join('')}</ul>` : '<span class="deck-ok">✓ Balanced deck</span>'}`;
   }
   if (ui.deckSlots) ui.deckSlots.innerHTML = deck.map((id, idx) => deckSlotHtml(id, idx, roadUi.pickSlot === idx)).join('');
 
@@ -453,7 +482,7 @@ function renderDeckEditor() {
     const nextLine = nextStats ? (nextStats.spell ? `Next Lv: ${Math.round(nextStats.dmgScaled)}` : `Next Lv: HP ${nextStats.hpScaled} • DMG ${Math.round(nextStats.dmgScaled)}`) : '';
     return `<article class="collection-card rarity-edge-${c.rarity} ${unlocked ? '' : 'locked'} ${inDeck ? 'in-deck' : ''} ${picking === c.id ? 'picking' : ''} ${c.winCondition ? 'win-condition' : ''}" data-card="${c.id}">
       <header><span class="cc-cost ${costClass(c.cost)}">${c.cost}</span><strong>${c.icon} ${escapeHtml(c.name)}</strong><span class="rarity-${c.rarity}">${RARITY_STYLE[c.rarity].label}</span></header>
-      <div class="cc-tags"><span class="type-badge type-${type}">${type === 'spell' ? '✦ Spell' : type === 'building' ? '🏯 Building' : '⚔️ Troop'}</span>${c.winCondition ? '<span class="wc-badge">👑 Win Condition</span>' : ''}${c.swarmCount > 1 ? `<span class="swarm-badge">×${c.swarmCount}</span>` : ''}${c.solo && c.arena > 0 ? `<span class="new-badge">${Road.ARENAS[c.arena].icon} ${escapeHtml(Road.ARENAS[c.arena].name)}</span>` : ''}</div>
+      <div class="cc-tags"><span class="type-badge type-${type}">${type === 'spell' ? '✦ Spell' : type === 'building' ? '🏯 Building' : '⚔️ Troop'}</span>${c.winCondition ? '<span class="wc-badge">👑 Win Condition</span>' : ''}${c.swarmCount > 1 ? `<span class="swarm-badge">×${c.swarmCount}</span>` : ''}${c.solo && c.arena > 0 ? `<span class="new-badge">${Road.ARENAS[c.arena].icon} ${escapeHtml(Road.ARENAS[c.arena].name)}</span>` : ''}${evoBadge(c)}</div>
       <p class="cc-desc">${escapeHtml(c.desc || c.role)}</p>
       ${unlocked ? `<p class="cc-stats">Lv ${cp.level} • ${statLineFor(c)}</p><p class="cc-traits">${cardTraits(c)}</p><p class="cc-own">Copies ${cp.copies} • Mastery ${Math.floor(cp.mastery)}${nextLine ? ` • ${nextLine}` : ''}</p>` : `<p class="cc-unlock">${unlockHint(c)}</p>`}
       <div class="collection-actions">${unlocked ? `<button type="button" data-select="${c.id}" class="${inDeck ? 'in' : ''}">${inDeck ? '✓ In Deck' : roadUi.pickSlot != null ? `Put in slot ${roadUi.pickSlot + 1}` : 'Use'}</button><button type="button" data-up="${c.id}" ${canUp ? '' : 'disabled'}>Level Up (${need} copies, ${upCost}g)</button><button type="button" data-ability="${c.id}" ${canAbility ? '' : 'disabled'}>${cp.abilityUnlocked ? `✓ ${c.ability.name}` : `${c.ability.name} (Lv${c.ability.minLevel}, ${c.ability.minMastery}M, 400g)`}</button>` : '<button type="button" disabled>Locked</button>'}</div>
@@ -467,6 +496,8 @@ function bindDeckEditor() {
     if (b) setActiveDeck(Number(b.dataset.deckTab));
   });
   ui.deckSlots?.addEventListener('click', (e) => {
+    const evoBtn = e.target.closest('[data-evo-toggle]');
+    if (evoBtn) { e.stopPropagation(); toggleEvoEquip(evoBtn.dataset.evoToggle); return; }
     const b = e.target.closest('[data-slot]');
     if (!b) return;
     const slot = Number(b.dataset.slot);

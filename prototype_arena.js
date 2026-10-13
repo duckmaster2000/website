@@ -569,6 +569,9 @@
         y += Math.sin(face) * k;
       }
 
+      // Evolved units: a violet/gold aura under the body
+      if (u.evo) drawEvoAura(x, y - lift - drop - bob, r, now, u.air);
+
       // Shadow (shrinks while the unit is dropping in)
       const shadowK = drop ? Math.max(0, 1 - drop / (scale * 3.2)) : 1;
       ctx.fillStyle = 'rgba(0,0,0,0.3)';
@@ -632,6 +635,7 @@
         stunSparks(x, y, r * 0.9, now);
       }
       drawStatus(u, x, y, r, face, team, now);
+      if (u.evo) drawEvoCrest(u, x, y, r, now);
       if (u.wind && !u.melee) {
         ctx.strokeStyle = 'rgba(255,230,120,0.9)';
         ctx.lineWidth = 2;
@@ -653,6 +657,54 @@
         ctx.fillRect(x - barW / 2 - 1, by - 1, barW + 2, bh + 2);
         ctx.fillStyle = '#7fe8ff';
         ctx.fillRect(x - barW / 2, by, barW * u.shd, bh);
+      }
+    }
+
+    const EVO1 = '#b45cff';
+    const EVO2 = '#ffcf3a';
+
+    function drawEvoAura(x, y, r, now, air) {
+      const pulse = 0.5 + 0.5 * Math.sin(now / 260);
+      const g = ctx.createRadialGradient(x, y, r * 0.6, x, y, r * 1.7);
+      g.addColorStop(0, `rgba(180,92,255,${0.35 + 0.15 * pulse})`);
+      g.addColorStop(1, 'rgba(180,92,255,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(x, y, r * 1.7, 0, Math.PI * 2); ctx.fill();
+      // Orbiting gold sparks
+      for (let i = 0; i < 3; i++) {
+        const a = now / 500 + (i * Math.PI * 2) / 3;
+        const px = x + Math.cos(a) * r * 1.35;
+        const py = y + Math.sin(a) * r * (air ? 1.35 : 0.7);
+        ctx.fillStyle = EVO2;
+        ctx.beginPath();
+        ctx.moveTo(px, py - scale * 0.1); ctx.lineTo(px + scale * 0.05, py); ctx.lineTo(px, py + scale * 0.1); ctx.lineTo(px - scale * 0.05, py);
+        ctx.fill();
+      }
+    }
+
+    // Gradient rim, crest, and stack/rally readouts so evolved units read at a glance
+    function drawEvoCrest(u, x, y, r, now) {
+      const rim = ctx.createLinearGradient(x - r, y - r, x + r, y + r);
+      rim.addColorStop(0, EVO1);
+      rim.addColorStop(1, EVO2);
+      ctx.strokeStyle = rim;
+      ctx.lineWidth = Math.max(2, scale * 0.1);
+      ctx.beginPath(); ctx.arc(x, y, r * (u.building ? 1.25 : 1.02), 0, Math.PI * 2); ctx.stroke();
+      outlinedText('✦', x + r * 0.85, y - r * 0.85, Math.max(9, scale * 0.42), EVO2, 'rgba(60,0,90,0.9)', 900);
+      if (u.stk) {
+        for (let i = 0; i < u.stk; i++) {
+          ctx.fillStyle = '#7ff3ff';
+          ctx.beginPath(); ctx.arc(x - r * 0.6 + i * r * 0.6, y + r * 1.05, Math.max(2, scale * 0.08), 0, Math.PI * 2); ctx.fill();
+        }
+      }
+      if (u.rly) {
+        ctx.fillStyle = `rgba(255,80,60,${0.25 + 0.2 * Math.sin(now / 90)})`;
+        ctx.beginPath(); ctx.arc(x, y, r * (1 + u.rly), 0, Math.PI * 2); ctx.fill();
+      }
+      if (u.dv) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+        ctx.lineWidth = 2;
+        for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.moveTo(x + i * r * 0.4, y - r * 2.4); ctx.lineTo(x + i * r * 0.2, y - r * 1.2); ctx.stroke(); }
       }
     }
 
@@ -774,6 +826,7 @@
       const grow = clamp(z.age / 0.25, 0, 1);
       ctx.save();
       ctx.globalAlpha = fade;
+      if (z.evo && drawEvoZone(z, x, y, R, now, grow)) { ctx.restore(); return; }
       switch (z.kind) {
         case 'dot': {
           const g = ctx.createRadialGradient(x, y, R * 0.2, x, y, R);
@@ -885,6 +938,52 @@
       ctx.restore();
     }
 
+    // Evolution zones have their own looks (returns true when drawn)
+    function drawEvoZone(z, x, y, R, now, grow) {
+      if (z.kind === 'slow' && z.cardId === 'siege') {
+        // Earthshaker crater: cracked, dusty ground
+        ctx.fillStyle = 'rgba(70,45,25,0.55)';
+        ctx.beginPath(); ctx.arc(x, y, R * grow, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(30,18,10,0.8)';
+        ctx.lineWidth = Math.max(1.5, scale * 0.06);
+        for (let i = 0; i < 6; i++) {
+          const a = i * 1.05 + 0.3;
+          ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a) * R * 0.5, y + Math.sin(a) * R * 0.5); ctx.lineTo(x + Math.cos(a + 0.3) * R * 0.95, y + Math.sin(a + 0.3) * R * 0.95); ctx.stroke();
+        }
+        ctx.strokeStyle = 'rgba(180,92,255,0.6)';
+        ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.stroke();
+        return true;
+      }
+      if (z.kind === 'dot' && z.cardId === 'firebomb') {
+        // Napalm: low flames licking up across the patch
+        ctx.fillStyle = 'rgba(255,90,20,0.22)';
+        ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.fill();
+        for (let i = 0; i < 12; i++) {
+          const a = i * 2.39;
+          const d = ((i * 53) % 10) / 10 * R * 0.85;
+          const fx = x + Math.cos(a) * d;
+          const fy = y + Math.sin(a) * d;
+          const h = scale * (0.25 + 0.2 * Math.sin(now / 90 + i));
+          ctx.fillStyle = i % 2 ? 'rgba(255,170,40,0.85)' : 'rgba(255,90,20,0.85)';
+          ctx.beginPath(); ctx.moveTo(fx - scale * 0.1, fy); ctx.quadraticCurveTo(fx, fy - h * 2, fx + scale * 0.1, fy); ctx.fill();
+        }
+        return true;
+      }
+      if (z.kind === 'echo') {
+        // Overload: a tightening ring until the aftershock lands
+        const k = z.wait > 0 ? 1 - z.wait / 0.8 : 1;
+        ctx.strokeStyle = `rgba(180,240,255,${0.4 + 0.5 * k})`;
+        ctx.lineWidth = Math.max(2, scale * 0.08);
+        ctx.setLineDash([scale * 0.25, scale * 0.15]);
+        ctx.beginPath(); ctx.arc(x, y, R * (1.4 - 0.4 * k), 0, Math.PI * 2); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.strokeStyle = 'rgba(180,92,255,0.7)';
+        ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.stroke();
+        return true;
+      }
+      return false;
+    }
+
     // Rolling boulders and thrown blades are objects, drawn over ground troops
     function drawZoneObject(z, now) {
       const x = sx(z.x);
@@ -956,7 +1055,17 @@
         ctx.beginPath(); ctx.ellipse(x, y, s * (spell ? 0.35 : 0.2), s * (spell ? 0.17 : 0.1), 0, 0, Math.PI * 2); ctx.fill();
         y -= height;
       }
+      if (p.evo && p.style !== 'bomblet') {
+        ctx.fillStyle = 'rgba(180,92,255,0.45)';
+        ctx.beginPath(); ctx.arc(x, y, s * 0.3, 0, Math.PI * 2); ctx.fill();
+      }
       switch (p.style) {
+        case 'bomblet':
+          ctx.fillStyle = '#ff9a3a';
+          ctx.shadowColor = '#b45cff'; ctx.shadowBlur = 8;
+          ctx.beginPath(); ctx.arc(x, y, s * 0.13, 0, Math.PI * 2); ctx.fill();
+          ctx.shadowBlur = 0;
+          break;
         case 'firebomb': {
           for (let i = 3; i >= 1; i--) {
             const dx = p.tx != null ? sx(p.tx) - x : 0;
@@ -1184,6 +1293,13 @@
           case 'popup': e.life = 420; break;
           case 'dash': e.life = 380; break;
           case 'taunt': e.life = 900; break;
+          case 'evolve': e.life = f.small ? 700 : 1300; if (!f.small) shake = Math.max(shake, 4); break;
+          case 'shockwave': e.life = 550; shake = Math.max(shake, 3); break;
+          case 'pulse': e.life = 500; break;
+          case 'pierce': e.life = 280; break;
+          case 'dive': e.life = 320; break;
+          case 'rally': e.life = 700; break;
+          case 'bastion': e.life = 800; break;
           case 'spell':
             e.life = f.kind === 'firebomb' ? 750 : f.kind === 'shock' ? 420 : f.kind === 'frost' ? 800 : 520;
             e.parts = Array.from({ length: f.kind === 'rocket' ? 6 : 14 }, () => ({ a: Math.random() * Math.PI * 2, d: Math.random(), v: 0.6 + Math.random() * 0.8 }));
@@ -1336,6 +1452,87 @@
           case 'dash':
             ctx.fillStyle = 'rgba(200,200,220,0.5)';
             ctx.beginPath(); ctx.arc(x, y, scale * (0.3 + t * 0.8), 0, Math.PI * 2); ctx.fill();
+            break;
+          case 'evolve': {
+            // Evolution arrives: a violet column, gold rays and a callout
+            const k = easeOut(clamp(t * 2, 0, 1));
+            const R = scale * (e.small ? 1 : 1.6);
+            ctx.globalAlpha = 1 - t;
+            const col = ctx.createLinearGradient(0, y - scale * 4, 0, y);
+            col.addColorStop(0, 'rgba(180,92,255,0)');
+            col.addColorStop(1, 'rgba(180,92,255,0.55)');
+            ctx.fillStyle = col;
+            ctx.fillRect(x - R * 0.5, y - scale * 4 * k, R, scale * 4 * k);
+            ctx.strokeStyle = '#ffcf3a';
+            ctx.lineWidth = Math.max(2, scale * 0.08);
+            for (let i = 0; i < 10; i++) {
+              const a = (i / 10) * Math.PI * 2 + t;
+              ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * R * 0.6, y + Math.sin(a) * R * 0.4); ctx.lineTo(x + Math.cos(a) * R * (0.8 + k), y + Math.sin(a) * R * (0.5 + k * 0.6)); ctx.stroke();
+            }
+            ctx.strokeStyle = '#b45cff';
+            ctx.beginPath(); ctx.arc(x, y, R * (0.5 + k), 0, Math.PI * 2); ctx.stroke();
+            if (!e.small) {
+              ctx.globalAlpha = t < 0.75 ? 1 : 1 - (t - 0.75) / 0.25;
+              outlinedText('EVOLVED!', x, y - scale * (1.8 + k * 0.6), scale * 0.62, '#ffcf3a', 'rgba(60,0,90,0.95)', 900);
+              if (e.name) outlinedText(e.name, x, y - scale * (1.15 + k * 0.6), scale * 0.42, '#f3e6ff', 'rgba(60,0,90,0.95)', 800);
+            }
+            break;
+          }
+          case 'shockwave':
+          case 'pulse': {
+            const R = (e.r || 1.5) * scale;
+            ctx.strokeStyle = e.type === 'pulse' ? `rgba(140,220,255,${1 - t})` : `rgba(230,200,150,${1 - t})`;
+            ctx.lineWidth = Math.max(2, scale * 0.14 * (1 - t));
+            ctx.beginPath(); ctx.arc(x, y, R * easeOut(t), 0, Math.PI * 2); ctx.stroke();
+            ctx.strokeStyle = `rgba(180,92,255,${0.8 * (1 - t)})`;
+            ctx.lineWidth = Math.max(1, scale * 0.05);
+            ctx.beginPath(); ctx.arc(x, y, R * easeOut(t) * 0.75, 0, Math.PI * 2); ctx.stroke();
+            if (e.type === 'shockwave') {
+              ctx.fillStyle = `rgba(160,130,90,${0.5 * (1 - t)})`;
+              for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; ctx.beginPath(); ctx.arc(x + Math.cos(a) * R * easeOut(t), y + Math.sin(a) * R * easeOut(t) * 0.7, scale * 0.15, 0, Math.PI * 2); ctx.fill(); }
+            }
+            break;
+          }
+          case 'pierce': {
+            // Prism beam: a white core with rainbow edges
+            const x2 = sx(e.x2);
+            const y2 = sy(e.y2);
+            ctx.globalAlpha = 1 - t;
+            ['rgba(255,80,200,0.6)', 'rgba(80,200,255,0.6)', 'rgba(255,255,255,0.95)'].forEach((c, i) => {
+              ctx.strokeStyle = c;
+              ctx.lineWidth = Math.max(1.5, scale * (0.3 - i * 0.09));
+              ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x2, y2); ctx.stroke();
+            });
+            break;
+          }
+          case 'dive': {
+            const x2 = sx(e.x2);
+            const y2 = sy(e.y2);
+            ctx.strokeStyle = `rgba(255,255,255,${0.9 * (1 - t)})`;
+            ctx.lineWidth = Math.max(2, scale * 0.08);
+            ctx.beginPath(); ctx.moveTo(x, y - scale * 1.2); ctx.lineTo(x2, y2); ctx.stroke();
+            break;
+          }
+          case 'rally':
+          case 'bastion':
+            (e.pts || []).forEach((pt) => {
+              const px = sx(pt.x);
+              const py = sy(pt.y);
+              if (e.type === 'rally') {
+                outlinedText('⬆', px, py - scale * (0.8 + t * 0.6), scale * 0.45, '#ff6b5a', 'rgba(0,0,0,0.8)', 900);
+              } else {
+                ctx.strokeStyle = `rgba(127,232,255,${1 - t})`;
+                ctx.lineWidth = Math.max(2, scale * 0.08);
+                ctx.beginPath();
+                for (let k = 0; k <= 6; k++) { const a = (k / 6) * Math.PI * 2; const rr = scale * (0.55 + 0.15 * t); if (k) ctx.lineTo(px + Math.cos(a) * rr, py + Math.sin(a) * rr); else ctx.moveTo(px + Math.cos(a) * rr, py + Math.sin(a) * rr); }
+                ctx.stroke();
+              }
+            });
+            if (e.type === 'bastion') {
+              ctx.strokeStyle = `rgba(180,92,255,${0.7 * (1 - t)})`;
+              ctx.lineWidth = 2;
+              ctx.beginPath(); ctx.arc(x, y, (e.r || 3) * scale * easeOut(t), 0, Math.PI * 2); ctx.stroke();
+            }
             break;
           case 'taunt':
             ctx.strokeStyle = `rgba(255,70,70,${1 - t})`;
