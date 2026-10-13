@@ -14,6 +14,7 @@ let onlineActive = false;
 let inQueue = false;
 let lastMatchWasOnline = false;
 let onlineDeckIds = [];
+let onlineMatch = null;    // { matchId, ranked } for the online match being played
 
 // Online smoothing: the server sends ~20 snapshots/sec. We draw slightly in the
 // past and blend between the two snapshots around that moment so units glide.
@@ -25,6 +26,7 @@ let arena = null;          // canvas renderer (prototype_arena.js)
 
 // Cards, arena rules and the match simulation are shared with the server (clash-sim.js)
 const Sim = window.ClashSim;
+const Road = window.TrophyRoad;
 const CARD_LIBRARY = Sim.CARD_LIBRARY;
 const CARD_MAP = Sim.CARD_MAP;
 const STARTER_DECK = Sim.STARTER_DECK;
@@ -146,7 +148,12 @@ const state = {
     stats: freshStats(),
     achievements: {},
     emoteMuted: false,
-    seenSpellNews: false
+    seenSpellNews: false,
+    road: Road.freshRoad(),   // Trophy Road: trophies, claimed rewards, ranked-match guard
+    decks: [[...STARTER_DECK], [...STARTER_DECK], [...STARTER_DECK]],
+    activeDeck: 0,
+    rankedAi: true,           // vs AI counts for trophies (arena AI deck, preset difficulty)
+    roadEmotes: {}            // emotes unlocked on the Trophy Road
   }
 };
 
@@ -159,6 +166,7 @@ const ui = {
     B: { name: null, base: null, tower: null, energy: null, gold: null }
   },
   baseBars: { A: null, B: null },
+  rank: { A: null, B: null },
   energyBars: { A: null, B: null },
   lobbyPanel: null, createRoom: null, joinCode: null, joinRoom: null, roomCodeDisplay: null,
   shareBox: null, shareLink: null, copyLink: null, lobbyStatus: null,
@@ -339,6 +347,20 @@ function applySavedProgress(saved) {
     state.progress.achievements = saved.achievements && typeof saved.achievements === 'object' ? saved.achievements : {};
     state.progress.emoteMuted = !!saved.emoteMuted;
     state.progress.seenSpellNews = !!saved.seenSpellNews;
+    state.progress.road = Road.normalize(saved.road);
+    const cleanDeck = (d) => (Array.isArray(d) ? d.filter((id) => typeof id === 'string' && CARD_MAP[id] && !CARD_MAP[id].token).slice(0, MAX_DECK) : []);
+    const decks = Array.isArray(saved.decks) ? saved.decks.slice(0, 3).map(cleanDeck) : [];
+    while (decks.length < 3) decks.push([]);
+    state.progress.activeDeck = clamp(Math.floor(Number(saved.activeDeck) || 0), 0, 2);
+    // Older saves only had one deck: it becomes deck 1
+    if (!Array.isArray(saved.decks)) decks[0] = cleanDeck(state.progress.deck);
+    state.progress.decks = decks;
+    state.progress.deck = decks[state.progress.activeDeck].length ? decks[state.progress.activeDeck] : state.progress.deck;
+    state.progress.rankedAi = saved.rankedAi !== false;
+    state.progress.roadEmotes = {};
+    if (saved.roadEmotes && typeof saved.roadEmotes === 'object') {
+      Object.keys(saved.roadEmotes).forEach((id) => { if (Sim.EMOTE_IDS.includes(id)) state.progress.roadEmotes[id] = true; });
+    }
   }
 }
 
@@ -347,6 +369,11 @@ function loadProgress() {
     applySavedProgress(JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}'));
   } catch (_) {}
   unlockInitial();
+  // A ranked match that never finished (page closed mid-battle) counts as a loss, once
+  const forfeit = Road.resolvePending(state.progress.road);
+  if (forfeit && forfeit.applied && forfeit.delta < 0) {
+    setTimeout(() => toast('🏳️', 'Ranked battle abandoned', `Leaving counts as a loss: ${forfeit.delta} 🏆`), 1200);
+  }
   const aiDeck = state.progress.aiDeck;
   // An AI deck that was never customised gets the newer default (which includes spells)
   if (!Array.isArray(aiDeck) || aiDeck.length === 0 || aiDeck.join() === STARTER_DECK.join()) {
@@ -408,6 +435,11 @@ function aiProfile() {
   return { thinkMin: p.thinkMin, thinkMax: p.thinkMax, strategicChance: p.strategicChance, aggression: p.aggression, leakAt: p.leakAt };
 }
 
+function presetProfile(key) {
+  const p = AI_PRESETS[key] || AI_PRESETS.normal;
+  return { thinkMin: p.thinkMin, thinkMax: p.thinkMax, strategicChance: p.strategicChance, aggression: p.aggression, leakAt: p.leakAt };
+}
+
 function playerName(side) {
   if (onlineActive || state.viewSource === 'online') return side === mySide ? 'You' : 'Opponent';
   if (side === 'B') return state.mode === 'ai' ? 'Enemy AI' : 'Commander B';
@@ -420,22 +452,60 @@ function sideAt(position) {
   return position === 'bottom' ? bottom : enemyOf(bottom);
 }
 
+// Ranked AI difficulty: 'custom' tuning isn't allowed to count, so it plays as Normal
+function rankedDifficulty() {
+  const d = state.progress.aiDifficulty;
+  return Road.AI_RULES[d] ? d : 'normal';
+}
+
+function averageDeckLevel(ids) {
+  if (!ids.length) return 1;
+  return Math.round(ids.reduce((sum, id) => sum + (cardProgress(id).level || 1), 0) / ids.length);
+}
+
+// Leaving a ranked match you've started playing counts as a loss (like closing the page does)
+function forfeitRunningRanked() {
+  const rm = state.rankedMatch;
+  if (!rm || !rm.engaged || !state.match || !state.match.running) return;
+  const res = Road.applyMatch(state.progress.road, { id: rm.id, result: 'loss', mode: 'ai', difficulty: rm.difficulty, forfeit: true });
+  state.rankedMatch = null;
+  saveProgress();
+  if (res.applied && res.delta < 0) toast('🏳️', 'Ranked battle abandoned', `Leaving counts as a loss: ${res.delta} 🏆`);
+}
+
 function setupMatch() {
+  forfeitRunningRanked();
   state.mode = ui.mode?.value || 'pvp';
   leaveQueue();
   lastMatchWasOnline = false;
   const b = state.progress.buildings;
   const vsAi = state.mode === 'ai';
+  const road = state.progress.road;
+  // Ranked vs AI: an arena-appropriate AI deck at your card level, and the difficulty's own
+  // tower health. Practice uses your AI deck and tuning, and doesn't touch trophies.
+  const ranked = vsAi && state.progress.rankedAi && !state.admin.active;
+  const difficulty = rankedDifficulty();
+  state.rankedMatch = ranked ? { id: `ai-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e9).toString(36)}`, difficulty, engaged: false } : null;
   const mine = { towerLevel: b.towerLevel, kingLevel: b.baseLevel };
-  const theirs = vsAi
-    ? { ...mine, towerMult: state.progress.aiHealth.towerMult, kingMult: state.progress.aiHealth.baseMult }
-    : mine;
+  const preset = AI_PRESETS[difficulty];
+  const theirs = !vsAi
+    ? mine
+    : ranked
+      ? { ...mine, towerMult: preset.towerMult, kingMult: preset.baseMult }
+      : { ...mine, towerMult: state.progress.aiHealth.towerMult, kingMult: state.progress.aiHealth.baseMult };
+  const myDeck = deckFor('A');
+  let aiDeck = deckEntries(deckFor('B'));
+  if (ranked) {
+    const lvl = averageDeckLevel(myDeck);
+    aiDeck = Sim.buildAiDeck(Road.arenaFor(road.trophies).id, Math.random).map((id) => ({ id, level: lvl, abilityUnlocked: false, mastery: 0 }));
+  }
   state.match = Sim.createMatch({
     seed: Math.floor(Math.random() * 2147483647),
-    decks: { A: deckEntries(deckFor('A')), B: deckEntries(deckFor('B')) },
+    decks: { A: deckEntries(myDeck), B: aiDeck },
     towers: { A: mine, B: theirs },
   });
-  state.ai = vsAi ? Sim.createAi('B', aiProfile()) : null;
+  state.ai = vsAi ? Sim.createAi('B', ranked ? presetProfile(difficulty) : aiProfile()) : null;
+  state.aiTag = !vsAi ? '' : ranked ? `🏆 Ranked · ${Road.AI_RULES[difficulty].label} AI` : 'Practice · no trophies';
   state.viewSource = 'local';
   state.running = true;
   state.winner = null;
@@ -459,6 +529,7 @@ function beginMatchPresentation() {
   if (ui.winOverlay) ui.winOverlay.hidden = true;
   if (!arena) return;
   arena.reset();
+  arena.setTheme(Road.activeTheme(state.progress.road));
   arena.setNames({ A: playerName('A'), B: playerName('B') });
   arena.announce('BATTLE!', { sub: state.viewSource === 'online' ? 'Destroy the enemy King Tower' : null, color: '#ffe680', dur: 1400, urgent: true });
   Sound.play('start');
@@ -512,8 +583,13 @@ function lerpSnap(a, b, t) {
   const lerp = (x, y) => x + (y - x) * k;
   const prevUnits = new Map(a.units.map((u) => [u.id, u]));
   const prevShots = new Map(a.projectiles.map((p) => [p.id, p]));
+  const prevZones = new Map((a.zones || []).map((z) => [z.id, z]));
   return {
     ...b,
+    zones: (b.zones || []).map((z) => {
+      const p = prevZones.get(z.id);
+      return p ? { ...z, x: lerp(p.x, z.x), y: lerp(p.y, z.y), age: lerp(p.age, z.age) } : z;
+    }),
     units: b.units.map((u) => {
       const p = prevUnits.get(u.id);
       return p ? { ...u, x: lerp(p.x, u.x), y: lerp(p.y, u.y), face: angleLerp(p.face, u.face, k) } : u;
@@ -532,8 +608,13 @@ function awardChest() {
   state.progress.chests.push({ id: `ch-${Date.now()}-${Math.random()}`, type: t, readyAt: Date.now() + ms });
 }
 
+// Cards that can drop in chests and rewards: everything from arenas you have reached
+function inCardPool(c) {
+  return c.arena <= Road.cardArena(state.progress.road);
+}
+
 function awardWinCard() {
-  const locked = CARD_LIBRARY.filter((c) => !cardProgress(c.id).unlocked);
+  const locked = CARD_LIBRARY.filter((c) => !cardProgress(c.id).unlocked && inCardPool(c));
   const unlocked = CARD_LIBRARY.filter((c) => cardProgress(c.id).unlocked);
 
   // 25% chance to unlock a brand-new card
@@ -601,6 +682,7 @@ function showWinOverlay(result, cardAward, goldBonus, isOnline, extra) {
   if (ui.winAch) {
     ui.winAch.innerHTML = (x.achievements || []).map((a) => `<div class="win-ach-row"><span>${a.icon}</span><b>${a.name}</b><em>+${a.gold} gold${a.emote ? ' · new emote!' : ''}</em></div>`).join('');
   }
+  renderWinTrophies(x.trophy, x.friendly);
   if (ui.confetti) {
     ui.confetti.innerHTML = won ? confettiHtml(46) : '';
   }
@@ -676,6 +758,9 @@ function onVictory(winner) {
     writeLog(`${playerName('B')} wins. ${reason}. Press Start Match to rematch.`);
   }
   const result = winner === 'draw' ? 'draw' : winner === 'A' ? 'win' : 'loss';
+  const rm = state.rankedMatch;
+  state.rankedMatch = null;
+  const trophy = rm ? settleRanked({ id: rm.id, result, mode: 'ai', difficulty: rm.difficulty }) : null;
   const snap = state.snapCur;
   const me = snap && snap.players.A;
   const newAch = recordMatch({
@@ -699,7 +784,27 @@ function onVictory(winner) {
     crowns: snap ? snap.players[crownSide].crowns : 0,
     stats: matchStats(snap, crownSide),
     achievements: newAch,
+    trophy,
   }));
+}
+
+// Apply a ranked result to the Trophy Road (at most once per match id) and announce a new arena
+function settleRanked(m) {
+  const road = state.progress.road;
+  const res = Road.applyMatch(road, m);
+  if (!res.applied) return null;
+  saveProgress();
+  renderRoadBadge();
+  if (res.arenaUp) {
+    const a = res.arenaUp;
+    road.seenArena = Math.max(road.seenArena || 0, a.id);
+    saveProgress();
+    setTimeout(() => {
+      Sound.play('arena');
+      toast(a.icon, `New arena: ${a.name}!`, 'New cards unlocked and rewards waiting on the Trophy Road.');
+    }, 2600);
+  }
+  return res;
 }
 
 function matchStats(snap, side) {
@@ -782,8 +887,17 @@ function emoteUnlocked(id) {
   const meta = EmoteArt.EMOTES.find((e) => e.id === id);
   if (!meta) return false;
   if (meta.starter || state.admin.active) return true;
+  if (state.progress.roadEmotes[id]) return true;
   const ach = ACHIEVEMENTS.find((a) => a.emote === id);
   return !!(ach && state.progress.achievements[ach.id]);
+}
+
+// How to unlock a locked emote, for tooltips
+function emoteUnlockHint(id) {
+  const ach = ACHIEVEMENTS.find((a) => a.emote === id);
+  if (ach) return `earn “${ach.name}”: ${ach.desc}`;
+  const m = Road.MILESTONES.find((x) => x.rewards.some((r) => r.type === 'emote' && r.id === id));
+  return m ? `reach ${m.trophies} 🏆 on the Trophy Road` : 'locked';
 }
 
 // The side whose emotes are shown as "mine" (muting only hides the other side)
@@ -811,8 +925,7 @@ function buildEmoteGrid() {
   if (!ui.emoteGrid) return;
   ui.emoteGrid.innerHTML = EmoteArt.EMOTES.map((e) => {
     const open = emoteUnlocked(e.id);
-    const ach = ACHIEVEMENTS.find((a) => a.emote === e.id);
-    const tip = open ? e.name : `Locked: earn “${ach ? ach.name : '?'}”`;
+    const tip = open ? e.name : `Locked: ${emoteUnlockHint(e.id)}`;
     return `<button type="button" class="emote-choice${open ? '' : ' locked'}" data-emote="${e.id}" title="${tip}" aria-label="${tip}"><canvas width="112" height="112"></canvas><span>${open ? e.name : '🔒'}</span></button>`;
   }).join('');
   drawEmoteGrid(0.35);
@@ -861,8 +974,7 @@ function emoteButtonFor(side) {
 
 function sendEmote(side, id) {
   if (!emoteUnlocked(id)) {
-    const ach = ACHIEVEMENTS.find((a) => a.emote === id);
-    if (ui.emoteHint) ui.emoteHint.textContent = ach ? `Unlock with “${ach.name}”: ${ach.desc}` : 'Locked';
+    if (ui.emoteHint) ui.emoteHint.textContent = `To unlock: ${emoteUnlockHint(id)}`;
     Sound.play('reject');
     return;
   }
@@ -943,6 +1055,7 @@ function renderStatus() {
     const king = towers.find((t) => t.tower === 'king');
     const princesses = towers.filter((t) => t.tower === 'princess').map((t) => (t.hp > 0 ? '⬡' : '✕'));
     setText(s.name, playerName(side));
+    setText(ui.rank[slot], rankLine(side));
     setText(s.base, Math.ceil(king.hp));
     setText(s.tower, `${princesses[0]}♛${princesses[1]}  👑${p.crowns}`);
     // Like the real game, you can't see your online opponent's elixir
@@ -1105,6 +1218,10 @@ const Sound = (() => {
     celebrate: () => [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.1, { type: 'triangle', delay: i * 0.06, vol: 0.05 })),
     facepalm: () => [300, 210].forEach((f, i) => tone(f, 0.22, { type: 'triangle', delay: i * 0.2, vol: 0.05 })),
     cool: () => [880, 1320].forEach((f, i) => tone(f, 0.12, { delay: i * 0.1, vol: 0.045 })),
+    trophy: () => [523, 784, 1046, 1568].forEach((f, i) => tone(f, 0.12, { type: 'triangle', delay: i * 0.07, vol: 0.05 })),
+    sleepy: () => tone(300, 0.6, { slide: 0.6, vol: 0.035 }),
+    heart: () => [660, 880].forEach((f, i) => tone(f, 0.16, { delay: i * 0.14, vol: 0.045 })),
+    thinking: () => [440, 470, 440].forEach((f, i) => tone(f, 0.1, { type: 'triangle', delay: i * 0.12, vol: 0.035 })),
   };
 
   const SOUNDS = {
@@ -1130,8 +1247,21 @@ const Sound = (() => {
     win: () => [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.25, { type: 'triangle', delay: i * 0.12, vol: 0.06 })),
     lose: () => [392, 330, 262].forEach((f, i) => tone(f, 0.35, { type: 'triangle', delay: i * 0.16, vol: 0.05 })),
     draw: () => [440, 440].forEach((f, i) => tone(f, 0.2, { delay: i * 0.2, vol: 0.04 })),
+    freeze: () => { tone(1800, 0.3, { type: 'triangle', slide: 0.5, vol: 0.03 }); noise(0.25, 0.04); },
+    zone: () => { tone(220, 0.35, { type: 'sine', slide: 1.5, vol: 0.035 }); noise(0.2, 0.025); },
+    laser: () => { tone(2200, 0.35, { type: 'sawtooth', slide: 0.2, vol: 0.025 }); noise(0.3, 0.06); },
+    drop: () => tone(900, 0.18, { type: 'triangle', slide: 0.5, vol: 0.02 }),
+    elixir: () => [880, 1320].forEach((f, i) => tone(f, 0.08, { delay: i * 0.06, vol: 0.03 })),
+    shieldBreak: () => { tone(1200, 0.12, { type: 'square', slide: 0.3, vol: 0.025 }); noise(0.12, 0.04); },
+    popup: () => tone(160, 0.18, { type: 'square', slide: 2, vol: 0.025 }),
+    dash: () => { noise(0.12, 0.03); tone(500, 0.12, { slide: 2.2, vol: 0.025 }); },
+    taunt: () => [700, 520].forEach((f, i) => tone(f, 0.1, { type: 'square', delay: i * 0.1, vol: 0.018 })),
+    claim: () => [784, 1046, 1318].forEach((f, i) => tone(f, 0.12, { type: 'triangle', delay: i * 0.06, vol: 0.05 })),
+    trophyUp: () => [523, 659, 784, 1046, 1318].forEach((f, i) => tone(f, 0.1, { type: 'triangle', delay: i * 0.05, vol: 0.04 })),
+    trophyDown: () => [392, 349, 311].forEach((f, i) => tone(f, 0.14, { type: 'triangle', delay: i * 0.08, vol: 0.035 })),
+    arena: () => [392, 523, 659, 784, 1046, 1318, 1568].forEach((f, i) => tone(f, 0.18, { type: 'triangle', delay: i * 0.09, vol: 0.05 })),
   };
-  const MIN_GAP = { hit: 0.07, splash: 0.12, death: 0.08, rocket: 0.1, horn: 0.5 };
+  const MIN_GAP = { hit: 0.07, splash: 0.12, death: 0.08, rocket: 0.1, horn: 0.5, drop: 0.15, elixir: 0.2, taunt: 1, popup: 0.3, dash: 0.2 };
 
   function play(name, arg) {
     if (!enabled || !ctx || !SOUNDS[name]) return;
@@ -1158,8 +1288,10 @@ function handleFx(list) {
   for (const f of shown) {
     switch (f.type) {
       case 'deploy': case 'tower': case 'splash': case 'death': case 'hit': Sound.play(f.type); break;
-      case 'cast': Sound.play('cast'); break;
-      case 'spell': Sound.play(f.kind === 'shock' ? 'shock' : f.kind === 'firebomb' ? 'boom' : 'rocket'); break;
+      case 'cast': Sound.play(CARD_MAP[f.cardId] && CARD_MAP[f.cardId].zone ? 'zone' : 'cast'); break;
+      case 'spell': Sound.play(f.kind === 'shock' ? 'shock' : f.kind === 'firebomb' ? 'boom' : f.kind === 'frost' ? 'freeze' : 'rocket'); break;
+      case 'laser': Sound.play('laser'); break;
+      case 'drop': case 'elixir': case 'shieldBreak': case 'popup': case 'dash': case 'taunt': Sound.play(f.type); break;
       case 'crown': Sound.play('crown'); break;
       case 'kingWake': Sound.play('horn'); break;
       case 'emote': Sound.play('emote', f.emote); break;
@@ -1231,6 +1363,13 @@ function tryDeployAt(owner, cardId, x, y) {
   }
   const res = Sim.deploy(state.match, owner, cardId, x, y);
   if (!res.ok) { rejectDeploy(res.reason, owner, cardId); return false; }
+  const rm = state.rankedMatch;
+  if (rm && owner === 'A' && !rm.engaged) {
+    // From your first card on, closing the page or leaving counts as a loss
+    rm.engaged = true;
+    Road.beginRanked(state.progress.road, rm.id, 'ai', rm.difficulty);
+    saveProgress();
+  }
   if (owner === 'A') {
     const cp = cardProgress(cardId);
     cp.mastery = (cp.mastery || 0) + 0.25;
@@ -1449,7 +1588,7 @@ function grantTierRewards(tier) {
 
   const maxIdx = RARITY_ORDER.indexOf(maxRarity);
   const lockedEligible = CARD_LIBRARY.filter((c) => {
-    if (cardProgress(c.id).unlocked) return false;
+    if (cardProgress(c.id).unlocked || !inCardPool(c)) return false;
     return RARITY_ORDER.indexOf(c.rarity) <= maxIdx;
   });
 
@@ -1665,8 +1804,8 @@ function unlockAbility(id) {
 
 function setDeckSlot(slot, cardId) {
   if (slot < 0 || slot >= MAX_DECK) return;
-  if (!cardProgress(cardId).unlocked) return;
-  const deck = [...state.progress.deck];
+  if (!CARD_MAP[cardId] || CARD_MAP[cardId].token || !cardProgress(cardId).unlocked) return;
+  const deck = [...activeDeckIds()];
   const other = deck.indexOf(cardId);
   if (other >= 0) {
     const temp = deck[slot];
@@ -1676,9 +1815,11 @@ function setDeckSlot(slot, cardId) {
     deck[slot] = cardId;
   }
   state.progress.deck = deck.slice(0, MAX_DECK);
+  state.progress.decks[state.progress.activeDeck] = state.progress.deck;
   saveProgress();
   renderCollection();
   renderDecks();
+  writeLog(`${CARD_MAP[cardId].name} is in slot ${slot + 1} of deck ${state.progress.activeDeck + 1}.`);
 }
 
 function setAiDeckSlot(slot, cardId) {
@@ -1700,6 +1841,10 @@ function setAiDeckSlot(slot, cardId) {
 
 function renderProgress() {
   if (ui.goldAmount) ui.goldAmount.textContent = String(state.progress.gold);
+  renderRoadBadge();
+  if (ui.ranked) ui.ranked.checked = !!state.progress.rankedAi;
+  if (ui.earnChest) ui.earnChest.hidden = !state.admin.active;
+  document.body.classList.toggle('ranked-ai', !!state.progress.rankedAi);
   if (ui.towerLevel) ui.towerLevel.textContent = String(state.progress.buildings.towerLevel);
   if (ui.baseLevel) ui.baseLevel.textContent = String(state.progress.buildings.baseLevel);
   const bl = state.progress.buildings;
@@ -1746,15 +1891,22 @@ function speedLabel(c) {
 // Plain-language summary of how a card behaves in battle
 function cardTraits(c) {
   if (c.spell) {
-    const sp = [c.role, `cast anywhere, radius ${c.splash} tiles`, `${Math.round(c.towerMult * 100)}% damage to crown towers`];
-    if (c.proj !== 'shock') sp.push('launched from your King Tower');
+    const sp = [c.role, `cast anywhere, radius ${c.splash} tiles`];
+    if (c.friendly) sp.push('affects your own troops');
+    else if (c.towerMult > 0 && c.dmg > 0) sp.push(`${Math.round(c.towerMult * 100)}% damage to crown towers`);
+    if (!c.instant && !c.zone && c.proj !== 'shock') sp.push('launched from your King Tower');
     if (c.stun) sp.push(`stuns for ${c.stun}s and resets attacks`);
+    if (c.freeze) sp.push(`freezes for ${c.freeze}s`);
     if (c.knockback) sp.push('knocks troops back');
     if (c.waves > 1) sp.push(`${c.waves} waves`);
+    if (c.zone && c.zone.dur && c.zone.kind !== 'spawn') sp.push(`lasts ${c.zone.dur}s`);
     return sp.join(' • ');
   }
   const parts = [c.role];
-  parts.push(c.targets === 'buildings' ? 'attacks buildings only' : c.targets === 'any' ? 'hits air & ground' : 'hits ground only');
+  parts.push(c.targets === 'buildings' ? 'attacks buildings only'
+    : c.targets === 'any' ? 'hits air & ground'
+      : c.targets === 'air' ? 'hits air only'
+        : c.targets === 'none' ? 'does not attack' : 'hits ground only');
   if (c.air) parts.push('flying');
   if (c.swarmCount > 1) parts.push(`${c.swarmCount} units`);
   if (c.splash) parts.push(`splash ${c.splash} tiles`);
@@ -1767,109 +1919,43 @@ function cardTraits(c) {
   if (c.minRange) parts.push(`can't hit within ${c.minRange} tiles`);
   if (c.style === 'double') parts.push('hits 2 targets');
   if (c.style === 'burst') parts.push('bonus follow-up shot');
+  if (c.anywhere) parts.push('deploy anywhere');
+  const m = c.mech || {};
+  if (m.spawner) parts.push(`spawns ${CARD_MAP[m.spawner.card].name} every ${m.spawner.every}s`);
+  if (m.deathSpawn) parts.push(`${m.deathSpawn.count} ${CARD_MAP[m.deathSpawn.card].name}s on death`);
+  if (m.elixir) parts.push(`+${m.elixir.amount} elixir every ${m.elixir.every}s`);
+  if (m.taunt) parts.push('taunts nearby enemies');
+  if (m.hide) parts.push('hides underground');
+  if (m.ramp) parts.push('damage ramps up');
+  if (m.shield) parts.push(`${m.shield} shield`);
+  if (m.heal) parts.push(`heals allies ${m.heal.perSec}/s`);
+  if (m.slowOnHit) parts.push('slows on hit');
+  if (m.dash) parts.push('dashes in');
+  if (m.pierce) parts.push('piercing blade');
+  if (m.chargeShot) parts.push('charged shot');
+  if (m.zap) parts.push('stuns in a chain');
+  if (c.crownMult < 1) parts.push(`${Math.round(c.crownMult * 100)}% damage to crown towers`);
   return parts.join(' • ');
 }
 
-function filterCards() {
-  const q = String(ui.cardSearch?.value || '').trim().toLowerCase();
-  if (!q) return CARD_LIBRARY;
-  return CARD_LIBRARY.filter((c) => c.name.toLowerCase().includes(q) || c.rarity.includes(q) || c.role.includes(q) || c.style.includes(q));
-}
-
+// The deck editor and collection grid live in prototype_road.js
 function renderCollection() {
-  const deck = state.progress.deck.slice(0, MAX_DECK);
-  while (deck.length < MAX_DECK) deck.push(STARTER_DECK[deck.length % STARTER_DECK.length]);
-  state.progress.deck = deck;
-
-  const aiDeck = state.progress.aiDeck.slice(0, MAX_DECK);
-  while (aiDeck.length < MAX_DECK) aiDeck.push(STARTER_DECK[aiDeck.length % STARTER_DECK.length]);
-  state.progress.aiDeck = aiDeck;
-
-  if (ui.deckSlots) {
-    ui.deckSlots.innerHTML = deck.map((id, idx) => {
-      const card = CARD_MAP[id];
-      const cp = cardProgress(id);
-      return `<button class="deck-slot" data-slot="${idx}"><span>${idx + 1}</span>${card.icon} ${card.name}<small>Lv ${cp.level}</small></button>`;
-    }).join('');
-
-    ui.deckSlots.querySelectorAll('.deck-slot').forEach((el) => {
-      el.addEventListener('click', () => {
-        const slot = Number(el.dataset.slot);
-        if (state.selectedCard && state.selectedCard.owner === 'collection') setDeckSlot(slot, state.selectedCard.type);
-        else writeLog('Select a collection card, then click a deck slot to assign it.');
-      });
-    });
-  }
-
-  if (ui.aiDeckSlots) {
-    ui.aiDeckSlots.innerHTML = aiDeck.map((id, idx) => {
-      const card = CARD_MAP[id];
-      const cp = cardProgress(id);
-      return `<button class="deck-slot ai-deck-slot" data-ai-slot="${idx}"><span>AI ${idx + 1}</span>${card.icon} ${card.name}<small>Lv ${cp.level}</small></button>`;
-    }).join('');
-
-    ui.aiDeckSlots.querySelectorAll('[data-ai-slot]').forEach((el) => {
-      el.addEventListener('click', () => {
-        const slot = Number(el.getAttribute('data-ai-slot'));
-        if (state.selectedCard && state.selectedCard.owner === 'collection') setAiDeckSlot(slot, state.selectedCard.type);
-        else writeLog('Select a collection card, then click an AI deck slot to assign it.');
-      });
-    });
-  }
-
-  if (!ui.cardCollection) return;
-  ui.cardCollection.innerHTML = filterCards().map((c) => {
-    const cp = cardProgress(c.id);
-    const unlocked = cp.unlocked;
-    const inDeck = deck.includes(c.id);
-    const next = cp.level + 1;
-    const need = copiesNeed(next);
-    const upCost = cardUpgradeCost(c.id, next);
-    const canUp = unlocked && cp.level < 14 && cp.copies >= need && state.progress.gold >= upCost;
-    const canAbility = unlocked && !cp.abilityUnlocked && cp.level >= c.ability.minLevel && cp.mastery >= c.ability.minMastery && state.progress.gold >= 400;
-    let statLine = 'Locked';
-    let nextLine = '';
-    if (unlocked) {
-      const nowStats = getCardStats(c.id);
-      const nextStats = cp.level < 14 ? getCardStatsAtLevel(c.id, cp.level + 1, cp.abilityUnlocked, cp.mastery || 0) : null;
-      statLine = nowStats.spell
-        ? `Lv ${cp.level} • DMG ${Math.round(nowStats.dmgScaled)} (towers ${Math.round(nowStats.dmgScaled * nowStats.towerMult)}) • Radius ${nowStats.splash} tiles`
-        : `Lv ${cp.level} • HP ${nowStats.hpScaled} • DMG ${Math.round(nowStats.dmgScaled)} every ${nowStats.cd}s • Range ${nowStats.proj === 'melee' ? 'melee' : `${nowStats.range} tiles`} • ${speedLabel(nowStats)}`;
-      if (nextStats) {
-        nextLine = nextStats.spell ? `Next Lv: DMG ${Math.round(nextStats.dmgScaled)}` : `Next Lv: HP ${nextStats.hpScaled} • DMG ${Math.round(nextStats.dmgScaled)}`;
-      }
-    }
-    return `<article class="collection-card ${unlocked ? '' : 'locked'} ${inDeck ? 'in-deck' : ''} ${c.winCondition ? 'win-condition' : ''} ${c.swarmCount > 1 ? 'swarm-card' : ''}" data-card="${c.id}"><header><strong>${c.icon} ${c.name}</strong><span class="rarity-${c.rarity}">${RARITY_STYLE[c.rarity].label}</span>${c.winCondition ? '<span class="wc-badge">👑 Win Condition</span>' : ''}${c.swarmCount > 1 ? `<span class="swarm-badge">🐝 ×${c.swarmCount} Swarm</span>` : ''}</header><p>${unlocked ? `Copies ${cp.copies} • Mastery ${Math.floor(cp.mastery)}` : 'Locked'}</p><p>${statLine}</p><p>${unlocked ? `Cost ${c.cost} • ${cardTraits(c)}` : 'Unknown stats'}</p><p>${nextLine}</p><div class="collection-actions">${unlocked ? `<button data-select="${c.id}">${inDeck ? 'In Deck' : 'Select'}</button>` : '<button disabled>Locked</button>'}${unlocked ? `<button data-up="${c.id}" ${canUp ? '' : 'disabled'}>Level Up (${need} copies, ${upCost}g)</button>` : ''}${unlocked ? `<button data-ability="${c.id}" ${canAbility ? '' : 'disabled'}>${cp.abilityUnlocked ? `✓ ${c.ability.name}` : `${c.ability.name} (Lv${c.ability.minLevel}, ${c.ability.minMastery}M, 400g)`}</button>` : ''}</div></article>`;
-  }).join('');
-
-  ui.cardCollection.querySelectorAll('[data-select]').forEach((b) => {
-    b.addEventListener('click', () => {
-      const id = b.getAttribute('data-select');
-      if (!id) return;
-      state.selectedCard = { owner: 'collection', type: id };
-      writeLog(`Selected ${CARD_MAP[id].name}. Click a deck slot (1-8).`);
-    });
-  });
-
-  ui.cardCollection.querySelectorAll('[data-up]').forEach((b) => {
-    b.addEventListener('click', () => {
-      const id = b.getAttribute('data-up');
-      if (!id) return;
-      upgradeCard(id);
-    });
-  });
-
-  ui.cardCollection.querySelectorAll('[data-ability]').forEach((b) => {
-    b.addEventListener('click', () => {
-      const id = b.getAttribute('data-ability');
-      if (!id) return;
-      unlockAbility(id);
-    });
-  });
+  renderDeckEditor();
 }
 
 function bindProgressUi() {
+  bindDeckEditor();
+  bindRoad();
+  ui.ranked?.addEventListener('change', () => {
+    state.progress.rankedAi = !!ui.ranked.checked;
+    saveProgress();
+    renderProgress();
+    writeLog(state.progress.rankedAi
+      ? 'Ranked vs AI: trophies count. The AI uses an arena deck and the chosen difficulty.'
+      : 'Practice vs AI: no trophies. The AI uses your practice deck and HP tuning.');
+  });
   ui.earnChest?.addEventListener('click', () => {
+    if (!state.admin.active) { writeLog('Free chests are an admin tool. Win matches or climb the Trophy Road for chests.'); return; }
     awardChest();
     saveProgress();
     renderProgress();
@@ -1984,14 +2070,19 @@ function ensureSocket() {
     if (ui.winRematch) { ui.winRematch.disabled = true; ui.winRematch.textContent = 'Waiting...'; }
   });
 
-  socket.on('match_start', showMatchOnline);
+  socket.on('match_start', (info) => showMatchOnline(info || {}));
   // Emotes sent after the final whistle arrive outside the normal state updates
   socket.on('fx', (list) => handleFx(Array.isArray(list) ? list : []));
   socket.on('emote_rejected', ({ reason } = {}) => { writeLog(reason || 'Emote not sent.'); });
   socket.on('state_update', applyServerState);
-  socket.on('match_over', ({ winner }) => handleOnlineVictory(winner));
+  socket.on('match_over', (info = {}) => handleOnlineVictory(info.winner, info));
 
-  socket.on('opponent_left', () => {
+  socket.on('opponent_left', (info = {}) => {
+    // The player who stays wins by forfeit (ranked matches count it)
+    if (onlineActive && onlineMatch) {
+      handleOnlineVictory(mySide, info, true);
+      return;
+    }
     state.running = false;
     onlineActive = false;
     state.selectedCard = null;
@@ -2079,7 +2170,17 @@ function scrollToBattle() {
   if (wrap) wrap.scrollIntoView({ block: 'start', behavior: 'smooth' });
 }
 
-function showMatchOnline() {
+function showMatchOnline(info) {
+  forfeitRunningRanked();
+  // A previous ranked match that never got a result (connection lost) is settled as a loss first
+  const road = state.progress.road;
+  if (road.pending && road.pending.id !== info.matchId) {
+    const old = Road.resolvePending(road);
+    if (old && old.applied && old.delta < 0) toast('🏳️', 'Unfinished ranked battle', `Counted as a loss: ${old.delta} 🏆`);
+  }
+  onlineMatch = { matchId: String(info.matchId || `online-${Date.now()}`), ranked: !!info.ranked };
+  if (onlineMatch.ranked) Road.beginRanked(road, onlineMatch.matchId, 'online');
+  saveProgress();
   onlineActive = true;
   lastMatchWasOnline = true;
   inQueue = false;
@@ -2096,7 +2197,7 @@ function showMatchOnline() {
   netFx = [];
   emoteUi.lastSent = { A: -1e9, B: -1e9 };
   beginMatchPresentation();
-  writeLog(`Online match started. Your towers are at the bottom.`);
+  writeLog(onlineMatch.ranked ? 'Ranked online match started 🏆. Your towers are at the bottom.' : 'Friendly online match started (no trophies). Your towers are at the bottom.');
   scrollToBattle();
 }
 
@@ -2140,8 +2241,11 @@ function interpolateNet() {
   }
 }
 
-function handleOnlineVictory(winner) {
+function handleOnlineVictory(winner, info, forfeit) {
+  if (!onlineActive) return;
   onlineActive = false;
+  const om = onlineMatch;
+  onlineMatch = null;
   state.running = false;
   state.selectedCard = null;
   // Show the final position
@@ -2152,7 +2256,7 @@ function handleOnlineVictory(winner) {
   const draw = winner === 'draw';
   let cardAward = null;
   let goldBonus = 0;
-  const reason = endReasonText(last && last.endReason);
+  const reason = forfeit ? 'Opponent left the match' : endReasonText(last && last.endReason);
   if (won) {
     goldBonus = 200;
     state.progress.gold += goldBonus;
@@ -2168,6 +2272,7 @@ function handleOnlineVictory(winner) {
     writeLog(`Opponent wins online. ${reason}.`);
   }
   const result = draw ? 'draw' : won ? 'win' : 'loss';
+  const trophy = om && om.ranked ? settleRanked({ id: om.matchId, result, mode: 'online' }) : null;
   const mine = last ? last.players[mySide] : null;
   const newAch = recordMatch({ result, crowns: mine ? mine.crowns : 0, kingKill: won && last?.endReason === 'king', hardAi: false, online: true });
   saveProgress();
@@ -2180,6 +2285,8 @@ function handleOnlineVictory(winner) {
     crowns: mine ? mine.crowns : 0,
     stats: matchStats(last, mySide),
     achievements: newAch,
+    trophy,
+    friendly: !!(om && !om.ranked),
   }));
 }
 
@@ -2240,6 +2347,17 @@ function cacheUi() {
   ui.status.B.tower = $('ptTowerB');
   ui.status.B.energy = $('ptEnergyB');
   ui.status.B.gold = $('ptGoldB');
+  ui.rank.A = $('ptRankA');
+  ui.rank.B = $('ptRankB');
+  ui.roadBtn = $('ptRoadBtn');
+  ui.roadOverlay = $('ptRoadOverlay');
+  ui.ranked = $('ptRanked');
+  ui.rankedWrap = $('ptRankedWrap');
+  ui.winTrophies = $('ptWinTrophies');
+  ui.deckTabs = $('ptDeckTabs');
+  ui.deckSummary = $('ptDeckSummary');
+  ui.collFilters = $('ptCollFilters');
+  ui.collCount = $('ptCollCount');
   ui.baseBars.A = $('ptBaseBarA');
   ui.baseBars.B = $('ptBaseBarB');
   ui.energyBars.A = $('ptEnergyBarA');
@@ -2358,7 +2476,12 @@ function bindCore() {
       stats: freshStats(),
       achievements: {},
       emoteMuted: false,
-      seenSpellNews: true
+      seenSpellNews: true,
+      road: Road.freshRoad(),
+      decks: [[...STARTER_DECK], [...STARTER_DECK], [...STARTER_DECK]],
+      activeDeck: 0,
+      rankedAi: true,
+      roadEmotes: {}
     };
     unlockInitial();
     state.progress.aiDeck = [...AI_DEFAULT_DECK];
@@ -2392,6 +2515,12 @@ function unlockPrototype() {
   arena.onCue = (cue) => Sound.play(cue === 'double' ? 'double' : 'overtime');
   bindCore();
   renderAchievements();
+  renderRoadBadge();
+  if (!state.progress.road.seenNews) {
+    state.progress.road.seenNews = 1;
+    saveProgress();
+    setTimeout(() => toast('🏆', 'New: Trophy Road!', 'Win ranked battles to climb 10 arenas and unlock 28 new cards, emotes and chests.'), 1500);
+  }
   if (!state.progress.seenSpellNews) {
     state.progress.seenSpellNews = true;
     saveProgress();

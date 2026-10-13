@@ -86,6 +86,8 @@ function startQueueMatch(idA, idB) {
     state: null,
     interval: null,
     rematchVotes: 0,
+    ranked: true, // matchmaking games count for trophies; private rooms and rematches are friendly
+    matchNo: 0,
   };
   rooms.set(code, room);
   socketRoom.set(idA, code);
@@ -95,8 +97,8 @@ function startQueueMatch(idA, idB) {
   console.log(`[Match] Room ${code}: ${idA} vs ${idB}`);
   sockA.emit('room_joined', { code, side: 'A' });
   sockB.emit('room_joined', { code, side: 'B' });
-  io.to(code).emit('match_start', { code });
   startRoom(room);
+  io.to(code).emit('match_start', matchInfo(room));
 }
 
 
@@ -116,8 +118,16 @@ function deckOf(socketId) {
   return io.sockets.sockets.get(socketId)?.data.deck || Sim.normalizeDeck(null);
 }
 
+// What clients need to know about the match that is starting. The id is unique per match, so a
+// client can make sure a result is only ever counted once.
+function matchInfo(room) {
+  return { code: room.code, ranked: !!room.ranked, matchId: `${room.code}-${room.matchNo}-${room.startedAt}` };
+}
+
 function startRoom(room) {
   if (room.interval) clearInterval(room.interval);
+  room.matchNo = (room.matchNo || 0) + 1;
+  room.startedAt = Date.now();
   room.state = Sim.createMatch({
     seed: Math.floor(Math.random() * 2147483647),
     decks: { A: deckOf(room.sockets.A), B: deckOf(room.sockets.B) },
@@ -140,7 +150,7 @@ function startRoom(room) {
     snap.fx = fx;
     io.to(room.code).emit('state_update', snap);
     if (!room.state.running && room.state.winner) {
-      io.to(room.code).emit('match_over', { winner: room.state.winner });
+      io.to(room.code).emit('match_over', { winner: room.state.winner, ...matchInfo(room) });
       clearInterval(room.interval);
       room.interval = null;
     }
@@ -183,6 +193,8 @@ io.on('connection', socket => {
       state: null,
       interval: null,
       rematchVotes: 0,
+      ranked: false,
+      matchNo: 0,
     };
     rooms.set(code, room);
     socketRoom.set(socket.id, code);
@@ -203,8 +215,8 @@ io.on('connection', socket => {
     socketRoom.set(socket.id, upper);
     socket.join(upper);
     socket.emit('room_joined', { code: upper, side: 'B' });
-    io.to(upper).emit('match_start', { code: upper });
     startRoom(room);
+    io.to(upper).emit('match_start', matchInfo(room));
     console.log(`Room ${upper} started`);
   });
 
@@ -239,8 +251,9 @@ io.on('connection', socket => {
     room.rematchVotes = (room.rematchVotes || 0) + 1;
     if (room.rematchVotes >= 2) {
       room.rematchVotes = 0;
-      io.to(code).emit('match_start', { code });
+      room.ranked = false; // rematches are friendly, so two players can't farm trophies off each other
       startRoom(room);
+      io.to(code).emit('match_start', matchInfo(room));
     } else {
       socket.emit('rematch_waiting', {});
     }
@@ -269,7 +282,8 @@ io.on('connection', socket => {
       if (room) {
         if (room.state?.running) {
           room.state.running = false;
-          io.to(code).emit('opponent_left', {});
+          // The player who stayed wins by forfeit
+          io.to(code).emit('opponent_left', matchInfo(room));
         }
         destroyRoom(code);
       }

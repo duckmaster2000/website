@@ -17,6 +17,11 @@
     { id: 'cool', name: 'Too easy', starter: false },
     { id: 'facepalm', name: 'Seriously?', starter: false },
     { id: 'king', name: 'King laugh', starter: false },
+    // Trophy Road emotes
+    { id: 'heart', name: 'Love it', starter: false },
+    { id: 'thinking', name: 'Hmm…', starter: false },
+    { id: 'sleepy', name: 'Zzz', starter: false },
+    { id: 'trophy', name: 'Champion', starter: false },
   ];
 
   const INK = '#5b3200';
@@ -394,6 +399,127 @@
         g.restore();
       }
       g.restore();
+    },
+
+    heart(g, cx, cy, R, t) {
+      // A beating heart with sparkles
+      const beat = 1 + Math.max(0, Math.sin(t * 7)) * 0.12;
+      g.save();
+      g.translate(cx, cy + R * 0.05);
+      g.scale(beat, beat);
+      const grad = g.createLinearGradient(0, -R, 0, R);
+      grad.addColorStop(0, '#ff8fa8');
+      grad.addColorStop(1, '#e0244a');
+      g.fillStyle = grad;
+      g.beginPath();
+      g.moveTo(0, R * 0.85);
+      g.bezierCurveTo(-R * 1.3, -R * 0.05, -R * 0.75, -R * 1.05, 0, -R * 0.45);
+      g.bezierCurveTo(R * 0.75, -R * 1.05, R * 1.3, -R * 0.05, 0, R * 0.85);
+      g.fill();
+      g.lineWidth = R * 0.07;
+      g.strokeStyle = '#8a0f2a';
+      g.stroke();
+      g.fillStyle = 'rgba(255,255,255,0.45)';
+      g.beginPath(); g.ellipse(-R * 0.4, -R * 0.35, R * 0.18, R * 0.1, -0.7, 0, Math.PI * 2); g.fill();
+      g.restore();
+      const tw = (Math.sin(t * 5) + 1) / 2;
+      star(g, cx + R * 0.95, cy - R * 0.75, R * (0.12 + tw * 0.12));
+      star(g, cx - R * 0.95, cy + R * 0.55, R * (0.2 - tw * 0.08));
+    },
+
+    thinking(g, cx, cy, R, t) {
+      face(g, cx, cy, R);
+      // One raised brow, eyes glancing up
+      line(g, [[cx - R * 0.55, cy - R * 0.42], [cx - R * 0.2, cy - R * 0.5]], R * 0.08);
+      line(g, [[cx + R * 0.2, cy - R * 0.62], [cx + R * 0.55, cy - R * 0.5]], R * 0.08);
+      const look = Math.sin(t * 1.5) * R * 0.05;
+      g.fillStyle = INK;
+      g.beginPath(); g.arc(cx - R * 0.36 + look, cy - R * 0.22, R * 0.09, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.arc(cx + R * 0.36 + look, cy - R * 0.28, R * 0.09, 0, Math.PI * 2); g.fill();
+      line(g, [[cx - R * 0.25, cy + R * 0.42], [cx + R * 0.3, cy + R * 0.32]], R * 0.08);
+      // Hand on the chin
+      g.fillStyle = SKIN;
+      g.strokeStyle = SKIN_LINE;
+      g.lineWidth = R * 0.05;
+      g.beginPath(); g.ellipse(cx + R * 0.15, cy + R * 0.8, R * 0.32, R * 0.22, -0.3, 0, Math.PI * 2); g.fill(); g.stroke();
+      g.beginPath(); g.ellipse(cx - R * 0.08, cy + R * 0.55, R * 0.1, R * 0.22, 0.4, 0, Math.PI * 2); g.fill(); g.stroke();
+      // Thought dots drifting up
+      for (let i = 0; i < 3; i++) {
+        const k = (t * 0.8 + i * 0.33) % 1;
+        g.fillStyle = `rgba(255,255,255,${0.9 * (1 - k)})`;
+        g.beginPath(); g.arc(cx + R * (0.8 + i * 0.18), cy - R * (0.6 + k * 0.6 + i * 0.15), R * (0.06 + i * 0.03), 0, Math.PI * 2); g.fill();
+      }
+    },
+
+    sleepy(g, cx, cy, R, t) {
+      const sway = Math.sin(t * 2) * 0.06;
+      g.save();
+      g.translate(cx, cy);
+      g.rotate(sway);
+      face(g, 0, 0, R, '#ffe9a0', '#e9b44a');
+      // Closed eyes and a little open mouth
+      line(g, [[-R * 0.55, -R * 0.12], [-R * 0.2, -R * 0.08]], R * 0.09);
+      line(g, [[R * 0.2, -R * 0.08], [R * 0.55, -R * 0.12]], R * 0.09);
+      g.fillStyle = '#5a140a';
+      g.beginPath(); g.ellipse(0, R * 0.38, R * 0.12, R * 0.1 + Math.max(0, Math.sin(t * 2)) * R * 0.05, 0, 0, Math.PI * 2); g.fill();
+      // Drool bubble
+      const b = 0.5 + 0.5 * Math.sin(t * 2);
+      g.fillStyle = 'rgba(180,230,255,0.75)';
+      g.beginPath(); g.arc(R * 0.32, R * 0.4, R * (0.06 + b * 0.12), 0, Math.PI * 2); g.fill();
+      g.restore();
+      // Floating Zzz
+      g.font = `900 ${Math.round(R * 0.42)}px "Orbitron","Space Grotesk",sans-serif`;
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      for (let i = 0; i < 3; i++) {
+        const k = (t * 0.6 + i / 3) % 1;
+        g.globalAlpha = 1 - k;
+        g.fillStyle = '#cfe8ff';
+        g.strokeStyle = '#3a5a8a';
+        g.lineWidth = R * 0.06;
+        const zx = cx + R * (0.75 + k * 0.4);
+        const zy = cy - R * (0.4 + k * 0.9);
+        g.strokeText('Z', zx, zy);
+        g.fillText('Z', zx, zy);
+      }
+      g.globalAlpha = 1;
+    },
+
+    trophy(g, cx, cy, R, t) {
+      // A gleaming golden cup that bounces
+      const hop = Math.abs(Math.sin(t * 4)) * R * 0.12;
+      const y = cy - hop;
+      const grad = g.createLinearGradient(cx - R, 0, cx + R, 0);
+      grad.addColorStop(0, '#c98a00');
+      grad.addColorStop(0.45, '#fff3a0');
+      grad.addColorStop(1, '#d99a00');
+      g.fillStyle = grad;
+      g.strokeStyle = '#7a4d00';
+      g.lineWidth = R * 0.06;
+      // Handles
+      g.beginPath(); g.arc(cx - R * 0.62, y - R * 0.3, R * 0.28, Math.PI * 0.5, Math.PI * 1.5); g.stroke();
+      g.beginPath(); g.arc(cx + R * 0.62, y - R * 0.3, R * 0.28, -Math.PI * 0.5, Math.PI * 0.5); g.stroke();
+      // Cup
+      g.beginPath();
+      g.moveTo(cx - R * 0.65, y - R * 0.75);
+      g.lineTo(cx + R * 0.65, y - R * 0.75);
+      g.quadraticCurveTo(cx + R * 0.6, y + R * 0.15, cx, y + R * 0.25);
+      g.quadraticCurveTo(cx - R * 0.6, y + R * 0.15, cx - R * 0.65, y - R * 0.75);
+      g.fill(); g.stroke();
+      // Stem and base
+      g.fillRect(cx - R * 0.1, y + R * 0.22, R * 0.2, R * 0.3);
+      g.strokeRect(cx - R * 0.1, y + R * 0.22, R * 0.2, R * 0.3);
+      roundRect(g, cx - R * 0.45, y + R * 0.5, R * 0.9, R * 0.28, R * 0.08);
+      g.fill(); g.stroke();
+      // Star on the cup and a sweeping glint
+      star(g, cx, y - R * 0.3, R * 0.22, '#ffffff');
+      const p = (t * 0.8) % 1.4;
+      if (p < 1) {
+        g.fillStyle = 'rgba(255,255,255,0.6)';
+        g.fillRect(cx - R * 0.6 + p * R * 1.2, y - R * 0.7, R * 0.08, R * 0.8);
+      }
+      const tw = (Math.sin(t * 6) + 1) / 2;
+      star(g, cx + R * 0.95, y - R * 0.85, R * (0.1 + tw * 0.14));
     },
 
     gg(g, cx, cy, R, t) {

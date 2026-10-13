@@ -258,7 +258,8 @@ test('every card can reach and damage an enemy tower from either side', () => {
   const failures = [];
   const times = [];
   for (const card of Sim.CARD_LIBRARY) {
-    if (card.building || card.spell) continue;
+    // Buildings and spells don't walk; anti-air troops never shoot towers by design
+    if (card.building || card.spell || card.targets === 'air') continue;
     for (const [side, x, y] of [['A', 4, 22], ['A', 15, 28], ['B', 13, 10]]) {
       const s = Sim.createMatch({ seed: 5 });
       s.towers.forEach((t) => { t.active = false; t.hp = t.hpMax = 1e6; });
@@ -413,4 +414,425 @@ test('AI emotes when it takes or loses a tower, and at the end, without spamming
   for (let i = 0; i < 5; i++) tick();
   assert.equal(s.running, false);
   assert.ok(emotes.length === count + 1 && ['gg', 'cry', 'facepalm'].includes(emotes[emotes.length - 1].emote), 'one good-game emote at the end');
+});
+
+// ─── Trophy Road cards: spells, buildings and troop mechanics ──────────────
+
+const near = (s, side, x, y, r) => s.units.filter((u) => u.owner === side && Math.hypot(u.x - x, u.y - y) <= r);
+const towerOf = (s, id) => s.towers.find((t) => t.id === id);
+
+test('the card library has the new cards, each in one version, with an arena and a description', () => {
+  const ids = ['frostnova', 'acidpool', 'tartrap', 'overdrive', 'repairwave', 'gravitywell', 'orbitallaser', 'boulder', 'paratroopers',
+    'flaktower', 'infernospire', 'mortarbunker', 'teslapit', 'dronehangar', 'bonecrypt', 'elixirpump', 'sirenbeacon',
+    'medicbot', 'rocktitan', 'teslatank', 'shieldknight', 'stormzeppelin', 'cryocaster', 'phantomrider', 'flakgunner', 'boomerang', 'moledriller', 'sparkspirit'];
+  for (const id of ids) {
+    const c = Sim.CARD_MAP[id];
+    assert.ok(c, id);
+    assert.ok(c.desc.length > 20, `${id} has a description`);
+    assert.ok(c.arena >= 1 && c.arena <= Sim.MAX_ARENA, `${id} arena`);
+    assert.ok(!Sim.CARD_MAP[`${id}-twin`], `${id} has no variants`);
+    assert.ok(c.ability && c.ability.name, `${id} has an ability`);
+  }
+  assert.equal(Sim.CARD_LIBRARY.filter((c) => c.spell).length, 12);
+  assert.equal(Sim.CARD_LIBRARY.filter((c) => c.building).length, 5 + 8);
+  // Tokens exist for spawning but can never be put in a deck
+  for (const t of Sim.TOKEN_CARDS) {
+    assert.ok(!Sim.CARD_LIBRARY.includes(t));
+    assert.ok(!Sim.normalizeDeck([t.id, 'scout']).some((e) => e.id === t.id));
+  }
+  // Every card has a unique icon (tokens excluded)
+  const icons = Sim.CARD_LIBRARY.filter((c) => c.variant === 0).map((c) => c.icon);
+  assert.equal(new Set(icons).size, icons.length);
+});
+
+test('Frost Nova freezes troops, buildings and towers, then they recover', () => {
+  const s = Sim.createMatch({ seed: 3 });
+  const brawler = Sim.spawnDirect(s, 'B', 'brawler', 9, 21);
+  const turret = Sim.spawnDirect(s, 'B', 'boltturret', 9, 23.5);
+  run(s, 1.2);
+  Sim.castDirect(s, 'A', 'frostnova', 9, 22.5);
+  Sim.step(s);
+  const y0 = brawler.y;
+  assert.ok(brawler.frozenT > 0 && turret.frozenT > 0);
+  run(s, 2);
+  assert.ok(Math.abs(brawler.y - y0) < 0.05, 'frozen troops do not move');
+  assert.equal(Sim.snapshot(s).units.find((u) => u.id === brawler.id).frz, 1);
+  run(s, 1.5);
+  assert.ok(brawler.frozenT <= 0);
+  const y1 = brawler.y;
+  run(s, 1);
+  assert.ok(Math.abs(brawler.y - y1) > 0.3 || brawler.targetId, 'moves or fights again after thawing');
+  // Towers freeze too
+  const s2 = Sim.createMatch({ seed: 3 });
+  Sim.castDirect(s2, 'A', 'frostnova', 3.5, 6.5);
+  Sim.step(s2);
+  assert.ok(towerOf(s2, 'T-B-L').stunT > 2.5);
+});
+
+test('Acid Pool deals its damage over 6 seconds and slows enemies in it; towers take 30%', () => {
+  const s = sandbox();
+  const bot = Sim.spawnDirect(s, 'B', 'zombiemob', 9, 22);
+  bot.hp = bot.hpMax = 5000;
+  bot.speed = 0.0001;
+  Sim.castDirect(s, 'A', 'acidpool', 9, 22);
+  run(s, 0.1);
+  assert.ok(bot.slowT > 0, 'slowed while inside');
+  run(s, 7);
+  const dealt = 5000 - bot.hp;
+  assert.ok(Math.abs(dealt - Sim.CARD_MAP.acidpool.dmg) < 1, `total damage ${dealt}`);
+  assert.equal(s.zones.length, 0, 'pool expires');
+  const t = Sim.createMatch({ seed: 2 });
+  const tower = towerOf(t, 'T-B-L');
+  const before = tower.hp;
+  Sim.castDirect(t, 'A', 'acidpool', tower.x, tower.y);
+  run(t, 7);
+  assert.ok(Math.abs((before - tower.hp) - Sim.CARD_MAP.acidpool.dmg * 0.3) < 1);
+});
+
+test('Tar Trap slows movement; Overdrive speeds up only friendly troops', () => {
+  const pace = (cast) => {
+    const s = sandbox();
+    const u = Sim.spawnDirect(s, 'A', 'brawler', 14.5, 27);
+    if (cast) cast(s);
+    run(s, 3);
+    return 27 - u.y;
+  };
+  const base = pace(null);
+  const tarred = pace((s) => Sim.castDirect(s, 'B', 'tartrap', 14.5, 26));
+  const hasted = pace((s) => Sim.castDirect(s, 'A', 'overdrive', 14.5, 26));
+  const enemyHaste = pace((s) => Sim.castDirect(s, 'B', 'overdrive', 14.5, 26));
+  assert.ok(tarred < base * 0.75, `tar ${tarred} vs ${base}`);
+  assert.ok(hasted > base * 1.15, `haste ${hasted} vs ${base}`);
+  assert.ok(Math.abs(enemyHaste - base) < 0.05, 'enemy overdrive does nothing to us');
+});
+
+test('Repair Wave heals friendly troops and buildings, but never crown towers or enemies', () => {
+  const s = sandbox();
+  const mine = Sim.spawnDirect(s, 'A', 'brawler', 9, 24);
+  const foe = Sim.spawnDirect(s, 'B', 'brawler', 10, 24);
+  mine.hp = 100; foe.hp = 100;
+  mine.speed = foe.speed = 0.0001; mine.dmg = foe.dmg = 0.0001;
+  const tower = towerOf(s, 'T-A-L');
+  tower.hp = 500;
+  Sim.castDirect(s, 'A', 'repairwave', 9.5, 24);
+  Sim.castDirect(s, 'A', 'repairwave', tower.x, tower.y);
+  run(s, 3.5);
+  assert.ok(Math.abs(mine.hp - (100 + Sim.CARD_MAP.repairwave.dmg)) < 1, `healed to ${mine.hp}`);
+  assert.ok(foe.hp <= 100);
+  assert.equal(tower.hp, 500);
+});
+
+test('Gravity Well pulls enemy troops together but cannot drag ground troops into the river', () => {
+  const s = sandbox();
+  const a = Sim.spawnDirect(s, 'B', 'brawler', 7, 22);
+  const b = Sim.spawnDirect(s, 'B', 'brawler', 11, 22);
+  a.speed = b.speed = 0.0001;
+  Sim.castDirect(s, 'A', 'gravitywell', 9, 22);
+  run(s, 2.3);
+  assert.ok(Math.abs(b.x - a.x) < 2, `pulled together: ${a.x.toFixed(2)} ${b.x.toFixed(2)}`);
+  assert.ok(a.hp < a.hpMax);
+  const r = sandbox();
+  const c = Sim.spawnDirect(r, 'B', 'brawler', 9, 18);
+  c.speed = 0.0001;
+  Sim.castDirect(r, 'A', 'gravitywell', 9, 15.5);
+  run(r, 2.3);
+  assert.ok(!Sim.isRiverPoint(c.x, c.y), 'stays on land');
+});
+
+test('Orbital Laser waits, then hits the 3 toughest enemies in range', () => {
+  const s = sandbox();
+  const big = ['siege', 'brawler', 'guardian'].map((id, i) => Sim.spawnDirect(s, 'B', id, 8 + i, 22));
+  const small = Sim.spawnDirect(s, 'B', 'mechmice', 9, 23);
+  s.units.forEach((u) => { u.speed = 0.0001; u.dmg = 0.0001; });
+  Sim.castDirect(s, 'A', 'orbitallaser', 9, 22.5);
+  run(s, 0.5);
+  assert.ok(big.every((u) => u.hp === u.hpMax), 'nothing before the lock-on finishes');
+  run(s, 0.6);
+  assert.ok(big.every((u) => u.hp < u.hpMax), 'big three hit');
+  assert.equal(small.hp, small.hpMax, 'the small fry is ignored');
+});
+
+test('Boulder Roll travels toward the enemy, hits each ground troop once and knocks it back; flyers are safe', () => {
+  const s = sandbox();
+  const g = Sim.spawnDirect(s, 'B', 'brawler', 9, 22);
+  const air = Sim.spawnDirect(s, 'B', 'nanodrones', 9, 21);
+  g.speed = air.speed = 0.0001;
+  Sim.castDirect(s, 'A', 'boulder', 9, 25);
+  run(s, 2.5);
+  assert.equal(g.hpMax - g.hp, Sim.CARD_MAP.boulder.dmg);
+  assert.ok(g.y < 21.5, `knocked forward to ${g.y}`);
+  assert.equal(air.hp, air.hpMax);
+});
+
+test('Paratroopers drop all their troopers over time, even beside an enemy tower', () => {
+  const s = sandbox();
+  Sim.castDirect(s, 'A', 'paratroopers', 3.5, 9);
+  run(s, 1);
+  const early = near(s, 'A', 3.5, 9, 3.5).length;
+  run(s, 4);
+  const all = near(s, 'A', 3.5, 9, 4.5).concat(s.units.filter((u) => u.owner === 'A' && u.cardId === 'paratrooper'));
+  assert.ok(early >= 1 && early < Sim.CARD_MAP.paratroopers.zone.count, `trickles in (${early} after 1s)`);
+  assert.equal(new Set(all.filter((u) => u.cardId === 'paratrooper').map((u) => u.id)).size, Sim.CARD_MAP.paratroopers.zone.count);
+  assert.ok(s.units.every((u) => u.cardId !== 'paratrooper' || u.costShare === 0), 'tokens carry no elixir value');
+});
+
+test('Flak Tower and Flak Gunner only shoot flyers', () => {
+  const s = sandbox();
+  Sim.spawnDirect(s, 'A', 'flaktower', 9, 22);
+  const gunner = Sim.spawnDirect(s, 'A', 'flakgunner', 12, 24);
+  const ground = Sim.spawnDirect(s, 'B', 'brawler', 9, 19.5);
+  ground.speed = 0.0001; ground.dmg = 0.0001;
+  run(s, 3);
+  assert.equal(ground.hp, ground.hpMax, 'ground troops are ignored');
+  assert.ok(Math.hypot(gunner.x - 12, gunner.y - 24) < 0.3, 'gunner holds position with no air target');
+  const drone = Sim.spawnDirect(s, 'B', 'nanodrones', 10, 19.5);
+  drone.speed = 0.0001;
+  run(s, 2);
+  assert.ok(drone.hp < drone.hpMax || !s.units.includes(drone));
+});
+
+test('Inferno Spire ramps up on one target and resets after a stun', () => {
+  const s = sandbox();
+  const spire = Sim.spawnDirect(s, 'A', 'infernospire', 9, 22);
+  const tank = Sim.spawnDirect(s, 'B', 'siege', 9, 18.5);
+  tank.hp = tank.hpMax = 100000; tank.speed = 0.0001; tank.dmg = 0.0001;
+  let hp = tank.hp;
+  run(s, 1);
+  const early = hp - tank.hp;
+  hp = tank.hp;
+  run(s, 4);
+  run(s, 1, () => { hp = tank.hp; return false; });
+  const t0 = tank.hp;
+  run(s, 1);
+  const late = t0 - tank.hp;
+  assert.ok(late > early * 3, `ramp: early ${early.toFixed(0)}/s, late ${late.toFixed(0)}/s`);
+  assert.ok(Sim.snapshot(s).units.find((u) => u.id === spire.id).rmp > 0.9);
+  Sim.castDirect(s, 'B', 'shock', 9, 22);
+  Sim.step(s);
+  assert.equal(spire.rampT, 0);
+});
+
+test('Mortar Bunker reaches a princess tower from beside the river but cannot hit nearby troops', () => {
+  const s = Sim.createMatch({ seed: 4 });
+  s.towers.forEach((t) => { t.active = false; });
+  Sim.spawnDirect(s, 'A', 'mortarbunker', 5.7, 18.5);
+  const tower = towerOf(s, 'T-B-L');
+  run(s, 8);
+  assert.ok(tower.hp < tower.hpMax, 'shells the tower');
+  const r = sandbox();
+  Sim.spawnDirect(r, 'A', 'mortarbunker', 9, 22);
+  const pest = Sim.spawnDirect(r, 'B', 'brawler', 9, 20.5);
+  pest.speed = 0.0001; pest.dmg = 0.0001;
+  run(r, 6);
+  assert.equal(pest.hp, pest.hpMax, 'inside the minimum range');
+});
+
+test('Tesla Pit hides until something comes in range, and hidden it cannot be targeted', () => {
+  const s = sandbox();
+  const pit = Sim.spawnDirect(s, 'A', 'teslapit', 9, 24);
+  run(s, 1.2);
+  assert.ok(pit.hidden);
+  const hog = Sim.spawnDirect(s, 'B', 'scout', 9, 12);
+  run(s, 0.5);
+  assert.notEqual(hog.targetId, pit.id, 'a hidden pit is not a target');
+  run(s, 6);
+  assert.ok(!pit.hidden || hog.hp < hog.hpMax, 'popped up to fight');
+  assert.ok(hog.hp < hog.hpMax);
+});
+
+test('Drone Hangar and Bone Crypt spawn tokens over time and more when destroyed', () => {
+  const s = sandbox();
+  const hangar = Sim.spawnDirect(s, 'A', 'dronehangar', 5, 26);
+  const crypt = Sim.spawnDirect(s, 'A', 'bonecrypt', 13, 26);
+  run(s, 6);
+  const count = (id) => s.units.filter((u) => u.cardId === id).length;
+  assert.ok(count('hangardrone') >= 1);
+  assert.ok(count('cryptskel') >= 2);
+  const before = count('cryptskel');
+  crypt.hp = 0;
+  Sim.step(s);
+  assert.equal(count('cryptskel'), before + 3);
+  assert.ok(hangar.hp > 0);
+});
+
+test('Elixir Pump produces elixir (never above the cap) and pays out once more when destroyed', () => {
+  const s = Sim.createMatch({ seed: 9 });
+  s.players.A.elixir = 0;
+  const pump = Sim.spawnDirect(s, 'A', 'elixirpump', 9, 30.5);
+  s.towers.forEach((t) => { t.active = false; });
+  const regen = Sim.MATCH.elixirPerSec * 9.3;
+  run(s, 9.3);
+  assert.ok(s.players.A.elixir > regen + 0.9, `pumped: ${s.players.A.elixir.toFixed(2)}`);
+  s.players.A.elixir = 9.8;
+  run(s, 9);
+  assert.ok(s.players.A.elixir <= Sim.MATCH.maxElixir);
+  s.players.A.elixir = 0;
+  pump.hp = 0;
+  Sim.step(s);
+  assert.ok(s.players.A.elixir >= 1);
+});
+
+test('Siren Beacon pulls enemy troops off their target', () => {
+  const s = sandbox();
+  const wolf = Sim.spawnDirect(s, 'B', 'brawler', 4, 21);
+  const bait = Sim.spawnDirect(s, 'A', 'scrapbots', 3.5, 22);
+  bait.speed = 0.0001; bait.dmg = 0.0001;
+  run(s, 1);
+  const beacon = Sim.spawnDirect(s, 'A', 'sirenbeacon', 8.5, 23);
+  run(s, 3);
+  assert.equal(wolf.targetId, beacon.id);
+});
+
+test('Medic Bot heals nearby friendly troops', () => {
+  const s = sandbox();
+  Sim.spawnDirect(s, 'A', 'medicbot', 9, 24);
+  const hurt = Sim.spawnDirect(s, 'A', 'brawler', 9.5, 25);
+  hurt.hp = 200;
+  hurt.speed = 0.0001;
+  run(s, 3);
+  assert.ok(hurt.hp > 260, `healed to ${hurt.hp.toFixed(0)}`);
+});
+
+test('Rock Titan and Storm Zeppelin split into tokens when they die', () => {
+  const s = sandbox();
+  const titan = Sim.spawnDirect(s, 'A', 'rocktitan', 9, 26);
+  const zep = Sim.spawnDirect(s, 'A', 'stormzeppelin', 13, 26);
+  const foe = Sim.spawnDirect(s, 'B', 'brawler', 9, 27.6);
+  run(s, 0.1);
+  titan.hp = 0; zep.hp = 0;
+  Sim.step(s);
+  assert.equal(s.units.filter((u) => u.cardId === 'rockshard').length, 2);
+  assert.equal(s.units.filter((u) => u.cardId === 'stormsprite' && u.air).length, Sim.CARD_MAP.stormzeppelin.mech.deathSpawn.count);
+  assert.ok(foe.hp < foe.hpMax, 'titan death blast');
+});
+
+test('Tesla Tank loses its charge when stunned', () => {
+  const s = sandbox();
+  const tank = Sim.spawnDirect(s, 'A', 'teslatank', 9, 24);
+  const foe = Sim.spawnDirect(s, 'B', 'brawler', 9, 20);
+  foe.speed = 0.0001; foe.dmg = 0.0001; foe.hp = foe.hpMax = 1e5;
+  run(s, 4);
+  const cdBefore = tank.atkCd;
+  Sim.castDirect(s, 'B', 'shock', 9, 24);
+  Sim.step(s);
+  assert.ok(tank.atkCd >= tank.cd - 0.1 && tank.atkCd >= cdBefore, 'charge reset');
+});
+
+test('Shield Knight soaks damage with its shield before losing health', () => {
+  const s = sandbox();
+  const k = Sim.spawnDirect(s, 'A', 'shieldknight', 9, 24);
+  assert.ok(k.shield > 0);
+  const src = { id: 'x', owner: 'B', structureMult: 1 };
+  Sim.castDirect(s, 'B', 'firebomb', 9, 24);
+  run(s, 2);
+  assert.equal(k.hp, k.hpMax, 'health untouched while the shield holds');
+  assert.ok(k.shield < k.shieldMax);
+  assert.ok(Sim.snapshot(s).units.find((u) => u.id === k.id).shd < 1);
+});
+
+test('Cryo Caster slows what it hits', () => {
+  const s = sandbox();
+  Sim.spawnDirect(s, 'A', 'cryocaster', 9, 24);
+  const foe = Sim.spawnDirect(s, 'B', 'brawler', 9, 20.5);
+  foe.speed = 0.0001; foe.dmg = 0.0001; foe.hp = foe.hpMax = 1e5;
+  run(s, 3);
+  assert.ok(foe.slowT > 0 && foe.slowMult < 1);
+});
+
+test('Phantom Rider dashes in, untouchable, and lands a double hit', () => {
+  const s = sandbox();
+  const rider = Sim.spawnDirect(s, 'A', 'phantomrider', 9, 25);
+  const foe = Sim.spawnDirect(s, 'B', 'brawler', 9, 21);
+  foe.speed = 0.0001; foe.dmg = 0.0001; foe.hp = foe.hpMax = 1e5;
+  let sawInvuln = false;
+  run(s, 3, () => { if (rider.invuln) sawInvuln = true; return true; });
+  assert.ok(sawInvuln, 'dashed');
+  assert.ok(foe.hpMax - foe.hp >= rider.dmg * 2 - 1);
+  rider.invuln = true;
+  const hp = rider.hp;
+  Sim.castDirect(s, 'B', 'firebomb', rider.x, rider.y);
+  run(s, 2, () => { rider.invuln = true; return true; });
+  assert.equal(rider.hp, hp, 'no damage while dashing');
+});
+
+test('Boomerang Bot hits every ground enemy in its line, twice', () => {
+  const s = sandbox();
+  Sim.spawnDirect(s, 'A', 'boomerang', 9, 25);
+  const line = [21.5, 22.6].map((y) => Sim.spawnDirect(s, 'B', 'brawler', 9, y));
+  line.forEach((u) => { u.speed = 0.0001; u.dmg = 0.0001; u.hp = u.hpMax = 1e5; });
+  run(s, 1.5);
+  const dmg = Sim.CARD_MAP.boomerang.dmg;
+  line.forEach((u) => assert.ok(u.hpMax - u.hp >= dmg * 2 - 1, `${(u.hpMax - u.hp).toFixed(0)} dealt`));
+});
+
+test('Mole Driller deploys anywhere legal (not on water or towers), tunnels slower far away and chips towers', () => {
+  const s = Sim.createMatch({ seed: 5, decks: { A: ['moledriller', 'scout', 'brawler', 'siege', 'guardian', 'voltbug', 'drillcat', 'ramhog'] } });
+  const mole = s.players.A.cards.moledriller;
+  assert.ok(Sim.canDeploy(s, 'A', 9, 8, mole), 'enemy side');
+  assert.ok(!Sim.canDeploy(s, 'A', 9, 16, mole), 'not the river');
+  assert.ok(!Sim.canDeploy(s, 'A', 3.5, 6.5, mole), 'not on a tower');
+  const snap = Sim.snapshot(s);
+  let mismatch = 0;
+  for (let y = 0.25; y < Sim.H; y += 0.5) for (let x = 0.25; x < Sim.W; x += 0.5) {
+    if (Sim.canDeploy(s, 'A', x, y, mole) !== Sim.canDeployOnSnapshot(snap, 'A', x, y, mole)) mismatch++;
+  }
+  assert.equal(mismatch, 0, 'online preview agrees');
+  s.players.A.elixir = 10;
+  const far = Sim.deploy(s, 'A', 'moledriller', 5.6, 6.5).units[0];
+  assert.ok(far.deployT > Sim.MATCH.deployTime + 0.5);
+  s.towers.forEach((t) => { t.active = false; });
+  const tower = towerOf(s, 'T-B-L');
+  run(s, 6);
+  const dealt = tower.hpMax - tower.hp;
+  assert.ok(dealt > 0 && dealt < far.dmg * 6, `reduced crown damage: ${dealt.toFixed(0)}`);
+});
+
+test('Spark Spirit jumps onto a target and stuns it and the enemies around it', () => {
+  const s = sandbox();
+  Sim.spawnDirect(s, 'A', 'sparkspirit', 9, 25);
+  const group = [[9, 21.5], [10.2, 21], [8, 21]].map(([x, y]) => Sim.spawnDirect(s, 'B', 'brawler', x, y));
+  group.forEach((u) => { u.speed = 0.0001; u.dmg = 0.0001; });
+  let stunned = 0;
+  run(s, 3, () => { stunned = Math.max(stunned, group.filter((u) => u.stunT > 0).length); return true; });
+  assert.ok(stunned >= 2, `stunned ${stunned}`);
+  assert.ok(!s.units.some((u) => u.cardId === 'sparkspirit'), 'spirit is spent');
+});
+
+test('the AI deck builder only uses cards from the allowed arenas and always fields a full, sane deck', () => {
+  for (let arena = 0; arena <= Sim.MAX_ARENA; arena++) {
+    for (let i = 0; i < 20; i++) {
+      const deck = Sim.buildAiDeck(arena, Math.random);
+      assert.equal(deck.length, 8);
+      assert.equal(new Set(deck.map((id) => Sim.CARD_MAP[id].slug)).size, 8, 'one version per card');
+      deck.forEach((id) => assert.ok(Sim.CARD_MAP[id].arena <= arena && !Sim.CARD_MAP[id].token));
+      assert.ok(deck.some((id) => Sim.CARD_MAP[id].winCondition), 'has a win condition');
+      assert.ok(deck.some((id) => Sim.CARD_MAP[id].spell), 'has a spell');
+    }
+  }
+});
+
+test('AI vs AI with the new cards plays full, legal matches and uses spells and buildings', () => {
+  let spells = 0;
+  let buildings = 0;
+  for (let i = 0; i < 6; i++) {
+    const r = (() => { let k = 5 + i; return () => ((k = (k * 16807) % 2147483647) / 2147483647); })();
+    const s = Sim.createMatch({ seed: 31 + i, decks: { A: Sim.buildAiDeck(9, r), B: Sim.buildAiDeck(9, r) } });
+    const ai = { A: Sim.createAi('A', {}, 1 + i), B: Sim.createAi('B', {}, 2 + i) };
+    let steps = 0;
+    while (s.running && steps < 20 * 260) {
+      for (const side of ['A', 'B']) {
+        const res = Sim.aiUpdate(s, ai[side], STEP);
+        if (res) assert.ok(res.ok, `AI only makes legal moves (${res.reason})`);
+      }
+      Sim.step(s);
+      Sim.takeFx(s);
+      steps++;
+      assert.ok(s.players.A.elixir >= 0 && s.players.B.elixir >= 0);
+    }
+    assert.ok(!s.running, 'match finished');
+    spells += s.castLog.length;
+    buildings += s.units.filter((u) => u.building).length;
+  }
+  assert.ok(spells > 0, 'spells were cast');
+  assert.ok(buildings > 0, 'buildings were placed');
 });

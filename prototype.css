@@ -1903,3 +1903,360 @@ body.mode-ai #ptAiDeckPanel {
   .emote-btn { width: 2rem; height: 2rem; font-size: 1rem; }
 }
 .win-modal > :not(.confetti) { position: relative; z-index: 1; }
+
+/* ═══════════════════════ Trophy Road, ranks and the deck editor ═══════════════════════ */
+
+/* Arena theme swatches (badges, road sections, theme chips) */
+.theme-meadow  { --th1: #4f9a44; --th2: #2d6b2a; --thA: #c9f59b; }
+.theme-scrap   { --th1: #8a6a4a; --th2: #4b3a2c; --thA: #ffb86b; }
+.theme-frost   { --th1: #9fd3f0; --th2: #4d7fa6; --thA: #e8fbff; }
+.theme-dunes   { --th1: #e0b469; --th2: #a2702f; --thA: #ffe8a6; }
+.theme-jungle  { --th1: #2f7d4f; --th2: #163f2b; --thA: #8dffb4; }
+.theme-volcano { --th1: #b33a1f; --th2: #3d1410; --thA: #ffb347; }
+.theme-neon    { --th1: #3a2a8f; --th2: #120a3a; --thA: #5ff2ff; }
+.theme-sky     { --th1: #8ec5ff; --th2: #4c76c4; --thA: #ffffff; }
+.theme-royal   { --th1: #d9c8a0; --th2: #8a6a2a; --thA: #ffe680; }
+.theme-legend  { --th1: #7c3fd1; --th2: #2b1356; --thA: #ffd35f; }
+
+.rarity-common { color: #88c7ff; }
+.rarity-rare { color: #63ffd2; }
+.rarity-epic { color: #ffb36c; }
+.rarity-legendary { color: #ffd35f; }
+.rarity-champion { color: #ff728f; }
+
+/* Top bar */
+.road-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border-color: rgba(255, 214, 102, 0.7);
+  background: linear-gradient(135deg, rgba(90, 64, 10, 0.9), rgba(40, 28, 6, 0.9));
+  color: #ffe9a8;
+}
+.road-btn .rb-trophy b { font-size: 0.86rem; color: #fff; }
+.road-btn .rb-arena { font-family: "Space Grotesk", sans-serif; font-size: 0.72rem; color: #ffe9a8; opacity: 0.9; }
+.road-btn.has-rewards { animation: roadGlow 1.6s ease-in-out infinite; }
+.road-dot {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  min-width: 19px;
+  height: 19px;
+  border-radius: 10px;
+  background: #ff4d5e;
+  color: #fff;
+  font-style: normal;
+  font-size: 0.66rem;
+  line-height: 19px;
+  text-align: center;
+  padding: 0 4px;
+  box-shadow: 0 0 0 2px #0b111c;
+}
+@keyframes roadGlow { 50% { box-shadow: 0 0 16px rgba(255, 214, 102, 0.6); } }
+
+.ranked-toggle {
+  display: none;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.74rem;
+  color: #ffe9a8;
+  border: 1px solid rgba(255, 214, 102, 0.45);
+  border-radius: 10px;
+  padding: 0.3rem 0.55rem;
+  cursor: pointer;
+  user-select: none;
+}
+body.mode-ai .ranked-toggle { display: inline-flex; }
+.ranked-toggle input { accent-color: #ffcf3a; }
+/* Ranked AI ignores the practice deck and HP tuning */
+body.mode-ai.ranked-ai #ptAiDeckPanel,
+body.mode-ai.ranked-ai #ptAiTuningPanel .slider-row,
+body.mode-ai.ranked-ai #ptAiTuningPanel input[type="range"] { opacity: 0.45; }
+
+.np-rank {
+  display: block;
+  font-size: 0.64rem;
+  color: #ffe08a;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 190px;
+}
+.np-rank:empty { display: none; }
+
+/* Results: trophy change */
+.win-trophies[hidden] { display: none; }
+.win-trophies {
+  margin: 0.4rem auto 0.2rem;
+  padding: 0.5rem 0.8rem;
+  border-radius: 12px;
+  background: rgba(255, 214, 102, 0.1);
+  border: 1px solid rgba(255, 214, 102, 0.35);
+  max-width: 340px;
+}
+.win-trophies.friendly { background: rgba(138, 214, 255, 0.08); border-color: rgba(138, 214, 255, 0.25); }
+.wt-row { display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
+.wt-icon { font-size: 1.5rem; }
+.wt-count { font-family: "Orbitron", sans-serif; font-size: 1.5rem; color: #fff; min-width: 3.2ch; }
+.wt-delta { font-family: "Orbitron", sans-serif; font-weight: 900; font-size: 1.1rem; }
+.win-trophies.up .wt-delta { color: #7dff9a; }
+.win-trophies.down .wt-delta { color: #ff7a7a; }
+.win-trophies.flat .wt-delta { color: var(--muted); }
+.wt-arena { font-size: 0.78rem; color: #ffe9a8; margin-top: 0.15rem; }
+.wt-up {
+  margin-top: 0.35rem;
+  font-family: "Orbitron", sans-serif;
+  font-weight: 900;
+  color: #ffd35f;
+  animation: arenaPop 0.8s ease-out both 0.4s;
+}
+.wt-note { font-size: 0.7rem; color: var(--muted); margin-top: 0.25rem; }
+@keyframes arenaPop { from { transform: scale(0.4); opacity: 0; } 70% { transform: scale(1.12); } to { transform: scale(1); opacity: 1; } }
+
+/* Trophy Road overlay */
+.road-overlay[hidden] { display: none; }
+.road-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 50% 10%, rgba(255, 214, 102, 0.16), rgba(2, 6, 12, 0.9) 55%);
+  backdrop-filter: blur(4px);
+  padding: 12px;
+}
+body.road-open { overflow: hidden; }
+.road-modal {
+  position: relative;
+  width: min(760px, 100%);
+  max-height: calc(100vh - 24px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 214, 102, 0.45);
+  background: linear-gradient(180deg, rgba(22, 30, 48, 0.98), rgba(10, 14, 24, 0.98));
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+  animation: roadIn 0.28s ease-out;
+}
+@keyframes roadIn { from { transform: translateY(18px) scale(0.97); opacity: 0; } }
+.road-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 50%;
+}
+.road-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.8rem;
+  align-items: center;
+  padding: 1rem 3.2rem 0.6rem 1rem;
+}
+.road-badge {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  font-size: 2.1rem;
+  background: linear-gradient(145deg, var(--th1), var(--th2));
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.25), 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+.road-kicker { margin: 0; font-family: "Orbitron", sans-serif; font-size: 0.62rem; letter-spacing: 0.18em; color: #ffd35f; }
+.road-headtext h3 { margin: 0.1rem 0 0; font-family: "Orbitron", sans-serif; font-size: 1.15rem; }
+.road-rank { margin: 0.1rem 0 0.4rem; font-size: 0.76rem; color: var(--muted); }
+.road-progress {
+  position: relative;
+  height: 20px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  border: 1px solid rgba(255, 214, 102, 0.3);
+}
+.road-progress-fill { height: 100%; background: linear-gradient(90deg, #ffb020, #ffe680); transition: width 0.6s ease; }
+.road-progress span { position: absolute; inset: 0; display: grid; place-items: center; font-size: 0.68rem; color: #fff; text-shadow: 0 1px 2px #000; }
+.road-trophies { text-align: center; }
+.road-trophies b { display: block; font-family: "Orbitron", sans-serif; font-size: 1.6rem; color: #ffe680; }
+.road-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.8rem;
+  align-items: center;
+  padding: 0 1rem 0.6rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.road-claim-all:disabled { opacity: 0.5; cursor: default; }
+.road-themes { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; font-size: 0.72rem; color: var(--muted); }
+.theme-chip {
+  min-width: 34px;
+  padding: 0.25rem 0.4rem;
+  font-size: 0.9rem;
+  background: linear-gradient(145deg, var(--th1, #24344f), var(--th2, #14203a));
+  border-color: rgba(255, 255, 255, 0.25);
+}
+.theme-chip[data-theme=""] { font-size: 0.66rem; }
+.theme-chip.on { border-color: #ffe680; box-shadow: 0 0 0 2px rgba(255, 230, 128, 0.45); }
+.road-howto { width: 100%; margin: 0; font-size: 0.7rem; color: var(--muted); }
+.road-track { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0.6rem 1rem 1.2rem; display: flex; flex-direction: column; gap: 0.8rem; }
+.road-arena { flex-shrink: 0; }
+.road-arena {
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--th1) 22%, transparent), rgba(10, 14, 24, 0.6) 60%);
+  overflow: hidden;
+}
+.road-arena.locked { filter: saturate(0.5); }
+.road-arena.current { border-color: rgba(255, 230, 128, 0.6); box-shadow: 0 0 18px rgba(255, 214, 102, 0.18); }
+.ra-banner {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.6rem;
+  align-items: center;
+  padding: 0.55rem 0.7rem;
+  background: linear-gradient(135deg, var(--th1), var(--th2));
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+.ra-icon { font-size: 1.7rem; }
+.ra-banner b { font-family: "Orbitron", sans-serif; font-size: 0.9rem; display: block; }
+.ra-banner small { font-size: 0.7rem; opacity: 0.95; }
+.ra-lock { font-size: 1.2rem; }
+.ra-cards { display: flex; flex-wrap: wrap; gap: 0.35rem; padding: 0.5rem 0.7rem 0; }
+.ra-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid currentColor;
+  font-size: 0.95rem;
+  opacity: 0.6;
+}
+.ra-card small { font-size: 0.64rem; color: var(--text); }
+.ra-card.owned { opacity: 1; }
+.ra-nodes { display: grid; gap: 0.35rem; padding: 0.5rem 0.7rem 0.7rem; }
+.road-node {
+  display: grid;
+  grid-template-columns: 74px 1fr auto;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.4rem 0.5rem;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.road-node.claimed { opacity: 0.55; }
+.road-node.ready { border-color: rgba(255, 230, 128, 0.75); background: rgba(255, 214, 102, 0.12); animation: nodeReady 1.6s ease-in-out infinite; }
+.road-node.locked { opacity: 0.8; }
+@keyframes nodeReady { 50% { box-shadow: 0 0 14px rgba(255, 214, 102, 0.35); } }
+.rn-trophies { font-family: "Orbitron", sans-serif; font-size: 0.72rem; color: #ffe9a8; }
+.rn-rewards { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.rn-state { font-size: 0.72rem; color: var(--muted); white-space: nowrap; }
+.rn-claim { background: linear-gradient(135deg, #ffcf3a, #ff9c1a); color: #2b1a00; border-color: #ffe680; font-weight: 700; }
+.reward-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.55rem 0.2rem 0.3rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 0.74rem;
+  color: var(--text);
+}
+.reward-pill.card { border-color: currentColor; }
+.reward-pill.card .rp-text { color: var(--text); }
+.reward-pill.gold { color: #ffe680; }
+.reward-pill.chest { color: #ffb36c; }
+.rp-icon { font-size: 1.05rem; }
+.rp-emote { width: 26px; height: 26px; }
+.rp-text small { display: block; font-size: 0.6rem; color: var(--muted); }
+.road-you {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: "Orbitron", sans-serif;
+  font-size: 0.7rem;
+  color: #8effd7;
+}
+.road-you::before, .road-you::after { content: ""; flex: 1; height: 2px; background: linear-gradient(90deg, transparent, #8effd7, transparent); }
+
+/* Deck editor */
+.deck-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
+.deck-head h4 { margin: 0; }
+.deck-tabs { display: flex; gap: 0.3rem; }
+.deck-tab { padding: 0.3rem 0.6rem; font-size: 0.68rem; opacity: 0.7; }
+.deck-tab.on { opacity: 1; border-color: var(--accent); box-shadow: 0 0 10px rgba(142, 255, 215, 0.25); }
+.deck-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.8rem; margin-top: 0.45rem; font-size: 0.72rem; color: var(--muted); }
+.deck-summary .avg-elixir { min-width: 180px; }
+.deck-warn { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 0.2rem 0.7rem; color: #ffcf7a; }
+.deck-ok { color: #7dff9a; }
+.deck-slot {
+  position: relative;
+  align-items: center;
+  text-align: center;
+  padding: 0.35rem 0.25rem;
+  border-color: currentColor;
+}
+.deck-slot .ds-icon { font-size: 1.4rem; opacity: 1; }
+.deck-slot .ds-name { font-size: 0.6rem; color: var(--text); opacity: 1; line-height: 1.15; }
+.deck-slot .ds-cost, .collection-card .cc-cost {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-family: "Orbitron", sans-serif;
+  font-size: 0.66rem;
+  font-weight: 900;
+  color: #1a0d2b;
+  opacity: 1;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+.deck-slot.picked { box-shadow: 0 0 0 2px #8effd7, 0 0 14px rgba(142, 255, 215, 0.5); }
+.coll-count { font-size: 0.7rem; color: var(--muted); font-weight: 400; margin-left: 0.3rem; }
+.coll-filters { display: grid; gap: 0.35rem; margin-top: 0.45rem; }
+.chip-row { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; }
+.coll-chip { padding: 0.25rem 0.55rem; font-size: 0.66rem; opacity: 0.7; }
+.coll-chip.on { opacity: 1; border-color: var(--accent); background: rgba(40, 80, 70, 0.8); }
+.coll-toggle, .coll-sort { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.7rem; color: var(--muted); margin-left: 0.3rem; }
+.coll-sort select { background: rgba(9, 18, 30, 0.9); color: var(--text); border: 1px solid rgba(138, 214, 255, 0.35); border-radius: 8px; padding: 0.15rem 0.3rem; }
+.collection-card { position: relative; }
+.collection-card header strong { flex: 1; margin-left: 0.6rem; }
+.collection-card.picking { border-color: #8effd7; box-shadow: 0 0 0 2px rgba(142, 255, 215, 0.6); }
+.rarity-edge-rare { border-left: 3px solid #63ffd2; }
+.rarity-edge-epic { border-left: 3px solid #ffb36c; }
+.rarity-edge-legendary { border-left: 3px solid #ffd35f; }
+.rarity-edge-champion { border-left: 3px solid #ff728f; }
+.cc-tags { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.3rem; }
+.cc-tags span { font-size: 0.6rem; padding: 0.08rem 0.4rem; border-radius: 6px; background: rgba(255, 255, 255, 0.07); }
+.type-badge.type-spell { color: #e48bff; }
+.type-badge.type-building { color: #ffcf7a; }
+.type-badge.type-troop { color: #9cc7ff; }
+.new-badge { color: #ffe680; }
+.collection-card p.cc-desc { color: var(--text); font-size: 0.74rem; }
+.collection-card p.cc-unlock { color: #ffe08a; }
+.collection-actions button.in { border-color: var(--accent); }
+
+@media (max-width: 640px) {
+  .road-head { grid-template-columns: auto 1fr; padding-right: 3rem; }
+  .road-trophies { display: none; }
+  .road-badge { width: 52px; height: 52px; font-size: 1.7rem; }
+  .road-node { grid-template-columns: 1fr auto; }
+  .rn-trophies { grid-column: 1 / -1; }
+  .road-btn .rb-arena { display: none; }
+  .np-rank { max-width: 120px; }
+}
+/* Cost bubble sits inside the card header (the scrolling grid would clip it outside) */
+.collection-card .cc-cost { position: static; flex: none; }

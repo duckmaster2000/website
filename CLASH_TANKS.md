@@ -9,11 +9,13 @@ Notes on the prototype tank game at `caleb-liu.com/prototype.html`: what was cha
 | Piece | File(s) | Runs where |
 |---|---|---|
 | **Game engine**: arena, cards, movement, combat, towers, clock, AI | `clash-tanks-server/clash-tanks-server/shared/clash-sim.js` | Browser (Local PvP, vs AI) **and** server (Online) |
-| Arena renderer (canvas drawing, effects, HUD, placement preview, announcements, emote bubbles) | `prototype_arena.js` | Browser |
+| **Trophy Road rules**: arenas, trophy gains/losses, milestones, anti-exploit guards | `clash-tanks-server/clash-tanks-server/shared/trophy-road.js` | Browser (tested in Node) |
+| Arena renderer (canvas drawing, arena themes, effects, HUD, placement preview, announcements, emote bubbles) | `prototype_arena.js` | Browser |
+| Trophy Road screen, rank display, deck editor | `prototype_road.js` | Browser |
 | Emote artwork (animated faces drawn with canvas paths) | `prototype_emotes.js` | Browser |
 | Page logic (menus, progression, chests, decks, lobby, input, sound) | `prototype_v4.js`, `prototype.html`, `prototype.css` | Browser |
 | Online server (matchmaking, rooms, runs the engine) | `clash-tanks-server/clash-tanks-server/server.js` | Render |
-| Tests | `clash-tanks-server/clash-tanks-server/test/sim.test.js` | `npm test` |
+| Tests | `clash-tanks-server/clash-tanks-server/test/sim.test.js`, `test/trophy.test.js` | `npm test` |
 
 **One engine for every mode.** Local PvP, vs AI and Online all use the same `clash-sim.js`, so they always play by identical rules. Change gameplay **only** in that file. Don't put a second copy of the rules in the server.
 
@@ -33,7 +35,8 @@ The page loads the engine straight from the server folder (`<script src="clash-t
 
 1. Commit and push everything in GitHub Desktop. Make sure these are included:
    - `prototype_arena.js`
-   - `prototype_emotes.js` (new)
+   - `prototype_emotes.js`
+   - `prototype_road.js` (new)
    - `clash-tanks-server/clash-tanks-server/shared/`
    - `clash-tanks-server/clash-tanks-server/test/`
 2. Render redeploys the server by itself.
@@ -210,9 +213,55 @@ All of this applies to **Local PvP, vs AI and Online** (rules in `clash-sim.js`)
 
 ---
 
+### 9. Trophy Road, 28 new cards, deck editor
+All gameplay is in the shared engine, so it applies to **Local PvP, vs AI and Online**.
+
+**Trophy Road** (`shared/trophy-road.js` rules, `prototype_road.js` screen; open it with the 🏆 button)
+- 10 arenas, each with its own battlefield look: Boot Camp (0), Scrapyard (300), Frost Pass (700), Sunscorch Dunes (1100), Jungle Ruins (1500), Volcano Forge (2000, lava river), Neon Circuit (2600), Sky Citadel (3300), Royal Colosseum (4000), Legend Summit (5000). Ranks: "Frost Pass II" inside an arena; Legend → Champion → Grand Champion → Ultimate Champion above 5000. Max 7000.
+- **Which matches count:** vs AI with **🏆 Ranked** on, and online **Find Match**. Local PvP, private rooms and rematches are friendly (no trophies).
+- **Trophies:** online win +30; losses cost 5 (Boot Camp) rising to 30 (top arenas). vs AI: Easy +12, Normal +20, Hard +26, Insane +32 per win, and each difficulty has a ceiling (Easy 800, Normal 2000, Hard 3600), so an easy AI can't carry you up the road. Harder AIs also cost fewer trophies on a loss. You never drop below the gate of the arena you're in.
+- **Ranked vs AI** uses an arena-appropriate AI deck (`Sim.buildAiDeck`) at your average card level, and the difficulty's own tower HP. The practice AI deck and HP sliders only apply when Ranked is off. "Custom" difficulty plays as Normal in ranked.
+- **62 milestones:** every arena gate gives its first new card plus gold; 5 stops inside each arena give the rest of its cards, gold, chests (granted instantly), card copies and 4 new emotes (Love it, Hmm…, Zzz, Champion). Rewards stay claimable after losing trophies (they track your best). "Claim all" grabs everything waiting.
+- **Unlocks:** chests and win rewards only drop cards from arenas you've reached. Locked cards say where they come from.
+- **Battlefield theme:** pick any reached arena on the Trophy Road screen (Auto = current arena).
+- **Exploit and duplicate protection:** each match result is applied once (by match id; the server sends a unique id per match). Each milestone is claimed once (marked before rewards are granted, then saved). Once you play a card in a ranked match, leaving (Start Match again, or closing/reloading the page) counts as a loss; closing the page is settled on the next load. An opponent leaving an online ranked match gives you the win. Saves are cleaned on load (bad numbers, unknown or unreached claims). Admin mode can't claim road rewards, and "Earn Chest" is now admin-only.
+
+**28 new cards** (one version each, all with descriptions; arena in brackets)
+| Type | Cards |
+|---|---|
+| Spells | Tar Trap (1, slow zone), Frost Nova (2, freezes troops/buildings/towers 3s), Boulder Roll (3, rolls 10 tiles, knockback), Acid Pool (3, damage over 6s + slow), Repair Wave (4, heals your troops/buildings, never towers), Overdrive (5, +40% speed for your troops), Gravity Well (6, pulls troops together, can't drag ground troops into the river), Paratroopers (7, drops 6 troopers anywhere over 4s), Orbital Laser (8, strikes the 3 toughest enemies after a lock-on) |
+| Buildings | Bone Crypt (1, skeleton spawner), Flak Tower (2, air only), Mortar Bunker (3, 11.5-tile siege with a blind spot), Drone Hangar (4, air spawner), Siren Beacon (4, taunts nearby troops), Inferno Spire (5, beam ramps to 10×, reset by stuns), Elixir Pump (5, +1 elixir every 9s), Tesla Pit (6, hides underground until something's in range) |
+| Troops | Flak Gunner (1, air only, holds position), Spark Spirit (1, stun chain kamikaze), Shield Knight (2, 280 shield), Cryo Caster (2, slows on hit), Mole Driller (3, deploys anywhere, 35% crown damage), Medic Bot (4, heals allies), Tesla Tank (5, charged blast, reset by stuns), Boomerang Bot (6, piercing blade out and back), Phantom Rider (6, invulnerable dash, double hit), Storm Zeppelin (7, flying tank, bursts into 4 sprites), Rock Titan (8, building-buster, shatters into 2 shards) |
+
+New engine systems behind them: lingering zones (`state.zones`), status effects (freeze, slow, haste, shield, hidden, invulnerable), spawner and elixir buildings, death spawns, ramp-up beams, dashes, piercing blades, deploy-anywhere, air-only targeting, and token units (spawned troops that are never in a deck). The online preview check knows the deploy-anywhere rule.
+
+**AI**
+- Values every spell type on its own terms (damage, freezes, pulls, laser targets, boulder paths, slows, friendly heals/haste, troop drops on lightly defended towers).
+- Defends with anti-air, ramp-up beams, decoys and spawners where they fit; places defensive buildings in the threatened lane toward the middle.
+- Offense: Mortar Bunker sieges from beside the river, Mole Driller tunnels to the target tower, Elixir Pump only when things are quiet.
+- Counts spells you cast (it now sees instant spells like Shock too) when estimating your elixir.
+
+**Deck editor**
+- 3 decks (tabs), cost bubbles, average elixir, troop/spell/building counts, and warnings (no win condition, no spell, nothing hits air, heavy deck).
+- Filters (type, owned/locked, show variants), sorting (cost, rarity, arena, name), search across descriptions. Tap a card then a slot, or a slot then a card.
+
+**Polish**
+- Arena themes, drawings for every zone and status (frozen, slowed, hasted, shielded, burrowed, dashing, healing, Inferno beam), new projectiles and effects (laser beams, parachutes, elixir drops, shield shatter), a full-path preview for Boulder Roll, green previews for friendly spells.
+- Results screen shows the trophy change counting up, the new rank, arena promotions, and why a gain was capped or a loss stopped at a gate. New sounds for the new effects, trophies and arenas.
+- Nameplates show your rank, "🏆 Ranked · Hard AI" or "Practice / Friendly".
+
+**Balance:** tuned from ~5,000 AI-vs-AI matches with random arena-9 decks. New cards land between about 42% and 64% win rate when included (the expensive tanks, Rock Titan and Storm Zeppelin, are at the top). Some older swarm cards (Bomb Beetles, Rabbit Rush, Goblin Bikers) sit at 35–40% and were left as they were.
+
+### 10. Fix: placing a swarm froze the game
+Swarm members land a moment apart, which made the drop-in animation compute a negative shadow size; the canvas threw and the frame loop stopped. The renderer now clamps it, and the frame loop keeps running even if a frame throws (the error is logged).
+
 ## Testing done
 
-- **22 automated tests** (`npm test`), all passing. Added in step 8: spells can be cast anywhere (and the online preview agrees), Fire Bomb flight/knockback/reduced tower damage, Shock stun and Rocket Rain swarm clear, an AI-vs-AI match with spell decks (legal moves only, spells used), emote validation and rate limits, and AI emotes. The original 16:
+- **59 automated tests** (`npm test`). Added in step 9: one test per new card mechanic (freeze, damage-over-time, slow/haste, heal, pull, laser, boulder, paratroopers, anti-air, ramp-up, siege range, hidden building, spawners, elixir pump, taunt, healer, death spawns, charge reset, shield, slow on hit, dash, pierce, deploy-anywhere with matching online preview, stun chain), the AI deck builder at every arena, AI-vs-AI matches with the new cards (legal moves only, spells and buildings used), and 10 Trophy Road tests (trophy maths, floors, AI ceilings, duplicate results, milestone claims, abandoned matches, save clean-up, every new card on the road once in its own arena).
+- **Headless Chrome (this round):** ranked AI win with arena promotion, forfeit by restarting and by reloading, practice and local PvP give no trophies, Trophy Road claim/claim-all/double-claim/theme switch, every card (all 191) deployed and drawn for both sides, a staged battle with every new effect, the deck editor (tabs, filters, slot swap, saved), two-window online (ranked queue start, forfeit win +30, friendly room with no trophies), and a 375 px phone screen (no horizontal scrolling). No console errors.
+- Earlier tests:
+
+  - 22 automated tests at step 8. Added in step 8: spells can be cast anywhere (and the online preview agrees), Fire Bomb flight/knockback/reduced tower damage, Shock stun and Rocket Rain swarm clear, an AI-vs-AI match with spell decks (legal moves only, spells used), emote validation and rate limits, and AI emotes. The original 16:
   1. Melee units find and attack nearby troops.
   2. Building-only units ignore distracting troops.
   3. Ranged units attack from range and stop there.
@@ -236,6 +285,8 @@ All of this applies to **Local PvP, vs AI and Online** (rules in `clash-sim.js`)
 
 ## Still to do
 
+- **Trophies live in the browser** (localStorage), like the rest of progress. There are no accounts, so someone could edit their save, or play themselves online in two windows to farm wins. Real protection needs server-side accounts.
+- **Online card levels** are whatever the client sends (unchanged from before).
 - **Balance** needs tuning from real play. With spells and the new AI, AI-vs-AI matches average about 2:30 (60 random-deck matches: 28–26 with 6 draws).
 - **Step 8 browser checks** (headless Chrome): vs AI (emote wheel, rate limit, locked emotes, spells, crown and victory banners, results sheet, achievements), two-window Online (emotes both ways, server rate limit, mute, spell sync, post-match emote), Local PvP (both emote wheels), a 375 px phone screen, and a ~100-unit stress test at 60 fps. No console errors.
 - **Live server:** online play has only been tested against a local copy of the server. The real Render server only updates once this is pushed.

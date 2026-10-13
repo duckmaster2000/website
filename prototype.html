@@ -39,7 +39,9 @@
             <option value="ai">1v1 vs Enemy AI</option>
             <option value="online">1v1 Online vs Opponent</option>
           </select>
+          <label class="ranked-toggle" id="ptRankedWrap" title="Ranked: trophies count, the AI brings an arena deck. Off: practice with your own AI deck and tuning."><input type="checkbox" id="ptRanked" checked /> 🏆 Ranked</label>
           <button id="ptStartMatch" type="button">Start Match</button>
+          <button id="ptRoadBtn" type="button" class="road-btn" aria-label="Open the Trophy Road">🏆 Trophy Road</button>
           <button id="ptSound" type="button" aria-pressed="true">🔊 Sound</button>
           <button id="ptAdminToggle" type="button">Admin Panel</button>
           <button id="ptResetUpgrades" type="button">Reset Upgrades</button>
@@ -95,6 +97,7 @@
         <div class="nameplate nameplate-b" id="ptStatusTop">
           <div class="np-left">
             <span class="np-name" id="ptNameB">Commander B</span>
+            <span class="np-rank" id="ptRankB"></span>
             <span class="np-towers" id="ptTowerB">⬡⬡⬡</span>
           </div>
           <div class="np-bars">
@@ -131,6 +134,7 @@
         <div class="nameplate nameplate-a" id="ptStatusBottom">
           <div class="np-left">
             <span class="np-name" id="ptNameA">Commander A</span>
+            <span class="np-rank" id="ptRankA"></span>
             <span class="np-towers" id="ptTowerA">⬡⬡⬡</span>
           </div>
           <div class="np-bars">
@@ -152,7 +156,7 @@
 
       <section class="panel progression">
         <h3>Collection Progression</h3>
-        <p class="note">Build a collection of 160 cards, level them up, and pick only 8 cards per match.</p>
+        <p class="note">Collect 190 cards, level them up, and build three 8-card decks. Climb the 🏆 Trophy Road to unlock new arenas and cards.</p>
         <div class="progress-grid">
           <article>
             <h4>Wallet</h4>
@@ -196,22 +200,27 @@
         </div>
 
         <div class="deck-builder">
-          <h4>Battle Deck (8 Cards Max)</h4>
-          <p class="note">Select a card in collection, then click a deck slot to assign it.</p>
+          <div class="deck-head">
+            <h4>Battle Deck</h4>
+            <div class="deck-tabs" id="ptDeckTabs" role="tablist" aria-label="Decks"></div>
+          </div>
+          <div class="deck-summary" id="ptDeckSummary"></div>
+          <p class="note">Tap <b>Use</b> on a card, then a slot to swap it in. Or tap a slot first, then a card.</p>
           <div class="deck-slots" id="ptDeckSlots"></div>
         </div>
 
         <div class="deck-builder" id="ptAiDeckPanel">
-          <h4>AI Deck (8 Cards Max)</h4>
-          <p class="note">Select a card in collection, then click an AI slot to assign it.</p>
+          <h4>Practice AI Deck</h4>
+          <p class="note">Used in vs AI when 🏆 Ranked is off. Ranked AI brings its own deck from your arena.</p>
           <div class="deck-slots" id="ptAiDeckSlots"></div>
         </div>
 
         <div class="collection-panel">
           <div class="collection-head">
-            <h4>Card Collection</h4>
-            <input id="ptCardSearch" type="text" placeholder="Search cards, role, style, rarity" autocomplete="off" />
+            <h4>Card Collection <span class="coll-count" id="ptCollCount"></span></h4>
+            <input id="ptCardSearch" type="text" placeholder="Search name, role, rarity, effect" autocomplete="off" />
           </div>
+          <div class="coll-filters" id="ptCollFilters"></div>
           <div class="collection-grid" id="ptCardCollection"></div>
         </div>
       </section>
@@ -225,6 +234,7 @@
       <p class="win-headline" id="ptWinHeadline">VICTORY!</p>
       <div class="win-crowns" id="ptWinCrowns" aria-label="Crowns"></div>
       <p class="win-subline" id="ptWinSubline"></p>
+      <div class="win-trophies" id="ptWinTrophies" hidden></div>
       <div class="win-stats" id="ptWinStats"></div>
       <div class="win-card-slot" id="ptWinCardSlot" hidden>
         <div class="win-card-reveal" id="ptWinCardReveal"></div>
@@ -263,12 +273,23 @@
     </div>
   </div>
 
+  <div class="road-overlay" id="ptRoadOverlay" hidden>
+    <div class="road-modal" role="dialog" aria-modal="true" aria-label="Trophy Road">
+      <button type="button" class="road-close" id="ptRoadClose" aria-label="Close">✕</button>
+      <header class="road-head" id="ptRoadHead"></header>
+      <div class="road-tools" id="ptRoadTools"></div>
+      <div class="road-track" id="ptRoadTrack"></div>
+    </div>
+  </div>
+
   <div class="toast-stack" id="ptToasts" aria-live="polite"></div>
 
   <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
   <script src="clash-tanks-server/clash-tanks-server/shared/clash-sim.js"></script>
+  <script src="clash-tanks-server/clash-tanks-server/shared/trophy-road.js"></script>
   <script src="prototype_emotes.js"></script>
   <script src="prototype_arena.js"></script>
+  <script src="prototype_road.js"></script>
   <script src="prototype_v4.js"></script>
 </body>
 </html>
