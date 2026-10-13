@@ -258,7 +258,7 @@ test('every card can reach and damage an enemy tower from either side', () => {
   const failures = [];
   const times = [];
   for (const card of Sim.CARD_LIBRARY) {
-    if (card.building) continue;
+    if (card.building || card.spell) continue;
     for (const [side, x, y] of [['A', 4, 22], ['A', 15, 28], ['B', 13, 10]]) {
       const s = Sim.createMatch({ seed: 5 });
       s.towers.forEach((t) => { t.active = false; t.hp = t.hpMax = 1e6; });
@@ -297,4 +297,120 @@ test('snapshot deploy check (online preview) agrees with the real rules', () => 
     }
   }
   assert.equal(mismatches, 0);
+});
+
+// ─── Spells ────────────────────────────────────────────────────────────────
+
+function spellMatch(deckA) {
+  const s = Sim.createMatch({ seed: 21, decks: { A: deckA } });
+  s.players.A.elixir = 10;
+  return s;
+}
+
+test('spells can be cast anywhere in the arena, but not off it', () => {
+  const s = spellMatch(['firebomb', 'shock', 'rocketrain', 'brawler', 'scout', 'siege', 'guardian', 'voltbug']);
+  const fire = s.players.A.cards.firebomb;
+  assert.ok(Sim.canDeploy(s, 'A', 9, 4, fire), 'deep in enemy territory');
+  assert.ok(Sim.canDeploy(s, 'A', 3, 16, fire), 'over the river');
+  assert.ok(!Sim.canDeploy(s, 'A', -1, 4, fire), 'off the arena');
+  const snap = Sim.snapshot(s);
+  assert.ok(Sim.canDeployOnSnapshot(snap, 'A', 9, 4, fire), 'online preview agrees');
+  const res = Sim.deploy(s, 'A', 'firebomb', 9, 4);
+  assert.ok(res.ok);
+  assert.equal(res.units.length, 0, 'spells spawn no units');
+  assert.equal(s.players.A.elixir, 6);
+  assert.ok(!s.players.A.hand.includes('firebomb'), 'spell cycles out of hand');
+});
+
+test('Fire Bomb flies from the king tower, hits a cluster, knocks back, and chips towers less', () => {
+  const s = spellMatch(['firebomb', 'shock', 'rocketrain', 'brawler']);
+  s.towers.forEach((t) => { t.active = false; });
+  const pack = [Sim.spawnDirect(s, 'B', 'scrapbots', 3.5, 9.5), Sim.spawnDirect(s, 'B', 'scrapbots', 4.3, 9.6), Sim.spawnDirect(s, 'B', 'flarepod', 3.9, 10.2)];
+  pack.forEach((u) => { u.speed = 0; u.dmg = 0; });
+  const tower = s.towers.find((t) => t.id === 'T-B-L');
+  const towerHp = tower.hp;
+  const before = pack.map((u) => ({ hp: u.hp, y: u.y }));
+  Sim.deploy(s, 'A', 'firebomb', 3.8, 9.6);
+  assert.equal(pack[0].hp, before[0].hp, 'no damage before the bomb lands');
+  run(s, 2.5);
+  pack.forEach((u, i) => assert.ok(u.hp < before[i].hp, `unit ${i} damaged`));
+  assert.ok(Math.hypot(pack[2].x - 3.9, pack[2].y - before[2].y) > 0.3, 'survivor knocked back');
+  const towerLoss = towerHp - tower.hp;
+  const unitLoss = before[2].hp - Math.max(0, pack[2].hp);
+  assert.ok(towerLoss > 0 && towerLoss < unitLoss * 0.5, `tower took reduced damage (${towerLoss} vs ${unitLoss})`);
+});
+
+test('Shock stuns troops and towers instantly; Rocket Rain clears a swarm', () => {
+  const s = spellMatch(['shock', 'rocketrain', 'firebomb', 'brawler']);
+  const hog = Sim.spawnDirect(s, 'B', 'ramhog', 9, 20);
+  run(s, 0.5);
+  const y0 = hog.y;
+  Sim.deploy(s, 'A', 'shock', hog.x, hog.y);
+  assert.ok(hog.stunT > 0, 'stunned right away');
+  run(s, 0.4);
+  assert.ok(Math.abs(hog.y - y0) < 0.05, 'stunned unit does not move');
+  run(s, 1);
+  assert.ok(Math.abs(hog.y - y0) > 0.2, 'moves again after the stun');
+
+  const s2 = spellMatch(['rocketrain', 'shock', 'firebomb', 'brawler']);
+  const bees = [];
+  for (let i = 0; i < 4; i++) bees.push(Sim.spawnDirect(s2, 'B', 'beeblitz', 8 + i * 0.6, 12));
+  bees.forEach((b) => { b.speed = 0; });
+  Sim.deploy(s2, 'A', 'rocketrain', 9, 12);
+  run(s2, 3);
+  assert.equal(bees.filter((b) => s2.units.includes(b)).length, 0, 'all bees cleared');
+});
+
+test('AI with spells in its deck plays a full, legal match and uses its spells', () => {
+  const deck = ['firebomb', 'shock', 'rocketrain', 'brawler', 'scout', 'junkpack', 'bugsquad', 'flarepod'];
+  const s = Sim.createMatch({ seed: 99, decks: { A: deck, B: deck } });
+  const brains = { A: Sim.createAi('A', { strategicChance: 0.9 }, 3), B: Sim.createAi('B', { strategicChance: 0.9 }, 4) };
+  let refused = 0;
+  let spellsCast = 0;
+  while (s.running && s.time < 260) {
+    for (const side of ['A', 'B']) {
+      const res = Sim.aiUpdate(s, brains[side], STEP);
+      if (res && !res.ok) refused++;
+      if (res && res.ok && res.units.length === 0) spellsCast++;
+    }
+    Sim.step(s);
+  }
+  assert.equal(refused, 0);
+  assert.ok(spellsCast >= 3, `spells cast: ${spellsCast}`);
+  console.log(`    winner ${s.winner} by ${s.endReason} at ${s.time.toFixed(0)}s, ${spellsCast} spells cast`);
+});
+
+// ─── Emotes ────────────────────────────────────────────────────────────────
+
+test('emotes are validated and rate limited', () => {
+  const s = Sim.createMatch({ seed: 3 });
+  assert.equal(Sim.emote(s, 'A', 'nope').ok, false, 'unknown emote refused');
+  assert.equal(Sim.emote(s, 'A', 'laugh').ok, true);
+  assert.equal(Sim.emote(s, 'A', 'cry').ok, false, 'too soon after the last one');
+  assert.equal(Sim.emote(s, 'B', 'cry').ok, true, 'limits are per player');
+  const fx = Sim.takeFx(s).filter((f) => f.type === 'emote');
+  assert.deepEqual(fx.map((f) => [f.owner, f.emote]), [['A', 'laugh'], ['B', 'cry']]);
+  // Spamming as fast as allowed still caps out within the window
+  let sent = 1;
+  for (let i = 0; i < 20 * 20; i++) {
+    Sim.step(s);
+    if (Sim.emote(s, 'A', 'thumbs').ok) sent++;
+  }
+  assert.ok(sent <= Sim.EMOTE_RULES.maxInWindow + 1, `sent ${sent} in ~20s`);
+});
+
+test('AI emotes when it takes or loses a tower, and at the end, without spamming', () => {
+  const s = Sim.createMatch({ seed: 5 });
+  const brain = Sim.createAi('B', { emoteChance: 1 }, 9);
+  const emotes = [];
+  const tick = () => { Sim.aiUpdate(s, brain, STEP); Sim.step(s); Sim.takeFx(s).forEach((f) => { if (f.type === 'emote') emotes.push(f); }); };
+  for (let i = 0; i < 20; i++) tick();
+  s.towers.find((t) => t.id === 'T-A-L').hp = 0; // AI just took a tower
+  for (let i = 0; i < 60; i++) tick();
+  assert.ok(emotes.some((e) => e.owner === 'B' && ['laugh', 'celebrate', 'king', 'cool'].includes(e.emote)), 'gloats after taking a tower');
+  const count = emotes.length;
+  s.towers.find((t) => t.id === 'T-B-K').hp = 0; // AI loses
+  for (let i = 0; i < 5; i++) tick();
+  assert.equal(s.running, false);
+  assert.ok(emotes.length === count + 1 && ['gg', 'cry', 'facepalm'].includes(emotes[emotes.length - 1].emote), 'one good-game emote at the end');
 });

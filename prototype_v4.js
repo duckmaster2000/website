@@ -40,6 +40,26 @@ const RARITY_STYLE = {
   champion: { label: 'Champion', color: '#ff728f', copies: 7, gold: 300 }
 };
 
+const SPELL_IDS = ['firebomb', 'shock', 'rocketrain'];
+// Default AI deck (used until you customise it): a real deck with spells, so the AI can use them
+const AI_DEFAULT_DECK = ['brawler', 'siege', 'ramhog', 'voltbug', 'drillcat', 'flarepod', 'firebomb', 'shock'];
+
+// Achievements: stats → gold, and some unlock emotes. progress(s) returns [current, goal].
+const ACHIEVEMENTS = [
+  { id: 'first_win', icon: '🏆', name: 'First Victory', desc: 'Win a match', gold: 100, emote: 'celebrate', progress: (s) => [s.wins, 1] },
+  { id: 'tower_breaker', icon: '🏰', name: 'Tower Breaker', desc: 'Destroy 10 enemy towers', gold: 150, emote: 'cool', progress: (s) => [s.towers, 10] },
+  { id: 'three_crown', icon: '👑', name: 'Three-Crown Win', desc: 'Destroy the enemy King Tower', gold: 200, emote: 'king', progress: (s) => [s.threeCrowns, 1] },
+  { id: 'veteran', icon: '🎖️', name: 'Veteran', desc: 'Play 10 matches', gold: 150, emote: 'facepalm', progress: (s) => [s.matches, 10] },
+  { id: 'giant_slayer', icon: '🗡️', name: 'Giant Slayer', desc: 'Beat the AI on Hard or Insane', gold: 300, progress: (s) => [s.hardWins, 1] },
+  { id: 'online_champ', icon: '🌐', name: 'Online Champion', desc: 'Win an online match', gold: 250, progress: (s) => [s.onlineWins, 1] },
+  { id: 'spell_slinger', icon: '☄️', name: 'Spell Slinger', desc: 'Cast 25 spells', gold: 120, progress: (s) => [s.spells, 25] },
+  { id: 'commander', icon: '🃏', name: 'Commander', desc: 'Play 200 cards', gold: 150, progress: (s) => [s.cards, 200] },
+];
+
+function freshStats() {
+  return { matches: 0, wins: 0, losses: 0, draws: 0, towers: 0, threeCrowns: 0, hardWins: 0, onlineWins: 0, spells: 0, cards: 0, emotes: 0 };
+}
+
 const AI_PRESETS = {
   easy: {
     baseMult: 0.85,
@@ -122,7 +142,11 @@ const state = {
     chests: [],
     buildings: { towerLevel: 1, baseLevel: 1 },
     aiHealth: { baseMult: 1, towerMult: 1 },
-    aiDifficulty: 'normal'
+    aiDifficulty: 'normal',
+    stats: freshStats(),
+    achievements: {},
+    emoteMuted: false,
+    seenSpellNews: false
   }
 };
 
@@ -150,8 +174,13 @@ const ui = {
   chestParticles: null,
   chestStars: null,
   winOverlay: null, winHeadline: null, winSubline: null, winCardSlot: null, winCardReveal: null, winCardLabel: null, winClaim: null, winRematch: null,
-  findMatch: null, cancelQueue: null, queueStatus: null
+  findMatch: null, cancelQueue: null, queueStatus: null,
+  winCrowns: null, winStats: null, winAch: null, confetti: null, toasts: null, achList: null, achCount: null,
+  emoteBtnA: null, emoteBtnB: null, emotePanel: null, emoteGrid: null, emoteHint: null, emoteMute: null
 };
+
+let matchToken = 0;        // bumps every new match so stale timers (result screens) don't fire
+let lastTickSecond = null; // final-seconds countdown ticks
 
 function $(id) { return document.getElementById(id); }
 function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
@@ -177,6 +206,11 @@ function unlockInitial() {
   // Everyone gets the basic defensive building so that role is available from the start
   const turret = cardProgress('boltturret');
   if (!turret.unlocked) { turret.unlocked = true; turret.copies += 1; }
+  // ...and the spells
+  SPELL_IDS.forEach((id) => {
+    const cp = cardProgress(id);
+    if (!cp.unlocked) { cp.unlocked = true; cp.copies += 1; }
+  });
 }
 
 function saveProgress() {
@@ -301,6 +335,10 @@ function applySavedProgress(saved) {
     state.progress.aiDifficulty = Object.prototype.hasOwnProperty.call(AI_PRESETS, saved.aiDifficulty)
       ? saved.aiDifficulty
       : 'normal';
+    state.progress.stats = Object.assign(freshStats(), saved.stats && typeof saved.stats === 'object' ? saved.stats : {});
+    state.progress.achievements = saved.achievements && typeof saved.achievements === 'object' ? saved.achievements : {};
+    state.progress.emoteMuted = !!saved.emoteMuted;
+    state.progress.seenSpellNews = !!saved.seenSpellNews;
   }
 }
 
@@ -309,8 +347,10 @@ function loadProgress() {
     applySavedProgress(JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}'));
   } catch (_) {}
   unlockInitial();
-  if (!Array.isArray(state.progress.aiDeck) || state.progress.aiDeck.length === 0) {
-    state.progress.aiDeck = [...STARTER_DECK];
+  const aiDeck = state.progress.aiDeck;
+  // An AI deck that was never customised gets the newer default (which includes spells)
+  if (!Array.isArray(aiDeck) || aiDeck.length === 0 || aiDeck.join() === STARTER_DECK.join()) {
+    state.progress.aiDeck = [...AI_DEFAULT_DECK];
   }
   saveProgress();
 }
@@ -406,8 +446,22 @@ function setupMatch() {
   state.snapPrev = Sim.snapshot(state.match);
   state.snapCur = state.snapPrev;
   state.view = state.snapCur;
+  beginMatchPresentation();
   renderDecks();
   renderStatus();
+}
+
+// Fresh arena, names for announcements, and the "BATTLE!" banner
+function beginMatchPresentation() {
+  matchToken++;
+  closeEmotePanel();
+  lastTickSecond = null;
+  if (ui.winOverlay) ui.winOverlay.hidden = true;
+  if (!arena) return;
+  arena.reset();
+  arena.setNames({ A: playerName('A'), B: playerName('B') });
+  arena.announce('BATTLE!', { sub: state.viewSource === 'online' ? 'Destroy the enemy King Tower' : null, color: '#ffe680', dur: 1400, urgent: true });
+  Sound.play('start');
 }
 
 // Gold trickles in from damage you deal in local modes (same idea as before the arena rework)
@@ -438,6 +492,8 @@ function stepLocalMatch(dt) {
     if (!m.running) {
       state.acc = 0;
       onVictory(m.winner);
+      // The AI gets its last word (a good-game emote) in after the final whistle
+      if (state.ai) { Sim.aiUpdate(m, state.ai, 0); handleFx(Sim.takeFx(m)); }
       break;
     }
   }
@@ -534,12 +590,50 @@ function showWinOverlay(result, cardAward, goldBonus, isOnline, extra) {
     ui.winRematch.disabled = false;
     ui.winRematch.textContent = 'Rematch';
   }
-  if (ui.winClaim) ui.winClaim.textContent = 'Continue';
+  if (ui.winClaim) ui.winClaim.textContent = isOnline ? 'Continue' : 'Play Again';
+  if (ui.winCrowns) {
+    const n = clamp(x.crowns || 0, 0, 3);
+    ui.winCrowns.innerHTML = [0, 1, 2].map((i) => `<span class="win-crown${i < n ? ' lit' : ''}" style="--i:${i}">👑</span>`).join('');
+  }
+  if (ui.winStats) {
+    ui.winStats.innerHTML = (x.stats || []).map(([label, value]) => `<div><strong>${value}</strong><span>${label}</span></div>`).join('');
+  }
+  if (ui.winAch) {
+    ui.winAch.innerHTML = (x.achievements || []).map((a) => `<div class="win-ach-row"><span>${a.icon}</span><b>${a.name}</b><em>+${a.gold} gold${a.emote ? ' · new emote!' : ''}</em></div>`).join('');
+  }
+  if (ui.confetti) {
+    ui.confetti.innerHTML = won ? confettiHtml(46) : '';
+  }
   ui.winOverlay.hidden = false;
+}
+
+function confettiHtml(n) {
+  const colors = ['#ff4d6d', '#4dc3ff', '#ffe14d', '#7dff8a', '#c38bff', '#ffb347'];
+  let html = '';
+  for (let i = 0; i < n; i++) {
+    const left = Math.random() * 100;
+    const delay = Math.random() * 0.6;
+    const dur = 1.6 + Math.random() * 1.4;
+    const rot = Math.round(Math.random() * 720 - 360);
+    html += `<i style="left:${left.toFixed(1)}%;background:${colors[i % colors.length]};animation-delay:${delay.toFixed(2)}s;animation-duration:${dur.toFixed(2)}s;--rot:${rot}deg"></i>`;
+  }
+  return html;
+}
+
+// Short pause on the arena (banner, explosions, last emotes) before the results sheet
+function presentResult(result, headline, showOverlay) {
+  const token = matchToken;
+  closeEmotePanel();
+  if (arena) {
+    const color = result === 'win' ? '#8effd2' : result === 'draw' ? '#ffe680' : '#ff7070';
+    arena.announce(headline, { color, big: true, dur: 2200, urgent: true });
+  }
+  setTimeout(() => { if (token === matchToken) showOverlay(); }, 1900);
 }
 
 function closeWinOverlay() {
   if (ui.winOverlay) ui.winOverlay.hidden = true;
+  if (ui.confetti) ui.confetti.innerHTML = '';
   if (lastMatchWasOnline) {
     if (ui.lobbyPanel) ui.lobbyPanel.hidden = false;
     if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Ready. Create or join a room.';
@@ -581,13 +675,261 @@ function onVictory(winner) {
   } else {
     writeLog(`${playerName('B')} wins. ${reason}. Press Start Match to rematch.`);
   }
+  const result = winner === 'draw' ? 'draw' : winner === 'A' ? 'win' : 'loss';
+  const snap = state.snapCur;
+  const me = snap && snap.players.A;
+  const newAch = recordMatch({
+    result,
+    crowns: me ? me.crowns : 0,
+    kingKill: winner === 'A' && state.match?.endReason === 'king',
+    hardAi: state.mode === 'ai' && ['hard', 'insane'].includes(state.progress.aiDifficulty),
+    online: false,
+  });
   saveProgress();
   renderProgress();
   renderCollection();
   Sound.play(winner === 'A' ? 'win' : winner === 'draw' ? 'draw' : 'lose');
-  const result = winner === 'draw' ? 'draw' : winner === 'A' ? 'win' : 'loss';
-  const headline = state.mode === 'pvp' && winner !== 'draw' ? `${playerName(winner).toUpperCase()} WINS!` : null;
-  showWinOverlay(result, cardAward, goldBonus, false, { headline, detail: `${reason} · ${crownLine(state.snapCur)}` });
+  const pvp = state.mode === 'pvp';
+  const headline = pvp && winner !== 'draw' ? `${playerName(winner).toUpperCase()} WINS!` : null;
+  const banner = headline || (result === 'win' ? 'VICTORY!' : result === 'draw' ? 'DRAW' : 'DEFEAT');
+  const crownSide = pvp && winner === 'B' ? 'B' : 'A';
+  presentResult(result, banner, () => showWinOverlay(result, cardAward, goldBonus, false, {
+    headline,
+    detail: `${reason} · ${crownLine(snap)}`,
+    crowns: snap ? snap.players[crownSide].crowns : 0,
+    stats: matchStats(snap, crownSide),
+    achievements: newAch,
+  }));
+}
+
+function matchStats(snap, side) {
+  if (!snap) return [];
+  const p = snap.players[side];
+  const t = Math.round(snap.time || 0);
+  return [
+    ['Damage dealt', (p.dmg || 0).toLocaleString()],
+    ['Cards played', p.played || 0],
+    ['Match time', `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`],
+  ];
+}
+
+// ─── Stats & achievements ───────────────────────────────────────────────────
+
+function recordMatch(r) {
+  const st = state.progress.stats;
+  st.matches += 1;
+  if (r.result === 'win') st.wins += 1;
+  else if (r.result === 'loss') st.losses += 1;
+  else st.draws += 1;
+  st.towers += Math.min(3, r.crowns || 0);
+  if (r.kingKill) st.threeCrowns += 1;
+  if (r.result === 'win' && r.hardAi) st.hardWins += 1;
+  if (r.result === 'win' && r.online) st.onlineWins += 1;
+  return checkAchievements();
+}
+
+function checkAchievements() {
+  const st = state.progress.stats;
+  const earned = [];
+  ACHIEVEMENTS.forEach((a) => {
+    if (state.progress.achievements[a.id]) return;
+    const [cur, goal] = a.progress(st);
+    if (cur < goal) return;
+    state.progress.achievements[a.id] = Date.now();
+    state.progress.gold += a.gold;
+    earned.push(a);
+  });
+  earned.forEach((a, i) => setTimeout(() => {
+    const em = a.emote && EmoteArt.EMOTES.find((e) => e.id === a.emote);
+    toast(a.icon, `Achievement: ${a.name}`, `+${a.gold} gold${em ? ` · Emote unlocked: ${em.name}` : ''}`);
+    Sound.play('achievement');
+  }, 2300 + i * 900));
+  if (earned.length) { buildEmoteGrid(); renderAchievements(); }
+  return earned;
+}
+
+function renderAchievements() {
+  if (!ui.achList) return;
+  const st = state.progress.stats;
+  const done = ACHIEVEMENTS.filter((a) => state.progress.achievements[a.id]).length;
+  if (ui.achCount) ui.achCount.textContent = `${done}/${ACHIEVEMENTS.length}`;
+  ui.achList.innerHTML = ACHIEVEMENTS.map((a) => {
+    const got = !!state.progress.achievements[a.id];
+    const [cur, goal] = a.progress(st);
+    const pct = clamp((cur / goal) * 100, 0, 100);
+    const em = a.emote && EmoteArt.EMOTES.find((e) => e.id === a.emote);
+    return `<li class="${got ? 'done' : ''}"><span class="ach-icon">${a.icon}</span><div class="ach-body"><b>${a.name}</b><small>${a.desc} · ${a.gold}g${em ? ` + “${em.name}” emote` : ''}</small><span class="ach-bar"><i style="width:${pct}%"></i></span></div><span class="ach-state">${got ? '✓' : `${Math.min(cur, goal)}/${goal}`}</span></li>`;
+  }).join('');
+}
+
+function toast(icon, title, sub) {
+  if (!ui.toasts) return;
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.innerHTML = `<span class="toast-icon">${icon}</span><div><b></b><small></small></div>`;
+  el.querySelector('b').textContent = title;
+  el.querySelector('small').textContent = sub || '';
+  ui.toasts.appendChild(el);
+  setTimeout(() => el.classList.add('out'), 3800);
+  setTimeout(() => el.remove(), 4300);
+}
+
+// ─── Emotes ─────────────────────────────────────────────────────────────────
+
+const emoteUi = { side: null, lastSent: { A: -1e9, B: -1e9 }, raf: 0 };
+
+function emoteUnlocked(id) {
+  const meta = EmoteArt.EMOTES.find((e) => e.id === id);
+  if (!meta) return false;
+  if (meta.starter || state.admin.active) return true;
+  const ach = ACHIEVEMENTS.find((a) => a.emote === id);
+  return !!(ach && state.progress.achievements[ach.id]);
+}
+
+// The side whose emotes are shown as "mine" (muting only hides the other side)
+function localSide() {
+  return state.viewSource === 'online' ? mySide : 'A';
+}
+
+function localPvp() {
+  return state.viewSource !== 'online' && state.mode === 'pvp';
+}
+
+function emoteHidden(owner) {
+  return state.progress.emoteMuted && !localPvp() && owner !== localSide();
+}
+
+function canEmote(side) {
+  if (!side || !state.view) return false;
+  if (state.viewSource === 'online') return side === mySide && !!socket && socket.connected;
+  if (!state.match) return false;
+  if (state.mode === 'ai') return side === 'A';
+  return true;
+}
+
+function buildEmoteGrid() {
+  if (!ui.emoteGrid) return;
+  ui.emoteGrid.innerHTML = EmoteArt.EMOTES.map((e) => {
+    const open = emoteUnlocked(e.id);
+    const ach = ACHIEVEMENTS.find((a) => a.emote === e.id);
+    const tip = open ? e.name : `Locked: earn “${ach ? ach.name : '?'}”`;
+    return `<button type="button" class="emote-choice${open ? '' : ' locked'}" data-emote="${e.id}" title="${tip}" aria-label="${tip}"><canvas width="112" height="112"></canvas><span>${open ? e.name : '🔒'}</span></button>`;
+  }).join('');
+  drawEmoteGrid(0.35);
+}
+
+function drawEmoteGrid(t) {
+  if (!ui.emoteGrid) return;
+  ui.emoteGrid.querySelectorAll('.emote-choice').forEach((b, i) => {
+    const c = b.querySelector('canvas');
+    const g = c.getContext('2d');
+    g.clearRect(0, 0, c.width, c.height);
+    EmoteArt.draw(g, b.dataset.emote, c.width / 2, c.height / 2 + 4, c.width * 0.3, t + i * 0.37);
+  });
+}
+
+function openEmotePanel(position) {
+  const side = sideAt(position);
+  if (!ui.emotePanel) return;
+  if (!canEmote(side)) { writeLog(state.viewSource === 'online' ? 'Emotes work during online matches.' : 'Start a match to use emotes.'); return; }
+  if (emoteUi.side === side && !ui.emotePanel.hidden) { closeEmotePanel(); return; }
+  emoteUi.side = side;
+  ui.emotePanel.classList.toggle('at-top', position === 'top');
+  ui.emotePanel.hidden = false;
+  if (ui.emoteHint) ui.emoteHint.textContent = 'Tap an emote to send it';
+  updateMuteButton();
+  Sound.play('select');
+  const start = performance.now();
+  const loop = (now) => {
+    if (ui.emotePanel.hidden) return;
+    drawEmoteGrid((now - start) / 1000);
+    emoteUi.raf = requestAnimationFrame(loop);
+  };
+  cancelAnimationFrame(emoteUi.raf);
+  emoteUi.raf = requestAnimationFrame(loop);
+}
+
+function closeEmotePanel() {
+  if (ui.emotePanel) ui.emotePanel.hidden = true;
+  cancelAnimationFrame(emoteUi.raf);
+  emoteUi.side = null;
+}
+
+function emoteButtonFor(side) {
+  return sideAt('bottom') === side ? ui.emoteBtnA : ui.emoteBtnB;
+}
+
+function sendEmote(side, id) {
+  if (!emoteUnlocked(id)) {
+    const ach = ACHIEVEMENTS.find((a) => a.emote === id);
+    if (ui.emoteHint) ui.emoteHint.textContent = ach ? `Unlock with “${ach.name}”: ${ach.desc}` : 'Locked';
+    Sound.play('reject');
+    return;
+  }
+  const gap = Sim.EMOTE_RULES.minGap * 1000;
+  if (performance.now() - emoteUi.lastSent[side] < gap) {
+    if (ui.emoteHint) ui.emoteHint.textContent = 'Easy there! Emote recharging…';
+    Sound.play('reject');
+    return;
+  }
+  if (state.viewSource === 'online') {
+    socket.emit('emote', { id });
+  } else {
+    const res = Sim.emote(state.match, side, id);
+    if (!res.ok) {
+      if (ui.emoteHint) ui.emoteHint.textContent = res.reason === 'Too many emotes' ? 'Too many emotes, take a breather' : 'Emote recharging…';
+      Sound.play('reject');
+      return;
+    }
+    handleFx(Sim.takeFx(state.match));
+  }
+  emoteUi.lastSent[side] = performance.now();
+  if (side === localSide()) state.progress.stats.emotes += 1;
+  const btn = emoteButtonFor(side);
+  if (btn) {
+    btn.style.setProperty('--cd', `${Sim.EMOTE_RULES.minGap}s`);
+    btn.classList.remove('cooling');
+    void btn.offsetWidth;
+    btn.classList.add('cooling');
+  }
+  closeEmotePanel();
+}
+
+function updateMuteButton() {
+  if (!ui.emoteMute) return;
+  const muted = !!state.progress.emoteMuted;
+  ui.emoteMute.hidden = localPvp();
+  ui.emoteMute.textContent = muted ? '🔔 Unmute opponent' : '🔕 Mute opponent';
+  ui.emoteMute.setAttribute('aria-pressed', muted ? 'true' : 'false');
+}
+
+function syncEmoteButtons() {
+  const top = sideAt('top');
+  const bottom = sideAt('bottom');
+  if (ui.emoteBtnA) ui.emoteBtnA.hidden = !canEmote(bottom);
+  if (ui.emoteBtnB) ui.emoteBtnB.hidden = !canEmote(top);
+}
+
+function bindEmotes() {
+  buildEmoteGrid();
+  ui.emoteBtnA?.addEventListener('click', (e) => { e.stopPropagation(); Sound.unlock(); openEmotePanel('bottom'); });
+  ui.emoteBtnB?.addEventListener('click', (e) => { e.stopPropagation(); Sound.unlock(); openEmotePanel('top'); });
+  ui.emoteGrid?.addEventListener('click', (e) => {
+    const b = e.target.closest('.emote-choice');
+    if (b && emoteUi.side) sendEmote(emoteUi.side, b.dataset.emote);
+  });
+  ui.emoteMute?.addEventListener('click', () => {
+    state.progress.emoteMuted = !state.progress.emoteMuted;
+    saveProgress();
+    updateMuteButton();
+    writeLog(state.progress.emoteMuted ? 'Opponent emotes muted.' : 'Opponent emotes unmuted.');
+  });
+  ui.emotePanel?.addEventListener('pointerdown', (e) => e.stopPropagation());
+  document.addEventListener('pointerdown', (e) => {
+    if (!ui.emotePanel || ui.emotePanel.hidden) return;
+    if (e.target.closest('.emote-btn')) return;
+    closeEmotePanel();
+  });
 }
 
 function renderStatus() {
@@ -600,17 +942,35 @@ function renderStatus() {
     const towers = v.towers.filter((t) => t.owner === side);
     const king = towers.find((t) => t.tower === 'king');
     const princesses = towers.filter((t) => t.tower === 'princess').map((t) => (t.hp > 0 ? '⬡' : '✕'));
-    s.name.textContent = playerName(side);
-    s.base.textContent = Math.ceil(king.hp);
-    s.tower.textContent = `${princesses[0]}♛${princesses[1]}  👑${p.crowns}`;
+    setText(s.name, playerName(side));
+    setText(s.base, Math.ceil(king.hp));
+    setText(s.tower, `${princesses[0]}♛${princesses[1]}  👑${p.crowns}`);
     // Like the real game, you can't see your online opponent's elixir
     const hidden = state.viewSource === 'online' && side !== mySide;
-    s.energy.textContent = hidden ? '?' : Math.floor(p.elixir);
+    setText(s.energy, hidden ? '?' : Math.floor(p.elixir));
     const mine = side === 'A' && state.viewSource !== 'online';
-    s.gold.textContent = mine ? `💰 ${state.progress.gold}` : (state.mode === 'ai' && state.viewSource !== 'online' && side === 'B' ? 'ENEMY AI' : '—');
-    if (ui.baseBars[slot]) ui.baseBars[slot].style.width = `${clamp((king.hp / king.hpMax) * 100, 0, 100)}%`;
-    if (ui.energyBars[slot]) ui.energyBars[slot].style.width = hidden ? '0%' : `${clamp((p.elixir / Sim.MATCH.maxElixir) * 100, 0, 100)}%`;
+    setText(s.gold, mine ? `💰 ${state.progress.gold}` : (state.mode === 'ai' && state.viewSource !== 'online' && side === 'B' ? 'ENEMY AI' : '—'));
+    setStyle(ui.baseBars[slot], 'width', `${clamp((king.hp / king.hpMax) * 100, 0, 100).toFixed(1)}%`);
+    setStyle(ui.energyBars[slot], 'width', hidden ? '0%' : `${clamp((p.elixir / Sim.MATCH.maxElixir) * 100, 0, 100).toFixed(1)}%`);
+    const track = ui.energyBars[slot] && ui.energyBars[slot].parentElement;
+    const full = !hidden && p.elixir >= Sim.MATCH.maxElixir && v.running;
+    if (track && track.__full !== full) { track.__full = full; track.classList.toggle('full', full); }
   });
+}
+
+function setText(el, value) {
+  const text = String(value);
+  if (!el || el.__text === text) return;
+  el.textContent = text;
+  el.__text = text;
+}
+
+function setStyle(el, prop, value) {
+  if (!el) return;
+  const key = `__${prop}`;
+  if (el[key] === value) return;
+  el.style[prop] = value;
+  el[key] = value;
 }
 
 function cardButton(owner, id) {
@@ -627,8 +987,9 @@ function cardButton(owner, id) {
   const fill = Math.floor(clamp(p.elixir / card.cost, 0, 1) * 10) * 10;
   const selected = state.selectedCard && state.selectedCard.owner === owner && state.selectedCard.type === id;
   const cp = cardProgress(id);
-  const tags = `${card.winCondition ? ' 👑' : ''}${card.air ? ' ✈' : ''}${card.swarmCount > 1 ? ` ×${card.swarmCount}` : ''}`;
-  return `<button class="card rarity-${card.rarity}${card.winCondition ? ' wc' : ''}${card.swarmCount > 1 ? ' swarm' : ''}" data-owner="${owner}" data-type="${id}" data-disabled="${disabled ? '1' : '0'}" data-short="${short ? '1' : '0'}" data-selected="${selected ? '1' : '0'}" title="${card.name}: ${card.role}"><span class="card-rarity">${RARITY_STYLE[card.rarity].label}${tags}</span><span class="card-icon">${card.icon}</span><span class="card-cost ${costClass(card.cost)}">${card.cost}</span><span class="card-name">${card.name}</span><span class="card-meta">Lv ${cp.level} • ${card.role}</span><span class="card-cd-bar"><i style="width:${cdPct}%"></i></span>${short ? `<span class="card-short" style="transform:scaleX(${fill / 100})"></span>` : ''}</button>`;
+  const tags = `${card.spell ? ' ✦ Spell' : ''}${card.winCondition ? ' 👑' : ''}${card.air ? ' ✈' : ''}${card.swarmCount > 1 ? ` ×${card.swarmCount}` : ''}`;
+  const entering = (handEnter[owner] && handEnter[owner][id] || 0) > performance.now();
+  return `<button class="card rarity-${card.rarity}${card.winCondition ? ' wc' : ''}${card.swarmCount > 1 ? ' swarm' : ''}${card.spell ? ' spell' : ''}${entering ? ' card-enter' : ''}" data-owner="${owner}" data-type="${id}" data-disabled="${disabled ? '1' : '0'}" data-short="${short ? '1' : '0'}" data-selected="${selected ? '1' : '0'}" title="${card.name}: ${card.role}"><span class="card-rarity">${RARITY_STYLE[card.rarity].label}${tags}</span><span class="card-icon">${card.icon}</span><span class="card-cost ${costClass(card.cost)}">${card.cost}</span><span class="card-name">${card.name}</span><span class="card-meta">Lv ${cp.level} • ${card.role}</span><span class="card-cd-bar"><i style="width:${cdPct}%"></i></span>${short ? `<span class="card-short" style="transform:scaleX(${fill / 100})"></span>` : ''}</button>`;
 }
 
 function deckAvgCost(ids) {
@@ -643,10 +1004,21 @@ function avgElixirBar(ids) {
   return `<div class="avg-elixir"><span class="avg-elixir-label">⚡ Avg ${avg.toFixed(1)}</span><span class="avg-elixir-track"><span class="avg-elixir-fill ${cls}" style="width:${pct}%"></span></span></div>`;
 }
 
+// Cards that just cycled into the hand slide in (tracked per card for a moment)
+const handEnter = { A: {}, B: {} };
+const handPrev = { A: null, B: null };
+
+function noteHandChanges(owner, hand) {
+  const prev = handPrev[owner];
+  if (prev) hand.forEach((id) => { if (!prev.includes(id)) handEnter[owner][id] = performance.now() + 420; });
+  handPrev[owner] = hand.slice();
+}
+
 function renderHandDeck(owner) {
   const v = state.view;
   const p = v && v.players[owner];
   const hand = p && p.hand.length ? p.hand : deckFor(owner).slice(0, 4);
+  noteHandChanges(owner, hand);
   const nextCard = p && p.next ? CARD_MAP[p.next] : null;
   const nextHtml = nextCard
     ? `<div class="next-card-preview"><span class="next-label">NEXT</span><span class="next-icon">${nextCard.icon}</span><span class="next-name">${nextCard.name}</span></div>`
@@ -722,7 +1094,32 @@ const Sound = (() => {
     src.start();
   }
 
+  const EMOTE_TUNES = {
+    laugh: () => [700, 600, 700, 600].forEach((f, i) => tone(f, 0.07, { type: 'triangle', delay: i * 0.09, vol: 0.05 })),
+    king: () => [440, 380, 440, 380, 330].forEach((f, i) => tone(f, 0.08, { type: 'square', delay: i * 0.09, vol: 0.03 })),
+    thumbs: () => [660, 990].forEach((f, i) => tone(f, 0.1, { type: 'triangle', delay: i * 0.08, vol: 0.05 })),
+    cry: () => tone(620, 0.55, { slide: 0.45, vol: 0.05 }),
+    angry: () => tone(140, 0.35, { type: 'sawtooth', slide: 0.7, vol: 0.04 }),
+    surprised: () => tone(380, 0.22, { type: 'triangle', slide: 3, vol: 0.05 }),
+    gg: () => [784, 1046].forEach((f, i) => tone(f, 0.16, { type: 'triangle', delay: i * 0.12, vol: 0.05 })),
+    celebrate: () => [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.1, { type: 'triangle', delay: i * 0.06, vol: 0.05 })),
+    facepalm: () => [300, 210].forEach((f, i) => tone(f, 0.22, { type: 'triangle', delay: i * 0.2, vol: 0.05 })),
+    cool: () => [880, 1320].forEach((f, i) => tone(f, 0.12, { delay: i * 0.1, vol: 0.045 })),
+  };
+
   const SOUNDS = {
+    emote: (id) => (EMOTE_TUNES[id] || EMOTE_TUNES.thumbs)(),
+    cast: () => { tone(260, 0.25, { type: 'triangle', slide: 3, vol: 0.04 }); noise(0.15, 0.02); },
+    boom: () => { noise(0.5, 0.12); tone(80, 0.45, { slide: 0.5, vol: 0.1 }); },
+    shock: () => { tone(1400, 0.16, { type: 'square', slide: 0.25, vol: 0.03 }); noise(0.12, 0.05); },
+    rocket: () => { noise(0.14, 0.05); tone(180, 0.12, { type: 'square', slide: 0.5, vol: 0.02 }); },
+    crown: () => [784, 988, 1175, 1568].forEach((f, i) => tone(f, 0.2, { type: 'triangle', delay: i * 0.08, vol: 0.05 })),
+    horn: () => { tone(220, 0.5, { type: 'sawtooth', vol: 0.03 }); tone(330, 0.5, { type: 'sawtooth', delay: 0.05, vol: 0.025 }); },
+    tick: (urgent) => tone(urgent ? 1250 : 900, 0.05, { type: 'square', vol: urgent ? 0.035 : 0.02 }),
+    start: () => [523, 659, 784].forEach((f, i) => tone(f, 0.14, { type: 'triangle', delay: i * 0.07, vol: 0.05 })),
+    double: () => [660, 880, 1100, 1320].forEach((f, i) => tone(f, 0.09, { delay: i * 0.05, vol: 0.04 })),
+    overtime: () => [392, 392, 523].forEach((f, i) => tone(f, 0.18, { type: 'triangle', delay: i * 0.16, vol: 0.05 })),
+    achievement: () => [1046, 1318, 1568, 2093].forEach((f, i) => tone(f, 0.14, { delay: i * 0.07, vol: 0.04 })),
     deploy: () => tone(520, 0.12, { type: 'triangle', slide: 1.6, vol: 0.05 }),
     select: () => tone(760, 0.05, { vol: 0.025 }),
     hit: () => tone(190, 0.05, { type: 'square', vol: 0.01 }),
@@ -734,14 +1131,14 @@ const Sound = (() => {
     lose: () => [392, 330, 262].forEach((f, i) => tone(f, 0.35, { type: 'triangle', delay: i * 0.16, vol: 0.05 })),
     draw: () => [440, 440].forEach((f, i) => tone(f, 0.2, { delay: i * 0.2, vol: 0.04 })),
   };
-  const MIN_GAP = { hit: 0.07, splash: 0.12, death: 0.08 };
+  const MIN_GAP = { hit: 0.07, splash: 0.12, death: 0.08, rocket: 0.1, horn: 0.5 };
 
-  function play(name) {
+  function play(name, arg) {
     if (!enabled || !ctx || !SOUNDS[name]) return;
     const now = ctx.currentTime;
     if (MIN_GAP[name] && now - (lastPlayed[name] || 0) < MIN_GAP[name]) return;
     lastPlayed[name] = now;
-    try { SOUNDS[name](); } catch (_) {}
+    try { SOUNDS[name](arg); } catch (_) {}
   }
 
   function setEnabled(on) {
@@ -756,9 +1153,18 @@ const Sound = (() => {
 // Battle effects from the simulation: draw them and play matching sounds
 function handleFx(list) {
   if (!list || !list.length || !arena) return;
-  arena.addFx(list);
-  for (const f of list) {
-    if (f.type === 'deploy' || f.type === 'tower' || f.type === 'splash' || f.type === 'death' || f.type === 'hit') Sound.play(f.type);
+  const shown = list.filter((f) => !(f.type === 'emote' && emoteHidden(f.owner)));
+  arena.addFx(shown);
+  for (const f of shown) {
+    switch (f.type) {
+      case 'deploy': case 'tower': case 'splash': case 'death': case 'hit': Sound.play(f.type); break;
+      case 'cast': Sound.play('cast'); break;
+      case 'spell': Sound.play(f.kind === 'shock' ? 'shock' : f.kind === 'firebomb' ? 'boom' : 'rocket'); break;
+      case 'crown': Sound.play('crown'); break;
+      case 'kingWake': Sound.play('horn'); break;
+      case 'emote': Sound.play('emote', f.emote); break;
+      default: break;
+    }
   }
 }
 
@@ -806,11 +1212,18 @@ function rejectDeploy(reason, owner, cardId) {
   }
 }
 
+function countPlay(owner, cardId) {
+  if (owner !== localSide()) return;
+  state.progress.stats.cards += 1;
+  if (CARD_MAP[cardId]?.spell) state.progress.stats.spells += 1;
+}
+
 function tryDeployAt(owner, cardId, x, y) {
   if (!canControl(owner)) return false;
   const check = deployCheck(owner, cardId, x, y);
   if (!check.ok) { rejectDeploy(check.reason, owner, cardId); return false; }
   if (state.viewSource === 'online') {
+    countPlay(owner, cardId);
     socket.emit('deploy', { cardId, x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100 });
     state.selectedCard = null;
     Sound.play('deploy');
@@ -823,7 +1236,8 @@ function tryDeployAt(owner, cardId, x, y) {
     cp.mastery = (cp.mastery || 0) + 0.25;
     saveProgress();
   }
-  writeLog(`${playerName(owner)} deployed ${CARD_MAP[cardId].name}.`);
+  countPlay(owner, cardId);
+  writeLog(`${playerName(owner)} ${CARD_MAP[cardId].spell ? 'cast' : 'deployed'} ${CARD_MAP[cardId].name}.`);
   state.selectedCard = null;
   handleFx(Sim.takeFx(state.match));
   state.snapCur = Sim.snapshot(state.match); // show it immediately
@@ -843,7 +1257,7 @@ function zoneOverlay() {
   const v = state.view;
   if (!sel || !v || !canControl(sel.owner)) return null;
   const card = getCardStats(sel.type);
-  if (!card) return null;
+  if (!card || card.spell) return null; // spells can go anywhere
   const alive = v.towers.map((t) => (t.hp > 0 ? 1 : 0)).join('');
   const buildings = v.units.filter((u) => u.building).map((u) => u.id).join(',');
   return { fn: (x, y) => zoneCheck(sel.owner, card, x, y), key: `${sel.owner}|${card.building ? 1 : 0}|${alive}|${buildings}` };
@@ -930,7 +1344,8 @@ function bindBoardInput() {
   // Keys 1-4 pick a card from the bottom hand; Esc cancels
   window.addEventListener('keydown', (e) => {
     if (e.target && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
-    if (e.key === 'Escape') { state.selectedCard = null; renderDecks(); return; }
+    if (e.key === 'Escape') { state.selectedCard = null; closeEmotePanel(); renderDecks(); return; }
+    if (e.key === 'e' || e.key === 'E') { openEmotePanel('bottom'); return; }
     const n = Number(e.key);
     if (n >= 1 && n <= 4 && state.view) {
       const side = sideAt('bottom');
@@ -1320,6 +1735,7 @@ function renderProgress() {
 }
 
 function speedLabel(c) {
+  if (c.spell) return 'instant cast';
   if (c.building) return `lasts ${c.lifetime}s`;
   if (c.speed >= 2) return 'very fast';
   if (c.speed >= 1.4) return 'fast';
@@ -1329,6 +1745,14 @@ function speedLabel(c) {
 
 // Plain-language summary of how a card behaves in battle
 function cardTraits(c) {
+  if (c.spell) {
+    const sp = [c.role, `cast anywhere, radius ${c.splash} tiles`, `${Math.round(c.towerMult * 100)}% damage to crown towers`];
+    if (c.proj !== 'shock') sp.push('launched from your King Tower');
+    if (c.stun) sp.push(`stuns for ${c.stun}s and resets attacks`);
+    if (c.knockback) sp.push('knocks troops back');
+    if (c.waves > 1) sp.push(`${c.waves} waves`);
+    return sp.join(' • ');
+  }
   const parts = [c.role];
   parts.push(c.targets === 'buildings' ? 'attacks buildings only' : c.targets === 'any' ? 'hits air & ground' : 'hits ground only');
   if (c.air) parts.push('flying');
@@ -1408,9 +1832,11 @@ function renderCollection() {
     if (unlocked) {
       const nowStats = getCardStats(c.id);
       const nextStats = cp.level < 14 ? getCardStatsAtLevel(c.id, cp.level + 1, cp.abilityUnlocked, cp.mastery || 0) : null;
-      statLine = `Lv ${cp.level} • HP ${nowStats.hpScaled} • DMG ${Math.round(nowStats.dmgScaled)} every ${nowStats.cd}s • Range ${nowStats.proj === 'melee' ? 'melee' : `${nowStats.range} tiles`} • ${speedLabel(nowStats)}`;
+      statLine = nowStats.spell
+        ? `Lv ${cp.level} • DMG ${Math.round(nowStats.dmgScaled)} (towers ${Math.round(nowStats.dmgScaled * nowStats.towerMult)}) • Radius ${nowStats.splash} tiles`
+        : `Lv ${cp.level} • HP ${nowStats.hpScaled} • DMG ${Math.round(nowStats.dmgScaled)} every ${nowStats.cd}s • Range ${nowStats.proj === 'melee' ? 'melee' : `${nowStats.range} tiles`} • ${speedLabel(nowStats)}`;
       if (nextStats) {
-        nextLine = `Next Lv: HP ${nextStats.hpScaled} • DMG ${Math.round(nextStats.dmgScaled)}`;
+        nextLine = nextStats.spell ? `Next Lv: DMG ${Math.round(nextStats.dmgScaled)}` : `Next Lv: HP ${nextStats.hpScaled} • DMG ${Math.round(nextStats.dmgScaled)}`;
       }
     }
     return `<article class="collection-card ${unlocked ? '' : 'locked'} ${inDeck ? 'in-deck' : ''} ${c.winCondition ? 'win-condition' : ''} ${c.swarmCount > 1 ? 'swarm-card' : ''}" data-card="${c.id}"><header><strong>${c.icon} ${c.name}</strong><span class="rarity-${c.rarity}">${RARITY_STYLE[c.rarity].label}</span>${c.winCondition ? '<span class="wc-badge">👑 Win Condition</span>' : ''}${c.swarmCount > 1 ? `<span class="swarm-badge">🐝 ×${c.swarmCount} Swarm</span>` : ''}</header><p>${unlocked ? `Copies ${cp.copies} • Mastery ${Math.floor(cp.mastery)}` : 'Locked'}</p><p>${statLine}</p><p>${unlocked ? `Cost ${c.cost} • ${cardTraits(c)}` : 'Unknown stats'}</p><p>${nextLine}</p><div class="collection-actions">${unlocked ? `<button data-select="${c.id}">${inDeck ? 'In Deck' : 'Select'}</button>` : '<button disabled>Locked</button>'}${unlocked ? `<button data-up="${c.id}" ${canUp ? '' : 'disabled'}>Level Up (${need} copies, ${upCost}g)</button>` : ''}${unlocked ? `<button data-ability="${c.id}" ${canAbility ? '' : 'disabled'}>${cp.abilityUnlocked ? `✓ ${c.ability.name}` : `${c.ability.name} (Lv${c.ability.minLevel}, ${c.ability.minMastery}M, 400g)`}</button>` : ''}</div></article>`;
@@ -1559,6 +1985,9 @@ function ensureSocket() {
   });
 
   socket.on('match_start', showMatchOnline);
+  // Emotes sent after the final whistle arrive outside the normal state updates
+  socket.on('fx', (list) => handleFx(Array.isArray(list) ? list : []));
+  socket.on('emote_rejected', ({ reason } = {}) => { writeLog(reason || 'Emote not sent.'); });
   socket.on('state_update', applyServerState);
   socket.on('match_over', ({ winner }) => handleOnlineVictory(winner));
 
@@ -1609,7 +2038,11 @@ function bindLobby() {
 
   ui.findMatch?.addEventListener('click', joinQueue);
   ui.cancelQueue?.addEventListener('click', leaveQueue);
-  ui.winClaim?.addEventListener('click', closeWinOverlay);
+  ui.winClaim?.addEventListener('click', () => {
+    const again = !lastMatchWasOnline && ui.mode?.value !== 'online';
+    closeWinOverlay();
+    if (again) setupMatch();
+  });
   ui.winRematch?.addEventListener('click', () => {
     if (!socket || !socket.connected) return;
     socket.emit('rematch');
@@ -1661,6 +2094,8 @@ function showMatchOnline() {
   netSnapshots = [];
   netClockOffset = null;
   netFx = [];
+  emoteUi.lastSent = { A: -1e9, B: -1e9 };
+  beginMatchPresentation();
   writeLog(`Online match started. Your towers are at the bottom.`);
   scrollToBattle();
 }
@@ -1727,17 +2162,25 @@ function handleOnlineVictory(winner) {
       ? (cardAward.isUnlock ? ` Unlocked ${cardAward.card.name}!` : ` +${cardAward.copies} ${cardAward.card.name}.`)
       : '';
     writeLog(`Online win! ${reason}. +${goldBonus} gold, chest earned.${cardMsg}`);
-    saveProgress();
-    renderProgress();
-    renderCollection();
   } else if (draw) {
     writeLog(`Online draw. ${reason}.`);
   } else {
     writeLog(`Opponent wins online. ${reason}.`);
   }
+  const result = draw ? 'draw' : won ? 'win' : 'loss';
+  const mine = last ? last.players[mySide] : null;
+  const newAch = recordMatch({ result, crowns: mine ? mine.crowns : 0, kingKill: won && last?.endReason === 'king', hardAi: false, online: true });
+  saveProgress();
+  renderProgress();
+  renderCollection();
   Sound.play(won ? 'win' : draw ? 'draw' : 'lose');
   const crowns = last ? `👑 You ${last.players[mySide].crowns} – ${last.players[enemyOf(mySide)].crowns} Opponent` : '';
-  showWinOverlay(draw ? 'draw' : won ? 'win' : 'loss', cardAward, goldBonus, true, { detail: `${reason} · ${crowns}` });
+  presentResult(result, won ? 'VICTORY!' : draw ? 'DRAW' : 'DEFEAT', () => showWinOverlay(result, cardAward, goldBonus, true, {
+    detail: `${reason} · ${crowns}`,
+    crowns: mine ? mine.crowns : 0,
+    stats: matchStats(last, mySide),
+    achievements: newAch,
+  }));
 }
 
 function joinQueue() {
@@ -1857,6 +2300,19 @@ function cacheUi() {
   ui.winCardLabel = $('ptWinCardLabel');
   ui.winClaim = $('ptWinClaim');
   ui.winRematch = $('ptWinRematch');
+  ui.winCrowns = $('ptWinCrowns');
+  ui.winStats = $('ptWinStats');
+  ui.winAch = $('ptWinAch');
+  ui.confetti = $('ptConfetti');
+  ui.toasts = $('ptToasts');
+  ui.achList = $('ptAchList');
+  ui.achCount = $('ptAchCount');
+  ui.emoteBtnA = $('ptEmoteBtnA');
+  ui.emoteBtnB = $('ptEmoteBtnB');
+  ui.emotePanel = $('ptEmotePanel');
+  ui.emoteGrid = $('ptEmoteGrid');
+  ui.emoteHint = $('ptEmoteHint');
+  ui.emoteMute = $('ptEmoteMute');
   ui.findMatch = $('ptFindMatch');
   ui.cancelQueue = $('ptCancelQueue');
   ui.queueStatus = $('ptQueueStatus');
@@ -1864,6 +2320,7 @@ function cacheUi() {
 
 function bindCore() {
   bindBoardInput();
+  bindEmotes();
   bindLobby();
   bindProgressUi();
   bindAdminUi();
@@ -1897,9 +2354,16 @@ function bindCore() {
       chests: [],
       buildings: { towerLevel: 1, baseLevel: 1 },
       aiHealth: { baseMult: 1, towerMult: 1 },
-      aiDifficulty: 'normal'
+      aiDifficulty: 'normal',
+      stats: freshStats(),
+      achievements: {},
+      emoteMuted: false,
+      seenSpellNews: true
     };
     unlockInitial();
+    state.progress.aiDeck = [...AI_DEFAULT_DECK];
+    buildEmoteGrid();
+    renderAchievements();
     saveProgress();
     renderProgress();
     renderCollection();
@@ -1925,7 +2389,14 @@ function unlockPrototype() {
   renderProgress();
   renderCollection();
   arena = ArenaView.create(ui.arena);
+  arena.onCue = (cue) => Sound.play(cue === 'double' ? 'double' : 'overtime');
   bindCore();
+  renderAchievements();
+  if (!state.progress.seenSpellNews) {
+    state.progress.seenSpellNews = true;
+    saveProgress();
+    setTimeout(() => toast('☄️', 'New: Spells!', 'Fire Bomb, Shock and Rocket Rain are in your collection. Add them to your deck.'), 900);
+  }
   window.addEventListener('storage', syncProgressFromOtherTab);
   setupMatch();
   requestAnimationFrame(gameLoop);
@@ -1940,8 +2411,15 @@ function gameLoop(ts) {
     stepLocalMatch(dt);
     state.view = lerpSnap(state.snapPrev, state.snapCur, state.acc / STEP);
   }
+  // Final-seconds countdown ticks
+  const v = state.view;
+  if (v && v.running && v.timeLeft <= 10 && v.timeLeft > 0) {
+    const sec = Math.ceil(v.timeLeft);
+    if (sec !== lastTickSecond) { lastTickSecond = sec; Sound.play('tick', sec <= 3); }
+  }
   renderStatus();
   renderDecks();
+  syncEmoteButtons();
   renderArena();
   requestAnimationFrame(gameLoop);
 }

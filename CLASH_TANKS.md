@@ -9,7 +9,8 @@ Notes on the prototype tank game at `caleb-liu.com/prototype.html`: what was cha
 | Piece | File(s) | Runs where |
 |---|---|---|
 | **Game engine**: arena, cards, movement, combat, towers, clock, AI | `clash-tanks-server/clash-tanks-server/shared/clash-sim.js` | Browser (Local PvP, vs AI) **and** server (Online) |
-| Arena renderer (canvas drawing, effects, HUD, placement preview) | `prototype_arena.js` | Browser |
+| Arena renderer (canvas drawing, effects, HUD, placement preview, announcements, emote bubbles) | `prototype_arena.js` | Browser |
+| Emote artwork (animated faces drawn with canvas paths) | `prototype_emotes.js` | Browser |
 | Page logic (menus, progression, chests, decks, lobby, input, sound) | `prototype_v4.js`, `prototype.html`, `prototype.css` | Browser |
 | Online server (matchmaking, rooms, runs the engine) | `clash-tanks-server/clash-tanks-server/server.js` | Render |
 | Tests | `clash-tanks-server/clash-tanks-server/test/sim.test.js` | `npm test` |
@@ -32,6 +33,7 @@ The page loads the engine straight from the server folder (`<script src="clash-t
 
 1. Commit and push everything in GitHub Desktop. Make sure these are included:
    - `prototype_arena.js`
+   - `prototype_emotes.js` (new)
    - `clash-tanks-server/clash-tanks-server/shared/`
    - `clash-tanks-server/clash-tanks-server/test/`
 2. Render redeploys the server by itself.
@@ -172,11 +174,45 @@ All of this applies to **Local PvP, vs AI and Online**.
 ### 7. Starter-copies bug
 - Every page reload gave 3 free copies of each starter card. Now they're only given the first time a starter card is unlocked.
 
+### 8. Emotes, spells, smarter AI and game feel
+All of this applies to **Local PvP, vs AI and Online** (rules in `clash-sim.js`).
+
+**Emotes**
+- 💬 button on each player's nameplate (or press **E**) opens an emote wheel. 10 original animated emotes: Ha ha!, Nice!, Waaah, Grrr!, Whoa!, Good game, plus 4 unlockable ones (Party!, Too easy, Seriously?, King laugh).
+- Emotes pop up in a speech bubble beside the sender's King Tower, animate, and fade after ~2.6 s.
+- Rate limits live in the engine (`Sim.emote`): one every 2 s, at most 5 per 20 s. The server enforces them online (`emote` socket event); emotes sent after the final whistle are relayed with an `fx` event.
+- "Mute opponent" in the wheel hides the other player's emotes (saved).
+- The AI emotes about its own towers falling or taking yours, after wiping out a big push, sometimes in reply to yours, and once at the end. Each AI emote waits at least 6 s after its last one.
+
+**Spells** (cast anywhere; crown towers take 30% damage)
+| Spell | Cost | Effect |
+|---|---|---|
+| Fire Bomb | 4 | Flies from your King Tower, 200 damage in 2.5 tiles, knocks troops back |
+| Shock | 2 | Instant, 75 damage in 2.5 tiles, stuns troops, buildings and towers for 0.6 s, resets charges and wind-ups |
+| Rocket Rain | 3 | 3 waves, 120 total damage in 3.8 tiles; clears swarms |
+- Unlocked for everyone. The default AI deck (if you never changed it) now includes Fire Bomb and Shock.
+
+**AI**
+- Casts spells only when the value is worth it (or to finish a tower), aiming ahead of moving troops.
+- Estimates your elixir from what it sees you play (it can't see your elixir) and pushes when you've just overspent.
+- Supports surviving defenders as a counter-push, and plays more aggressively during double elixir.
+
+**Game feel**
+- Arena: sandy lanes, grass and flowers, river foam, stone tower pads, brick towers with team platforms.
+- Units drop in when deployed, bob while walking, flash when hit, and show stun sparks. Health bars leave a short trailing "recent damage" segment.
+- Floating damage numbers on towers and heavy hits, "-N" elixir popups where cards land, king wake-up "!" with a horn.
+- Banners: BATTLE!, 2× ELIXIR, OVERTIME, CROWN!, VICTORY/DEFEAT. A big countdown with ticks in the last 10 seconds.
+- The match ends with a banner on the arena; the results sheet appears ~2 s later with crowns, damage dealt, cards played, match time, new achievements and confetti on a win. Local "Play Again" restarts immediately.
+- Cards slide into the hand when they cycle in; spell cards have their own style; the elixir bar glows when full.
+- New synthesized sounds for emotes, spells, crowns, banners and the countdown.
+
+**Achievements** (Collection Progression panel): First Victory, Tower Breaker, Three-Crown Win, Veteran, Giant Slayer, Online Champion, Spell Slinger, Commander. Each gives gold; four unlock emotes. Stats are saved with your progress.
+
 ---
 
 ## Testing done
 
-- **16 automated tests** (`npm test`), all passing:
+- **22 automated tests** (`npm test`), all passing. Added in step 8: spells can be cast anywhere (and the online preview agrees), Fire Bomb flight/knockback/reduced tower damage, Shock stun and Rocket Rain swarm clear, an AI-vs-AI match with spell decks (legal moves only, spells used), emote validation and rate limits, and AI emotes. The original 16:
   1. Melee units find and attack nearby troops.
   2. Building-only units ignore distracting troops.
   3. Ranged units attack from range and stop there.
@@ -200,7 +236,7 @@ All of this applies to **Local PvP, vs AI and Online**.
 
 ## Still to do
 
-- **Balance** needs tuning from real play. AI matches currently end a bit fast, around 1:45.
-- **Missing features:** knockback, spells and floating damage numbers.
+- **Balance** needs tuning from real play. With spells and the new AI, AI-vs-AI matches average about 2:30 (60 random-deck matches: 28–26 with 6 draws).
+- **Step 8 browser checks** (headless Chrome): vs AI (emote wheel, rate limit, locked emotes, spells, crown and victory banners, results sheet, achievements), two-window Online (emotes both ways, server rate limit, mute, spell sync, post-match emote), Local PvP (both emote wheels), a 375 px phone screen, and a ~100-unit stress test at 60 fps. No console errors.
 - **Live server:** online play has only been tested against a local copy of the server. The real Render server only updates once this is pushed.
 - **Leftover code:** an old, unused `prototype.js` and some old board CSS rules can be deleted.

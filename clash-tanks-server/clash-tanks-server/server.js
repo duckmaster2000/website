@@ -219,6 +219,18 @@ io.on('connection', socket => {
     if (!result.ok) socket.emit('deploy_rejected', { reason: result.reason });
   });
 
+  // Emotes go through the shared engine (validation + rate limits) and reach both players
+  // with the next state update. After the final whistle the tick loop has stopped, so send them directly.
+  socket.on('emote', ({ id } = {}) => {
+    const code = socketRoom.get(socket.id);
+    const room = code && rooms.get(code);
+    if (!room || !room.state) return;
+    const side = room.sockets.A === socket.id ? 'A' : 'B';
+    const res = Sim.emote(room.state, side, String(id || ''));
+    if (!res.ok) { socket.emit('emote_rejected', { reason: res.reason }); return; }
+    if (!room.state.running) io.to(code).emit('fx', Sim.takeFx(room.state));
+  });
+
   socket.on('rematch', () => {
     const code = socketRoom.get(socket.id);
     if (!code) return;

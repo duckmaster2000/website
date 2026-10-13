@@ -110,12 +110,20 @@
             </div>
           </div>
           <span class="np-gold" id="ptGoldB">— gold</span>
+          <button class="emote-btn" id="ptEmoteBtnB" type="button" data-side="top" aria-label="Emotes (top player)" title="Emotes">💬</button>
         </div>
 
         <div class="deck deck-top" id="ptDeckB" aria-label="commander b deck"></div>
 
         <div class="board" id="ptBoard">
           <canvas id="ptArena" class="arena-canvas" aria-label="Battle arena: drag a card here or select a card and tap the arena to deploy"></canvas>
+          <div class="emote-panel" id="ptEmotePanel" role="dialog" aria-label="Choose an emote" hidden>
+            <div class="emote-grid" id="ptEmoteGrid"></div>
+            <div class="emote-foot">
+              <span class="emote-hint" id="ptEmoteHint">Tap an emote to send it</span>
+              <button type="button" class="emote-mute" id="ptEmoteMute" aria-pressed="false">🔕 Mute opponent</button>
+            </div>
+          </div>
         </div>
 
         <div class="deck deck-bottom" id="ptDeckA" aria-label="commander a deck"></div>
@@ -138,6 +146,7 @@
             </div>
           </div>
           <span class="np-gold" id="ptGoldA">💰 0</span>
+          <button class="emote-btn" id="ptEmoteBtnA" type="button" data-side="bottom" aria-label="Emotes (E)" title="Emotes (E)">💬</button>
         </div>
       </section>
 
@@ -160,6 +169,11 @@
             <p class="note" id="ptTowerUpgradeInfo">Tower HP/DMG: 320 / 13 (next +28 HP, +3 DMG)</p>
             <button id="ptUpgradeBase" type="button">Upgrade Base</button>
             <button id="ptUpgradeTower" type="button">Upgrade Tower</button>
+          </article>
+          <article class="achievements-card">
+            <h4>Achievements <span class="ach-count" id="ptAchCount">0/0</span></h4>
+            <p class="note">Earn gold and unlock new emotes by playing.</p>
+            <ul class="ach-list" id="ptAchList"></ul>
           </article>
           <article id="ptAiTuningPanel">
             <h4>AI Tuning</h4>
@@ -209,11 +223,15 @@
   <div class="win-overlay" id="ptWinOverlay" hidden>
     <div class="win-modal" role="dialog" aria-modal="true">
       <p class="win-headline" id="ptWinHeadline">VICTORY!</p>
+      <div class="win-crowns" id="ptWinCrowns" aria-label="Crowns"></div>
       <p class="win-subline" id="ptWinSubline"></p>
+      <div class="win-stats" id="ptWinStats"></div>
       <div class="win-card-slot" id="ptWinCardSlot" hidden>
         <div class="win-card-reveal" id="ptWinCardReveal"></div>
       </div>
       <p class="win-card-label" id="ptWinCardLabel"></p>
+      <div class="win-ach" id="ptWinAch"></div>
+      <div class="confetti" id="ptConfetti" aria-hidden="true"></div>
       <div class="win-actions">
         <button id="ptWinRematch" type="button" hidden>Rematch</button>
         <button id="ptWinClaim" type="button">Continue</button>
@@ -245,8 +263,11 @@
     </div>
   </div>
 
+  <div class="toast-stack" id="ptToasts" aria-live="polite"></div>
+
   <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
   <script src="clash-tanks-server/clash-tanks-server/shared/clash-sim.js"></script>
+  <script src="prototype_emotes.js"></script>
   <script src="prototype_arena.js"></script>
   <script src="prototype_v4.js"></script>
 </body>

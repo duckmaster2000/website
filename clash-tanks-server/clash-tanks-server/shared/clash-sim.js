@@ -42,7 +42,11 @@
     deployTime: 1,          // troops can't act for this long after landing
   };
 
-  const PROJ_SPEED = { slug: 13, spark: 15, shell: 10, mortar: 6, beam: 26, flare: 11, arrow: 15, bolt: 13, pulse: 12 };
+  const PROJ_SPEED = { slug: 13, spark: 15, shell: 10, mortar: 6, beam: 26, flare: 11, arrow: 15, bolt: 13, pulse: 12, firebomb: 15, rocket: 17 };
+
+  // Emotes: ids only (the art lives in the browser). Rate limits keep them fun, not spammy.
+  const EMOTE_IDS = ['laugh', 'thumbs', 'cry', 'angry', 'surprised', 'celebrate', 'facepalm', 'cool', 'gg', 'king'];
+  const EMOTE_RULES = { minGap: 2, window: 20, maxInWindow: 5 };
 
   // ─── Cards ───────────────────────────────────────────────────────────────
   //
@@ -119,6 +123,14 @@
     // ── Buildings ──
     { slug: 'boltturret', name: 'Bolt Turret', icon: '🏯', rarity: 'common', cost: 4, role: 'defensive building', building: true, lifetime: 30, hp: 1000, dmg: 70, cd: 0.9, range: 5.5, speed: 0, targets: 'ground', proj: 'bolt', radius: 0.95, deployCd: 1.2,
       ability: ab('Overclock', 5, 10, 1.1, 1.1) },
+    // ── Spells: cast anywhere on the arena. Projectile spells fly from your king tower. ──
+    // `splash` is the spell radius; crown towers take `towerMult` of the damage.
+    { slug: 'firebomb', name: 'Fire Bomb', icon: '☄️', rarity: 'rare', cost: 4, role: 'area damage spell', spell: true, hp: 0, dmg: 200, cd: 1, range: 0, speed: 0, targets: 'any', proj: 'firebomb', splash: 2.5, radius: 0, towerMult: 0.3, knockback: 0.9, deployCd: 1.0,
+      ability: ab('Inferno Core', 6, 12, 1.1, 1) },
+    { slug: 'shock', name: 'Shock', icon: '🌩️', rarity: 'common', cost: 2, role: 'instant stun spell', spell: true, hp: 0, dmg: 75, cd: 1, range: 0, speed: 0, targets: 'any', proj: 'shock', splash: 2.5, radius: 0, towerMult: 0.3, stun: 0.6, deployCd: 0.9,
+      ability: ab('Overvolt', 5, 10, 1.1, 1) },
+    { slug: 'rocketrain', name: 'Rocket Rain', icon: '🚀', rarity: 'common', cost: 3, role: 'swarm-clearing spell', spell: true, hp: 0, dmg: 120, cd: 1, range: 0, speed: 0, targets: 'any', proj: 'rocket', splash: 3.8, radius: 0, towerMult: 0.3, waves: 3, deployCd: 1.0,
+      ability: ab('Cluster Payload', 5, 10, 1.1, 1) },
   ];
 
   // Variants scale the base unit; the pricier ones change how the unit attacks.
@@ -143,6 +155,7 @@
     const cards = [];
     ARCHETYPES.forEach((a) => {
       VARIANTS.forEach((v, idx) => {
+        if (a.spell && idx > 0) return; // spells come in one version only
         const id = idx === 0 ? a.slug : `${a.slug}-${v.suffix.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
         const style = v.style || a.style || 'single';
         const melee = a.proj === 'melee';
@@ -175,6 +188,11 @@
           deployCd: Math.max(0.7, a.deployCd + v.deployCd),
           winCondition: a.targets === 'buildings',
           ability: a.ability,
+          spell: !!a.spell,
+          towerMult: a.towerMult || 1,
+          knockback: a.knockback || 0,
+          stun: a.stun || 0,
+          waves: a.waves || 1,
         });
       });
     });
@@ -564,6 +582,8 @@
       cards,
       cooldowns,
       damageDealt: 0,
+      cardsPlayed: 0,
+      emoteLog: [],
     };
   }
 
@@ -590,6 +610,7 @@
       targetId: null,
       lastAtkT: -9,
       hitT: -9,
+      stunT: 0,
     };
   }
 
@@ -611,6 +632,7 @@
       towers: [],
       projectiles: [],
       fx: [],
+      lastEmote: null,
       players: {},
       nav: createNav(),
       hash: null,
@@ -653,6 +675,7 @@
   function canDeploy(state, side, x, y, card) {
     if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
     if (x < 0.5 || x > W - 0.5 || y < 0.5 || y > H - 0.5) return false;
+    if (card && card.spell) return true; // spells can be cast anywhere
     if (!inDeployZone(state, side, x, y, card)) return false;
     return walkablePoint(state.nav, x, y, false);
   }
@@ -662,6 +685,7 @@
   function canDeployOnSnapshot(snap, side, x, y, card) {
     if (!snap || !Number.isFinite(x) || !Number.isFinite(y)) return false;
     if (x < 0.5 || x > W - 0.5 || y < 0.5 || y > H - 0.5) return false;
+    if (card && card.spell) return true;
     const own = side === 'A' ? y >= RIVER.y1 + 0.5 : y <= RIVER.y0 - 0.5;
     if (!own) {
       if (card && card.building) return false;
@@ -732,6 +756,7 @@
       runDist: 0,
       charging: false,
       jumping: false,
+      stunT: 0,
     };
     state.units.push(u);
     state.byId.set(u.id, u);
@@ -760,6 +785,14 @@
 
     p.elixir = Math.max(0, p.elixir - stats.cost);
     p.cooldowns[cardId] = state.time + stats.deployCdScaled;
+    p.cardsPlayed += 1;
+
+    if (stats.spell) {
+      castSpell(state, side, stats, px, py);
+      cycleHand(p, cardId);
+      pushFx(state, { type: 'cast', x: px, y: py, owner: side, r: stats.splash, cardId, cost: stats.cost });
+      return { ok: true, units: [] };
+    }
 
     const count = stats.swarmCount || 1;
     const units = [];
@@ -777,8 +810,103 @@
     }
     if (stats.building) rebuildObstacles(state);
     cycleHand(p, cardId);
-    pushFx(state, { type: 'deploy', x: px, y: py, owner: side, r: count > 1 ? 1.4 : 1 });
+    pushFx(state, { type: 'deploy', x: px, y: py, owner: side, r: count > 1 ? 1.4 : 1, cardId, cost: stats.cost });
     return { ok: true, units };
+  }
+
+  // ─── Spells ──────────────────────────────────────────────────────────────
+
+  function spellSpec(stats) {
+    return { kind: stats.proj, towerMult: stats.towerMult, knockback: stats.knockback, stun: stats.stun, cost: stats.cost };
+  }
+
+  function castSpell(state, side, stats, x, y) {
+    const spec = spellSpec(stats);
+    const waves = stats.waves || 1;
+    const dmg = stats.dmgScaled / waves;
+    if (stats.proj === 'shock') {
+      applySpell(state, side, spec, x, y, stats.splash, dmg);
+      return;
+    }
+    const king = state.towers.find((t) => t.owner === side && t.tower === 'king');
+    const fromX = king ? king.x : x;
+    const fromY = king ? king.y : y;
+    for (let i = 0; i < waves; i++) {
+      state.projectiles.push({
+        id: `p${state.nextId++}`,
+        owner: side,
+        source: { id: null, owner: side, structureMult: 1 },
+        style: stats.proj,
+        x: fromX, y: fromY, sx: fromX, sy: fromY, tx: x, ty: y,
+        targetId: null,
+        homing: false,
+        lob: true,
+        speed: PROJ_SPEED[stats.proj] || 15,
+        dmg,
+        splash: stats.splash,
+        canHitAir: true,
+        chain: false,
+        delay: i * 0.22,
+        spell: spec,
+      });
+    }
+  }
+
+  // Damage (and knock back / stun) every enemy in the radius. Crown towers take reduced damage.
+  function applySpell(state, owner, spec, x, y, radius, dmg) {
+    const hit = [];
+    queryHash(state, x, y, radius, (e) => {
+      if (e.hp <= 0 || e.owner === owner) return;
+      const gap = e.kind === 'tower' ? boxDist(x, y, e) : dist(x, y, e.x, e.y) - e.radius;
+      if (gap <= radius) hit.push(e);
+    });
+    const src = { id: null, owner, structureMult: 1 };
+    for (const e of hit) {
+      applyDamage(state, src, e, e.kind === 'tower' ? dmg * spec.towerMult : dmg);
+      if (spec.stun > 0) {
+        e.stunT = Math.max(e.stunT || 0, spec.stun);
+        e.windupT = 0;
+        if (e.kind === 'troop') { e.charging = false; e.runDist = 0; }
+      }
+      if (spec.knockback > 0 && e.kind === 'troop' && e.hp > 0) knockBack(state, e, x, y, spec.knockback * (1 - 0.4 * Math.min(1, dist(x, y, e.x, e.y) / radius)));
+    }
+    pushFx(state, { type: 'spell', kind: spec.kind, x, y, r: radius, owner });
+  }
+
+  function knockBack(state, e, fromX, fromY, amount) {
+    let dx = e.x - fromX;
+    let dy = e.y - fromY;
+    const d = Math.hypot(dx, dy);
+    if (d < 1e-3) { dx = 0; dy = e.owner === 'A' ? 1 : -1; } else { dx /= d; dy /= d; }
+    const jump = e.special.includes('jump');
+    for (const k of [1, 0.5, 0.25]) {
+      const nx = clamp(e.x + dx * amount * k, e.radius, W - e.radius);
+      const ny = clamp(e.y + dy * amount * k, e.radius, H - e.radius);
+      if (e.air || walkablePoint(state.nav, nx, ny, jump)) {
+        e.x = nx;
+        e.y = ny;
+        e.path = null;
+        return;
+      }
+    }
+  }
+
+  // ─── Emotes ──────────────────────────────────────────────────────────────
+
+  /** Send an emote. Rate limited per player: one every EMOTE_RULES.minGap s, at most maxInWindow per window. */
+  function emote(state, side, emoteId) {
+    const p = state.players[side];
+    const id = String(emoteId || '');
+    if (!p || !EMOTE_IDS.includes(id)) return { ok: false, reason: 'Unknown emote' };
+    const now = state.time;
+    p.emoteLog = p.emoteLog.filter((t) => now - t < EMOTE_RULES.window);
+    const last = p.emoteLog[p.emoteLog.length - 1];
+    if (last != null && now - last < EMOTE_RULES.minGap) return { ok: false, reason: 'Emote cooling down' };
+    if (p.emoteLog.length >= EMOTE_RULES.maxInWindow) return { ok: false, reason: 'Too many emotes' };
+    p.emoteLog.push(now);
+    state.lastEmote = { side, id, time: now };
+    pushFx(state, { type: 'emote', owner: side, emote: id });
+    return { ok: true };
   }
 
   // ─── Targeting ───────────────────────────────────────────────────────────
@@ -866,7 +994,7 @@
     return shielded;
   }
 
-  function applyDamage(state, source, target, amount) {
+  function applyDamage(state, source, target, amount, showNumber) {
     if (!target || target.hp <= 0 || amount <= 0) return 0;
     let amt = amount;
     if (target.kind !== 'troop') amt *= source.structureMult || 1;
@@ -876,8 +1004,18 @@
     if (source.id) target.lastAttackerId = source.id;
     const p = state.players[source.owner];
     if (p) p.damageDealt += amt;
-    if (target.tower === 'king' && !target.active) target.active = true;
+    if (target.tower === 'king' && !target.active) wakeKing(state, target);
+    // Floating damage numbers: towers, spells and heavy hits
+    if (showNumber || target.kind === 'tower' || amt >= 150) {
+      pushFx(state, { type: 'dmg', x: target.x, y: target.y - (target.half || target.radius || 0.4), amt: Math.round(amt), owner: source.owner, big: amt >= 150 });
+    }
     return amt;
+  }
+
+  function wakeKing(state, king) {
+    if (king.active) return;
+    king.active = true;
+    pushFx(state, { type: 'kingWake', x: king.x, y: king.y, owner: king.owner });
   }
 
   function splashDamage(state, source, x, y, radius, amount, canHitAir) {
@@ -923,7 +1061,8 @@
   // The moment an attack lands (end of wind-up). Melee hits instantly; ranged fires a projectile.
   function fireAttack(state, u, t) {
     let dmg = u.dmg;
-    if (u.charging) { dmg *= 2; u.charging = false; u.runDist = 0; pushFx(state, { type: 'charge', x: t.x, y: t.y, owner: u.owner }); }
+    let heavy = false;
+    if (u.charging) { dmg *= 2; heavy = true; u.charging = false; u.runDist = 0; pushFx(state, { type: 'charge', x: t.x, y: t.y, owner: u.owner }); }
     u.lastAtkT = state.time;
     const src = damageSource(u);
     const canHitAir = u.targets === 'any';
@@ -940,7 +1079,7 @@
       } else if (u.splash > 0) {
         splashDamage(state, src, t.x, t.y, u.splash, dmg, canHitAir);
       } else {
-        applyDamage(state, src, t, dmg);
+        applyDamage(state, src, t, dmg, heavy);
         pushFx(state, { type: 'hit', x: t.x, y: t.y, owner: u.owner, style: 'melee' });
       }
       if (u.style === 'double') {
@@ -985,6 +1124,13 @@
     if (u.building && u.lifetime > 0) {
       u.hp -= (u.hpMax / u.lifetime) * dt;
       if (u.hp <= 0) return;
+    }
+    if (u.stunT > 0) {
+      u.stunT -= dt;
+      u.vx = 0;
+      u.vy = 0;
+      u.windupT = 0;
+      return;
     }
 
     u.atkCd -= dt;
@@ -1169,6 +1315,7 @@
 
   function updateTower(state, t, dt) {
     if (t.hp <= 0) return;
+    if (t.stunT > 0) { t.stunT -= dt; return; }
     t.atkCd -= dt;
     if (!t.active) return;
     let target = t.targetId ? state.byId.get(t.targetId) : null;
@@ -1210,7 +1357,9 @@
       p.x = p.tx;
       p.y = p.ty;
       p.done = true;
-      if (p.splash > 0) {
+      if (p.spell) {
+        applySpell(state, p.owner, p.spell, p.tx, p.ty, p.splash, p.dmg);
+      } else if (p.splash > 0) {
         splashDamage(state, p.source, p.tx, p.ty, p.splash, p.dmg, p.canHitAir);
       } else if (t && t.hp > 0) {
         applyDamage(state, p.source, t, p.dmg);
@@ -1278,8 +1427,9 @@
       } else {
         state.players[foe].crowns += 1;
         const king = state.towers.find((k) => k.owner === t.owner && k.tower === 'king');
-        if (king) king.active = true;
+        if (king && king.hp > 0) wakeKing(state, king);
       }
+      pushFx(state, { type: 'crown', owner: foe, crowns: state.players[foe].crowns });
     }
     if (navDirty) rebuildObstacles(state);
   }
@@ -1364,6 +1514,8 @@
         hand: p.hand.slice(),
         next: p.queue[0] || null,
         cooldownsRemaining,
+        dmg: Math.round(p.damageDealt),
+        played: p.cardsPlayed,
       };
     };
     const since = (t) => r2(Math.min(9, state.time - t));
@@ -1386,13 +1538,14 @@
         wind: u.windupT > 0 ? 1 : 0,
         hit: since(u.hitT),
         chg: u.charging ? 1 : 0,
+        stn: u.stunT > 0 ? 1 : 0,
         jmp: u.jumping ? 1 : 0,
         melee: u.proj === 'melee' ? 1 : 0,
       })),
       towers: state.towers.map((t) => ({
         id: t.id, owner: t.owner, tower: t.tower, x: t.x, y: t.y,
         hp: Math.round(Math.max(0, t.hp)), hpMax: t.hpMax, active: t.active, half: t.half,
-        atk: since(t.lastAtkT), hit: since(t.hitT),
+        atk: since(t.lastAtkT), hit: since(t.hitT), stn: t.stunT > 0 ? 1 : 0,
       })),
       projectiles: state.projectiles.filter((p) => !(p.delay > 0)).map((p) => {
         const total = dist(p.sx, p.sy, p.tx, p.ty) || 1;
@@ -1400,6 +1553,8 @@
           id: p.id, owner: p.owner, style: p.style,
           x: r2(p.x), y: r2(p.y),
           lob: p.lob ? r2(clamp(1 - dist(p.x, p.y, p.tx, p.ty) / total, 0, 1)) : null,
+          tx: p.spell ? r2(p.tx) : undefined,
+          ty: p.spell ? r2(p.ty) : undefined,
         };
       }),
       players: { A: player(state.players.A), B: player(state.players.B) },
@@ -1422,10 +1577,87 @@
     }
     return {
       side,
-      profile: Object.assign({ thinkMin: 0.5, thinkMax: 0.6, strategicChance: 0.7, aggression: 0.35, leakAt: 9.3 }, profile || {}),
+      profile: Object.assign({ thinkMin: 0.5, thinkMax: 0.6, strategicChance: 0.7, aggression: 0.35, leakAt: 9.3, emoteChance: 0.55 }, profile || {}),
       thinkT: 1.5,
       rand: rng,
+      // What the AI has *seen* the opponent spend (it can't see their elixir, so it estimates)
+      foeElixir: MATCH.startElixir,
+      seenSeq: 0,
+      emo: { init: false, mine: 3, theirs: 3, scanT: 0, peakThreat: 0, queued: null, lastAt: -99, seenEmoteT: -1, endDone: false },
     };
+  }
+
+  function idSeq(id) { return Number(String(id).slice(1)) || 0; }
+
+  // Track the opponent's elixir from what they visibly play (troops landing, spells flying)
+  function trackFoeElixir(state, brain, dt) {
+    const foe = enemyOf(brain.side);
+    brain.foeElixir = clamp(brain.foeElixir + MATCH.elixirPerSec * elixirMultiplier(state) * dt, 0, MATCH.maxElixir);
+    let maxSeq = brain.seenSeq;
+    for (const u of state.units) {
+      if (u.owner !== foe) continue;
+      const n = idSeq(u.id);
+      if (n <= brain.seenSeq) continue;
+      if (n > maxSeq) maxSeq = n;
+      brain.foeElixir -= u.costShare; // swarm members each carry their share of the card's cost
+    }
+    for (const pr of state.projectiles) {
+      if (pr.owner !== foe || !pr.spell) continue;
+      const n = idSeq(pr.id);
+      if (n <= brain.seenSeq) continue;
+      if (n > maxSeq) maxSeq = n;
+      if (!(pr.delay > 0.01)) brain.foeElixir -= pr.spell.cost; // first wave only
+    }
+    brain.seenSeq = maxSeq;
+    brain.foeElixir = Math.max(0, brain.foeElixir);
+  }
+
+  // Emotes that react to what just happened, with a human-ish delay and plenty of restraint
+  function aiEmotes(state, brain, dt) {
+    const em = brain.emo;
+    const side = brain.side;
+    const foe = enemyOf(side);
+    const pick = (list) => list[Math.floor(brain.rand() * list.length)];
+    const towersUp = (s) => state.towers.reduce((n, t) => n + (t.owner === s && t.hp > 0 ? 1 : 0), 0);
+    if (!state.running) {
+      if (em.endDone) return;
+      em.endDone = true;
+      const id = state.winner === side ? pick(['celebrate', 'king', 'laugh']) : state.winner === 'draw' ? 'gg' : pick(['gg', 'cry', 'facepalm']);
+      emote(state, side, id);
+      return;
+    }
+    const mine = towersUp(side);
+    const theirs = towersUp(foe);
+    if (!em.init) { em.init = true; em.mine = mine; em.theirs = theirs; }
+    const chance = brain.profile.emoteChance;
+    let want = null;
+    if (theirs < em.theirs) want = pick(['laugh', 'celebrate', 'king', 'cool']);
+    else if (mine < em.mine) want = pick(['angry', 'cry', 'surprised', 'facepalm']);
+    em.mine = mine;
+    em.theirs = theirs;
+
+    // A big push that got wiped out without costing a tower: "nice try"
+    em.scanT -= dt;
+    if (!want && em.scanT <= 0) {
+      em.scanT = 0.5;
+      const threat = laneSummary(state, side, 0).threatValue + laneSummary(state, side, 1).threatValue;
+      if (threat > em.peakThreat) em.peakThreat = threat;
+      if (threat < 0.5 && em.peakThreat >= 6) { want = pick(['cool', 'thumbs', 'laugh']); em.peakThreat = 0; }
+      else if (threat < 0.5) em.peakThreat = 0;
+    }
+    // Sometimes answer the opponent's emote
+    const le = state.lastEmote;
+    if (!want && le && le.side === foe && le.time > em.seenEmoteT) {
+      em.seenEmoteT = le.time;
+      if (brain.rand() < chance * 0.5) want = le.id === 'laugh' || le.id === 'king' ? pick(['angry', 'laugh', 'cool']) : pick(['thumbs', 'laugh', 'gg']);
+    }
+    if (want && !em.queued && state.time - em.lastAt > 6 && brain.rand() < chance) {
+      em.queued = { id: want, at: state.time + 0.6 + brain.rand() * 0.9 };
+    }
+    if (em.queued && state.time >= em.queued.at) {
+      if (emote(state, side, em.queued.id).ok) em.lastAt = state.time;
+      em.queued = null;
+    }
   }
 
   function ownHalf(side, y) { return side === 'A' ? y >= RIVER.y1 : y < RIVER.y0; }
@@ -1473,7 +1705,7 @@
     let best = null;
     let bestScore = -Infinity;
     options.forEach((c) => {
-      if (c.targets === 'buildings') return;
+      if (c.targets === 'buildings' || c.spell) return;
       if (lane.ground === 0 && lane.air > 0 && c.targets !== 'any') return; // can't touch pure air
       let s = 0;
       if (smart) {
@@ -1492,12 +1724,64 @@
     return best;
   }
 
+  // Best place to cast a spell: lead moving targets by the flight time, value what it would kill
+  function planSpell(state, brain, options) {
+    const spells = options.filter((c) => c.spell);
+    if (!spells.length) return null;
+    const side = brain.side;
+    const foe = enemyOf(side);
+    const smart = brain.rand() < brain.profile.strategicChance;
+    const king = state.towers.find((t) => t.owner === side && t.tower === 'king');
+    const enemies = state.units.filter((u) => u.owner === foe && u.hp > 0 && u.deployT <= 0.2);
+    const enemyTowers = state.towers.filter((t) => t.owner === foe && t.hp > 0);
+    let best = null;
+    for (const c of spells) {
+      const r = c.splash;
+      const dmg = c.dmgScaled;
+      const towerDmg = dmg * c.towerMult;
+      const flight = c.proj === 'shock' ? 0 : (king ? 1 : 0);
+      const points = [];
+      for (const e of enemies) {
+        const t = flight ? dist(king.x, king.y, e.x, e.y) / (PROJ_SPEED[c.proj] || 15) + (c.waves > 1 ? 0.2 : 0) : 0.1;
+        points.push({ x: e.x + e.vx * t * 0.8, y: e.y + e.vy * t * 0.8 });
+      }
+      enemyTowers.forEach((t) => { if (t.hp <= towerDmg) points.push({ x: t.x, y: t.y }); });
+      for (const pt of points) {
+        let value = 0;
+        let count = 0;
+        for (const e of enemies) {
+          if (dist(pt.x, pt.y, e.x, e.y) - e.radius > r * 0.9) continue;
+          count++;
+          const unitCost = e.costShare;
+          value += e.hp <= dmg ? unitCost * (e.hp / e.hpMax + 0.3) : unitCost * (dmg / e.hpMax) * 0.6;
+          if (c.stun && (e.charging || e.windupT > 0 || e.building)) value += 0.4;
+        }
+        for (const t of enemyTowers) {
+          if (boxDist(pt.x, pt.y, t) > r) continue;
+          value += t.hp <= towerDmg ? 20 : (towerDmg / t.hpMax) * 8;
+        }
+        // Prefer clearing threats on our own side of the river
+        if (ownHalf(side, pt.y)) value *= 1.15;
+        const need = c.cost * (smart ? 1.05 : 1.5);
+        if ((count >= 2 || value >= 20) && value >= need && (!best || value - c.cost > best.score)) {
+          best = { cardId: c.id, x: clamp(pt.x, 0.6, W - 0.6), y: clamp(pt.y, 0.6, H - 0.6), score: value - c.cost };
+        }
+      }
+    }
+    return best;
+  }
+
   function aiDecide(state, brain) {
     const side = brain.side;
     const foe = enemyOf(side);
     const p = state.players[side];
     const options = p.hand.map((id) => p.cards[id]).filter((c) => c && c.cost <= p.elixir && (p.cooldowns[c.id] || 0) <= state.time);
     if (options.length === 0) return null;
+    const troops = options.filter((c) => !c.spell);
+
+    // 0) A spell that pays for itself (or finishes a tower)
+    const spell = planSpell(state, brain, options);
+    if (spell) return spell;
 
     // 1) Defend the more dangerous lane if it isn't already covered
     const lanes = [laneSummary(state, side, 0), laneSummary(state, side, 1)];
@@ -1506,7 +1790,7 @@
     const need = lane.threatValue - lane.defenseValue * 0.8;
     const leadDeep = lane.lead && (side === 'A' ? lane.lead.y > RIVER.y1 + 1 : lane.lead.y < RIVER.y0 - 1);
     if (lane.lead && (need >= 1.5 || (leadDeep && need > 0.5))) {
-      const card = chooseDefender(state, brain, options, lane);
+      const card = chooseDefender(state, brain, troops, lane);
       if (card) {
         const lead = lane.lead;
         const laneX = TOWER_LAYOUT.princessX[lanePick];
@@ -1529,14 +1813,23 @@
     const laneX = TOWER_LAYOUT.princessX[attackLane];
     const bridgeY = side === 'A' ? RIVER.y1 + 0.8 : RIVER.y0 - 0.8;
     const myPush = state.units.filter((u) => u.owner === side && u.hp > 0 && !u.building && (attackLane === 0 ? u.x < MID_X : u.x >= MID_X));
-    const tank = myPush.find((u) => u.hpMax >= 500 || u.targets === 'buildings');
+    let tank = myPush.find((u) => u.hpMax >= 500 || u.targets === 'buildings');
+    // Counter-push: surviving defenders heading for the bridge are worth backing up
+    if (!tank) {
+      const survivors = myPush.filter((u) => u.deployT <= 0 && (side === 'A' ? u.y < RIVER.y1 + 5 : u.y > RIVER.y0 - 5));
+      if (survivors.reduce((sum, u) => sum + u.costShare * (u.hp / u.hpMax), 0) >= 3.5) tank = survivors[0];
+    }
 
     const leaking = p.elixir >= brain.profile.leakAt;
-    const wantsPush = leaking || (p.elixir >= 7 && brain.rand() < brain.profile.aggression);
+    const doubleTime = elixirMultiplier(state) > 1;
+    // Punish when the opponent has (visibly) just spent a lot
+    const foeLow = brain.foeElixir < 3;
+    const aggression = Math.min(0.95, brain.profile.aggression * (doubleTime ? 1.5 : 1) + (foeLow ? 0.3 : 0));
+    const wantsPush = leaking || (p.elixir >= (foeLow ? 5 : 7) && brain.rand() < aggression);
 
     // Support an existing tank that is heading over the river
     if (tank && p.elixir >= 4) {
-      const support = options.filter((c) => c.targets !== 'buildings' && !c.building).sort((a, b) => (b.splash > 0) - (a.splash > 0) || b.range - a.range)[0];
+      const support = troops.filter((c) => c.targets !== 'buildings' && !c.building).sort((a, b) => (b.splash > 0) - (a.splash > 0) || b.range - a.range)[0];
       if (support) {
         const spot = findDeploySpot(state, side, support, tank.x, ownHalf(side, tank.y) ? toward(side, tank.y, 2) : bridgeY);
         if (spot) return { cardId: support.id, x: spot.x, y: spot.y };
@@ -1544,7 +1837,7 @@
     }
     if (!wantsPush) return null;
 
-    const winCons = options.filter((c) => !c.building && (c.winCondition || c.hpScaled >= 600)).sort((a, b) => b.cost - a.cost);
+    const winCons = troops.filter((c) => !c.building && (c.winCondition || c.hpScaled >= 600)).sort((a, b) => b.cost - a.cost);
     if (winCons.length && !tank) {
       const c = winCons[0];
       // Slow tanks start at the back to build elixir behind them; fast ones go straight to the bridge
@@ -1555,7 +1848,7 @@
     }
     if (leaking) {
       // Avoid wasting elixir: cycle the cheapest non-building card at the back
-      const cheap = options.filter((c) => !c.building).sort((a, b) => a.cost - b.cost)[0];
+      const cheap = troops.filter((c) => !c.building).sort((a, b) => a.cost - b.cost)[0];
       if (cheap) {
         const spot = findDeploySpot(state, side, cheap, cheap.targets === 'buildings' ? BRIDGES[attackLane].cx : laneX, cheap.targets === 'buildings' ? bridgeY : toward(side, TOWER_LAYOUT.princessY[side], 2.8));
         if (spot) return { cardId: cheap.id, x: spot.x, y: spot.y };
@@ -1566,7 +1859,9 @@
 
   /** Call every frame with the step size; returns the deploy result when the AI plays a card. */
   function aiUpdate(state, brain, dt) {
+    aiEmotes(state, brain, dt);
     if (!state.running) return null;
+    trackFoeElixir(state, brain, dt);
     brain.thinkT -= dt;
     if (brain.thinkT > 0) return null;
     const pr = brain.profile;
@@ -1585,7 +1880,8 @@
   }
 
   return {
-    W, H, MID_X, RIVER, BRIDGES, TOWER_LAYOUT, MATCH, NAV_CELL,
+    W, H, MID_X, RIVER, BRIDGES, TOWER_LAYOUT, MATCH, NAV_CELL, EMOTE_IDS, EMOTE_RULES,
+    emote,
     spawnDirect,
     ARCHETYPES, VARIANTS, CARD_LIBRARY, CARD_MAP, STARTER_DECK, MAX_DECK, RARITY_ORDER,
     getCardStatsAtLevel, towerStats, normalizeDeck,
