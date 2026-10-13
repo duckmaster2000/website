@@ -2403,6 +2403,16 @@ function unlockPrototype() {
 }
 
 function gameLoop(ts) {
+  // Queue the next frame first: a single bad frame must never freeze the whole game
+  requestAnimationFrame(gameLoop);
+  try {
+    gameFrame(ts);
+  } catch (err) {
+    if (!gameLoop.lastErr || ts - gameLoop.lastErr > 2000) { gameLoop.lastErr = ts; console.error(err); }
+  }
+}
+
+function gameFrame(ts) {
   const dt = state.lastTick ? Math.min(0.1, (ts - state.lastTick) / 1000) : 0;
   state.lastTick = ts;
   if (onlineActive) {
@@ -2421,7 +2431,6 @@ function gameLoop(ts) {
   renderDecks();
   syncEmoteButtons();
   renderArena();
-  requestAnimationFrame(gameLoop);
 }
 
 function boot() {

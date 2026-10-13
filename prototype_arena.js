@@ -457,7 +457,8 @@
       let drop = 0;
       let alpha = 1;
       if (deploying) {
-        const p = 1 - u.dep / Sim.MATCH.deployTime;
+        // Swarm members land staggered (dep can exceed deployTime), so clamp to 0..1
+        const p = Math.min(1, Math.max(0, 1 - u.dep / Sim.MATCH.deployTime));
         if (p < 0.22) {
           const k = 1 - p / 0.22;
           drop = k * k * scale * 2.2;
@@ -474,7 +475,7 @@
       }
 
       // Shadow (shrinks while the unit is dropping in)
-      const shadowK = drop ? 1 - drop / (scale * 3.2) : 1;
+      const shadowK = drop ? Math.max(0, 1 - drop / (scale * 3.2)) : 1;
       ctx.fillStyle = 'rgba(0,0,0,0.3)';
       ctx.beginPath(); ctx.ellipse(x, y + r * 0.35, r * 0.95 * shadowK, r * 0.5 * shadowK, 0, 0, Math.PI * 2); ctx.fill();
       y -= lift + drop + bob;
@@ -541,7 +542,7 @@
         ctx.beginPath(); ctx.arc(x, y, r * 1.15, face - 0.6, face + 0.6); ctx.stroke();
       }
       if (deploying) {
-        const p = 1 - u.dep / Sim.MATCH.deployTime;
+        const p = Math.min(1, Math.max(0, 1 - u.dep / Sim.MATCH.deployTime));
         ctx.strokeStyle = 'rgba(255,255,255,0.9)';
         ctx.lineWidth = 2;
         ctx.beginPath(); ctx.arc(x, y, r * 1.25, -Math.PI / 2, -Math.PI / 2 + p * Math.PI * 2); ctx.stroke();
