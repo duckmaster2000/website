@@ -42,6 +42,7 @@
           <label class="ranked-toggle" id="ptRankedWrap" title="Ranked: trophies count, the AI brings an arena deck. Off: practice with your own AI deck and tuning."><input type="checkbox" id="ptRanked" checked /> 🏆 Ranked</label>
           <button id="ptStartMatch" type="button">Start Match</button>
           <button id="ptRoadBtn" type="button" class="road-btn" aria-label="Open the Trophy Road">🏆 Trophy Road</button>
+          <button id="ptEventsBtn" type="button" class="events-btn" aria-label="Open the Event Hub">🎪 Events</button>
           <button id="ptSound" type="button" aria-pressed="true">🔊 Sound</button>
           <button id="ptAdminToggle" type="button">Admin Panel</button>
           <button id="ptResetUpgrades" type="button">Reset Upgrades</button>
@@ -66,6 +67,7 @@
 
       <section class="panel lobby-panel" id="ptLobbyPanel" hidden>
         <h3>Online 1v1</h3>
+        <div id="ptLobbyEvent" class="lobby-event" hidden></div>
         <p class="note lobby-desc">Play against a friend in real-time. Create a room and send them the link, or paste a room code to join.</p>
         <div class="lobby-row">
           <button id="ptCreateRoom" type="button" class="btn-primary">Create Room</button>
@@ -117,6 +119,8 @@
         </div>
 
         <div class="deck deck-top" id="ptDeckB" aria-label="commander b deck"></div>
+
+        <div class="event-bar" id="ptEventBar" hidden aria-label="Event status: active and upcoming modifiers"></div>
 
         <div class="board" id="ptBoard">
           <canvas id="ptArena" class="arena-canvas" aria-label="Battle arena: drag a card here or select a card and tap the arena to deploy"></canvas>
@@ -244,6 +248,7 @@
       <div class="win-crowns" id="ptWinCrowns" aria-label="Crowns"></div>
       <p class="win-subline" id="ptWinSubline"></p>
       <div class="win-trophies" id="ptWinTrophies" hidden></div>
+      <div class="win-event" id="ptWinEvent" hidden></div>
       <div class="win-stats" id="ptWinStats"></div>
       <div class="win-card-slot" id="ptWinCardSlot" hidden>
         <div class="win-card-reveal" id="ptWinCardReveal"></div>
@@ -253,6 +258,7 @@
       <div class="confetti" id="ptConfetti" aria-hidden="true"></div>
       <div class="win-actions">
         <button id="ptWinRematch" type="button" hidden>Rematch</button>
+        <button id="ptWinHub" type="button" hidden>🎪 Events</button>
         <button id="ptWinClaim" type="button">Continue</button>
       </div>
     </div>
@@ -299,16 +305,26 @@
     </div>
   </div>
 
+  <div class="road-overlay ev-overlay" id="ptEventsOverlay" hidden>
+    <div class="road-modal ev-modal" id="ptEventsModal" role="dialog" aria-modal="true" aria-label="Event Hub"></div>
+  </div>
+
+  <div class="road-overlay draft-overlay" id="ptDraftOverlay" hidden>
+    <div class="road-modal draft-modal" role="dialog" aria-modal="true" aria-label="Draft Duel"></div>
+  </div>
+
   <div class="toast-stack" id="ptToasts" aria-live="polite"></div>
 
   <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
   <script src="clash-tanks-server/clash-tanks-server/shared/clash-sim.js"></script>
   <script src="clash-tanks-server/clash-tanks-server/shared/trophy-road.js"></script>
   <script src="clash-tanks-server/clash-tanks-server/shared/evo-progress.js"></script>
+  <script src="clash-tanks-server/clash-tanks-server/shared/events.js"></script>
   <script src="prototype_emotes.js"></script>
   <script src="prototype_arena.js"></script>
   <script src="prototype_road.js"></script>
   <script src="prototype_evo.js"></script>
+  <script src="prototype_events.js"></script>
   <script src="prototype_v4.js"></script>
 </body>
 </html>

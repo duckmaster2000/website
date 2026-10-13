@@ -162,7 +162,8 @@ const state = {
     activeDeck: 0,
     rankedAi: true,           // vs AI counts for trophies (arena AI deck, preset difficulty)
     roadEmotes: {},           // emotes unlocked on the Trophy Road
-    evo: Evo.fresh()          // Evolution shards, unlocks and equipped slots
+    evo: Evo.fresh(),         // Evolution shards, unlocks and equipped slots
+    events: Events.freshProgress() // special events: records, rewards, challenges (shared/events.js)
   }
 };
 
@@ -373,6 +374,7 @@ function applySavedProgress(saved) {
     state.progress.deck = decks[state.progress.activeDeck].length ? decks[state.progress.activeDeck] : state.progress.deck;
     state.progress.rankedAi = saved.rankedAi !== false;
     state.progress.evo = Evo.normalize(saved.evo, EVO_SLUGS, evoSlug);
+    state.progress.events = Events.normalizeProgress(saved.events);
     state.progress.roadEmotes = {};
     if (saved.roadEmotes && typeof saved.roadEmotes === 'object') {
       Object.keys(saved.roadEmotes).forEach((id) => { if (Sim.EMOTE_IDS.includes(id)) state.progress.roadEmotes[id] = true; });
@@ -390,6 +392,9 @@ function loadProgress() {
   if (forfeit && forfeit.applied && forfeit.delta < 0) {
     setTimeout(() => toast('🏳️', 'Ranked battle abandoned', `Leaving counts as a loss: ${forfeit.delta} 🏆`), 1200);
   }
+  // Same for an event match closed after a card was played (once; challenges lose a life)
+  const evForfeit = Events.resolvePending(state.progress.events, Date.now());
+  if (evForfeit && evForfeit.applied) setTimeout(() => toast('🏳️', 'Event match abandoned', 'Leaving after playing a card counts as a loss.'), 1500);
   const aiDeck = state.progress.aiDeck;
   // An AI deck that was never customised gets the newer default (which includes spells)
   if (!Array.isArray(aiDeck) || aiDeck.length === 0 || aiDeck.join() === STARTER_DECK.join()) {
@@ -470,6 +475,7 @@ function presetProfile(key) {
 
 function playerName(side) {
   if (onlineActive || state.viewSource === 'online') return side === mySide ? 'You' : 'Opponent';
+  if (side === 'B' && state.eventMatch && state.eventMatch.scripted) return state.eventMatch.eventId === 'boss' ? 'Iron Colossus' : 'The Horde';
   if (side === 'B') return state.mode === 'ai' ? 'Enemy AI' : 'Commander B';
   return 'Commander A';
 }
@@ -503,6 +509,7 @@ function forfeitRunningRanked() {
 
 function setupMatch() {
   forfeitRunningRanked();
+  forfeitRunningEvent(); // a normal battle always starts on normal rules (state.eventMatch = null)
   state.mode = ui.mode?.value || 'pvp';
   leaveQueue();
   lastMatchWasOnline = false;
@@ -716,6 +723,7 @@ function showWinOverlay(result, cardAward, goldBonus, isOnline, extra) {
     ui.winAch.innerHTML = (x.achievements || []).map((a) => `<div class="win-ach-row"><span>${a.icon}</span><b>${a.name}</b><em>+${a.gold} gold${a.wild ? ' · Wild Shards' : ''}${a.emote ? ' · new emote!' : ''}</em></div>`).join('');
   }
   renderWinTrophies(x.trophy, x.friendly);
+  renderWinEvent(x.event);
   if (ui.confetti) {
     ui.confetti.innerHTML = won ? confettiHtml(46) : '';
   }
@@ -769,6 +777,7 @@ function endReasonText(reason) {
 
 function onVictory(winner) {
   if (state.winner) return;
+  if (state.eventMatch) { onEventVictory(winner); return; } // event rewards replace the normal ones
   state.winner = winner;
   state.running = false;
   state.selectedCard = null;
@@ -1088,21 +1097,24 @@ function renderStatus() {
     const p = v.players[side];
     const s = ui.status[slot];
     const towers = v.towers.filter((t) => t.owner === side);
-    const king = towers.find((t) => t.tower === 'king');
+    // Survival and boss events: the scripted side has no towers at all
+    const king = towers.find((t) => t.tower === 'king') || { hp: 0, hpMax: 1 };
     const princesses = towers.filter((t) => t.tower === 'princess').map((t) => (t.hp > 0 ? '⬡' : '✕'));
     setText(s.name, playerName(side));
     setText(ui.rank[slot], rankLine(side));
-    setText(s.base, Math.ceil(king.hp));
-    setText(s.tower, `${princesses[0]}♛${princesses[1]}  👑${p.crowns}`);
+    setText(s.base, towers.length ? Math.ceil(king.hp) : '—');
+    setText(s.tower, towers.length ? `${princesses[0]}♛${princesses[1]}  👑${p.crowns}` : 'no towers');
     // Like the real game, you can't see your online opponent's elixir
-    const hidden = state.viewSource === 'online' && side !== mySide;
-    setText(s.energy, hidden ? '?' : Math.floor(p.elixir));
+    const scripted = side === 'B' && state.viewSource === 'local' && state.eventMatch && state.eventMatch.scripted;
+    const hidden = (state.viewSource === 'online' && side !== mySide) || scripted;
+    setText(s.energy, scripted ? '—' : hidden ? '?' : Math.floor(p.elixir));
     const mine = side === 'A' && state.viewSource !== 'online';
-    setText(s.gold, mine ? `💰 ${state.progress.gold}` : (state.mode === 'ai' && state.viewSource !== 'online' && side === 'B' ? 'ENEMY AI' : '—'));
+    setText(s.gold, mine ? `💰 ${state.progress.gold}` : scripted ? (state.eventMatch.eventId === 'boss' ? 'BOSS' : 'HORDE') : (state.mode === 'ai' && state.viewSource !== 'online' && side === 'B' ? 'ENEMY AI' : '—'));
     setStyle(ui.baseBars[slot], 'width', `${clamp((king.hp / king.hpMax) * 100, 0, 100).toFixed(1)}%`);
-    setStyle(ui.energyBars[slot], 'width', hidden ? '0%' : `${clamp((p.elixir / Sim.MATCH.maxElixir) * 100, 0, 100).toFixed(1)}%`);
+    const maxElixir = v.maxElixir || Sim.MATCH.maxElixir;
+    setStyle(ui.energyBars[slot], 'width', hidden ? '0%' : `${clamp((p.elixir / maxElixir) * 100, 0, 100).toFixed(1)}%`);
     const track = ui.energyBars[slot] && ui.energyBars[slot].parentElement;
-    const full = !hidden && p.elixir >= Sim.MATCH.maxElixir && v.running;
+    const full = !hidden && p.elixir >= maxElixir && v.running;
     if (track && track.__full !== full) { track.__full = full; track.classList.toggle('full', full); }
   });
 }
@@ -1129,17 +1141,23 @@ function cardButton(owner, id) {
   const p = v.players[owner];
   const rem = (p.cooldownsRemaining && p.cooldownsRemaining[id]) || 0;
   const onCd = rem > 0;
-  const short = p.elixir < card.cost;
+  // Events can change what a card costs (and Size Roulette rolls it Tiny or Mega)
+  const cost = p.cost && p.cost[id] != null ? p.cost[id] : card.cost;
+  const form = p.size && p.size[id];
+  const short = p.elixir < cost;
   const disabled = !v.running || onCd;
   const cdPct = onCd ? Math.round((1 - rem / card.deployCdScaled) * 10) * 10 : 100;
   // Quantised so the hand doesn't re-render every frame while elixir fills
-  const fill = Math.floor(clamp(p.elixir / card.cost, 0, 1) * 10) * 10;
+  const fill = Math.floor(clamp(p.elixir / cost, 0, 1) * 10) * 10;
   const selected = state.selectedCard && state.selectedCard.owner === owner && state.selectedCard.type === id;
   const cp = cardProgress(id);
   const tags = `${card.spell ? ' ✦ Spell' : ''}${card.winCondition ? ' 👑' : ''}${card.air ? ' ✈' : ''}${card.swarmCount > 1 ? ` ×${card.swarmCount}` : ''}`;
   const entering = (handEnter[owner] && handEnter[owner][id] || 0) > performance.now();
   const evoB = handEvoBadge(p, id);
-  return `<button class="card rarity-${card.rarity}${card.winCondition ? ' wc' : ''}${card.swarmCount > 1 ? ' swarm' : ''}${card.spell ? ' spell' : ''}${entering ? ' card-enter' : ''}${evoB.cls}" data-owner="${owner}" data-type="${id}" data-disabled="${disabled ? '1' : '0'}" data-short="${short ? '1' : '0'}" data-selected="${selected ? '1' : '0'}" title="${card.name}: ${card.role}"><span class="card-rarity">${RARITY_STYLE[card.rarity].label}${tags}</span><span class="card-icon">${card.icon}</span><span class="card-cost ${costClass(card.cost)}">${card.cost}</span><span class="card-name">${card.name}</span><span class="card-meta">Lv ${cp.level} • ${card.role}</span><span class="card-cd-bar"><i style="width:${cdPct}%"></i></span>${short ? `<span class="card-short" style="transform:scaleX(${fill / 100})"></span>` : ''}${evoB.html}</button>`;
+  const lvl = p.lvl && p.lvl[id] != null ? p.lvl[id] : cp.level;
+  const costTag = cost !== card.cost ? ` card-cost-${cost < card.cost ? 'down' : 'up'}` : '';
+  const formHtml = form ? `<span class="card-form form-${form}" title="${form === 'mega' ? 'Mega: +1 cost, 160% HP, 130% damage, slower' : 'Tiny: −1 cost, 60% HP, 75% damage, faster'}">${form === 'mega' ? 'MEGA' : 'TINY'}</span>` : '';
+  return `<button class="card rarity-${card.rarity}${card.winCondition ? ' wc' : ''}${card.swarmCount > 1 ? ' swarm' : ''}${card.spell ? ' spell' : ''}${entering ? ' card-enter' : ''}${form ? ` sized-${form}` : ''}${evoB.cls}" data-owner="${owner}" data-type="${id}" data-disabled="${disabled ? '1' : '0'}" data-short="${short ? '1' : '0'}" data-selected="${selected ? '1' : '0'}" title="${card.name}: ${card.role}${cost !== card.cost ? ` (costs ${cost} in this event)` : ''}"><span class="card-rarity">${RARITY_STYLE[card.rarity].label}${tags}</span><span class="card-icon">${card.icon}</span><span class="card-cost ${costClass(cost)}${costTag}">${cost}</span>${formHtml}<span class="card-name">${card.name}</span><span class="card-meta">Lv ${lvl} • ${card.role}</span><span class="card-cd-bar"><i style="width:${cdPct}%"></i></span>${short ? `<span class="card-short" style="transform:scaleX(${fill / 100})"></span>` : ''}${evoB.html}</button>`;
 }
 
 function deckAvgCost(ids) {
@@ -1184,7 +1202,9 @@ function renderDecks() {
     return;
   }
   setHtml(ui.deckA, renderHandDeck('A'));
-  if (state.mode === 'ai') {
+  if (state.eventMatch && state.eventMatch.scripted) {
+    setHtml(ui.deckB, `<div class="note">${state.eventMatch.eventId === 'boss' ? '🤖 The Iron Colossus fights on its own: no cards, no elixir.' : '🌊 Scripted waves: the horde plays no cards.'}</div>`);
+  } else if (state.mode === 'ai') {
     setHtml(ui.deckB, '<div class="note">Enemy AI controls this deck in real time.</div>');
   } else {
     setHtml(ui.deckB, renderHandDeck('B'));
@@ -1305,8 +1325,16 @@ const Sound = (() => {
     dive: () => tone(1400, 0.22, { type: 'triangle', slide: 0.3, vol: 0.035 }),
     rally: () => tone(180, 0.25, { type: 'sawtooth', slide: 1.6, vol: 0.03 }),
     bastion: () => [523, 784].forEach((f, i) => tone(f, 0.18, { type: 'sine', delay: i * 0.06, vol: 0.035 })),
+    // Special events
+    chaos: () => { [196, 233, 277, 330, 392].forEach((f, i) => tone(f, 0.16, { type: 'sawtooth', delay: i * 0.05, vol: 0.025 })); tone(1568, 0.5, { type: 'triangle', delay: 0.25, slide: 0.5, vol: 0.03 }); },
+    modOn: () => [880, 1175, 1568].forEach((f, i) => tone(f, 0.1, { type: 'triangle', delay: i * 0.05, vol: 0.035 })),
+    warn: () => [660, 520].forEach((f, i) => tone(f, 0.12, { type: 'square', delay: i * 0.12, vol: 0.022 })),
+    wave: () => { noise(0.4, 0.05); tone(150, 0.4, { type: 'sawtooth', slide: 1.5, vol: 0.03 }); },
+    bossSpawn: () => { noise(0.8, 0.12); [98, 82, 65].forEach((f, i) => tone(f, 0.5, { type: 'sawtooth', delay: i * 0.25, vol: 0.06 })); },
+    bossEnrage: () => [220, 233, 247, 262].forEach((f, i) => tone(f, 0.12, { type: 'sawtooth', delay: i * 0.06, vol: 0.04 })),
+    swap: () => [523, 392, 659, 523, 784].forEach((f, i) => tone(f, 0.08, { type: 'triangle', delay: i * 0.06, vol: 0.04 })),
   };
-  const MIN_GAP = { hit: 0.07, splash: 0.12, death: 0.08, rocket: 0.1, horn: 0.5, drop: 0.15, elixir: 0.2, taunt: 1, popup: 0.3, dash: 0.2, shockwave: 0.15, pulse: 0.2, pierce: 0.1, dive: 0.15, rally: 0.3, bastion: 0.5 };
+  const MIN_GAP = { warn: 0.4, modOn: 0.3, hit: 0.07, splash: 0.12, death: 0.08, rocket: 0.1, horn: 0.5, drop: 0.15, elixir: 0.2, taunt: 1, popup: 0.3, dash: 0.2, shockwave: 0.15, pulse: 0.2, pierce: 0.1, dive: 0.15, rally: 0.3, bastion: 0.5 };
 
   function play(name, arg) {
     if (!enabled || !ctx || !SOUNDS[name]) return;
@@ -1334,11 +1362,18 @@ function handleFx(list) {
     switch (f.type) {
       case 'deploy': case 'tower': case 'splash': case 'death': case 'hit': Sound.play(f.type); break;
       case 'cast': Sound.play(CARD_MAP[f.cardId] && CARD_MAP[f.cardId].zone ? 'zone' : 'cast'); break;
-      case 'spell': Sound.play(f.kind === 'shock' ? 'shock' : f.kind === 'firebomb' ? 'boom' : f.kind === 'frost' ? 'freeze' : 'rocket'); break;
+      case 'spell': Sound.play(f.kind === 'shock' ? 'shock' : f.kind === 'firebomb' || f.kind === 'meteor' || f.kind === 'slam' ? 'boom' : f.kind === 'frost' ? 'freeze' : 'rocket'); break;
       case 'laser': Sound.play('laser'); break;
       case 'drop': case 'elixir': case 'shieldBreak': case 'popup': case 'dash': case 'taunt': Sound.play(f.type); break;
       case 'evolve': case 'shockwave': case 'pulse': case 'pierce': case 'dive': case 'rally': case 'bastion': Sound.play(f.type); break;
       case 'crown': Sound.play('crown'); break;
+      case 'modOn': Sound.play('modOn'); break;
+      case 'bossSlam': Sound.play('warn'); break;
+      case 'hillMove': Sound.play('warn'); break;
+      case 'wave': Sound.play('wave'); break;
+      case 'bossSpawn': Sound.play('bossSpawn'); break;
+      case 'bossEnrage': case 'bossSummon': Sound.play('bossEnrage'); break;
+      case 'deckSwap': Sound.play('swap'); break;
       case 'kingWake': Sound.play('horn'); break;
       case 'emote': Sound.play('emote', f.emote); break;
       default: break;
@@ -1373,7 +1408,8 @@ function deployCheck(owner, cardId, x, y) {
   if (!card || !p) return { ok: false, reason: 'Match not running' };
   if (!v.running) return { ok: false, reason: 'Match is over' };
   if (!zoneCheck(owner, card, x, y)) return { ok: false, reason: "Can't deploy there" };
-  if (p.elixir < card.cost) return { ok: false, reason: `Need ${card.cost} elixir` };
+  const cost = p.cost && p.cost[cardId] != null ? p.cost[cardId] : card.cost;
+  if (p.elixir < cost) return { ok: false, reason: `Need ${cost} elixir` };
   if (((p.cooldownsRemaining && p.cooldownsRemaining[cardId]) || 0) > 0) return { ok: false, reason: 'Card is recharging' };
   return { ok: true };
 }
@@ -1402,6 +1438,7 @@ function tryDeployAt(owner, cardId, x, y) {
   if (!check.ok) { rejectDeploy(check.reason, owner, cardId); return false; }
   if (state.viewSource === 'online') {
     countPlay(owner, cardId);
+    eventEngaged();
     socket.emit('deploy', { cardId, x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100 });
     state.selectedCard = null;
     Sound.play('deploy');
@@ -1419,6 +1456,7 @@ function tryDeployAt(owner, cardId, x, y) {
   if (owner === 'A') {
     const cp = cardProgress(cardId);
     cp.mastery = (cp.mastery || 0) + 0.25;
+    eventEngaged();
     saveProgress();
   }
   countPlay(owner, cardId);
@@ -2105,6 +2143,17 @@ function ensureSocket() {
     if (ui.lobbyStatus) ui.lobbyStatus.textContent = `Error: ${msg}`;
   });
 
+  // Events: the server checks the event is open and playable online, and fixes illegal decks
+  socket.on('queue_error', ({ msg } = {}) => {
+    inQueue = false;
+    if (ui.queueStatus) ui.queueStatus.hidden = true;
+    if (ui.findMatch) ui.findMatch.disabled = false;
+    if (ui.lobbyStatus) ui.lobbyStatus.textContent = `Error: ${msg || 'Could not join that queue.'}`;
+  });
+  socket.on('deck_loaner', ({ problems } = {}) => {
+    toast('🃏', 'Loaner deck', `Your deck didn't fit this event's rules, so the server gave you a legal one. ${(problems || []).join(' ')}`);
+  });
+
   socket.on('queue_waiting', () => {
     inQueue = true;
     if (ui.queueStatus) ui.queueStatus.hidden = false;
@@ -2164,7 +2213,7 @@ function bindLobby() {
   ui.createRoom?.addEventListener('click', () => {
     ensureSocket();
     if (!socket) return;
-    socket.emit('create_room', { deck: onlineDeckPayload() });
+    socket.emit('create_room', { deck: onlineDeckPayload(), ...onlineEventPayload() });
     if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Creating room...';
   });
 
@@ -2184,7 +2233,9 @@ function bindLobby() {
   ui.cancelQueue?.addEventListener('click', leaveQueue);
   ui.winClaim?.addEventListener('click', () => {
     const again = !lastMatchWasOnline && ui.mode?.value !== 'online';
+    const wasEvent = !!(evUi.winHub && !evUi.winHub.hidden);
     closeWinOverlay();
+    if (again && wasEvent && replayEvent()) return;
     if (again) setupMatch();
   });
   ui.winRematch?.addEventListener('click', () => {
@@ -2222,13 +2273,14 @@ function scrollToBattle() {
 
 function showMatchOnline(info) {
   forfeitRunningRanked();
+  forfeitRunningEvent();
   // A previous ranked match that never got a result (connection lost) is settled as a loss first
   const road = state.progress.road;
   if (road.pending && road.pending.id !== info.matchId) {
     const old = Road.resolvePending(road);
     if (old && old.applied && old.delta < 0) toast('🏳️', 'Unfinished ranked battle', `Counted as a loss: ${old.delta} 🏆`);
   }
-  onlineMatch = { matchId: String(info.matchId || `online-${Date.now()}`), ranked: !!info.ranked };
+  onlineMatch = { matchId: String(info.matchId || `online-${Date.now()}`), ranked: !!info.ranked, eventId: info.eventId || null, tier: info.tier || null, law: info.law || null };
   if (onlineMatch.ranked) Road.beginRanked(road, onlineMatch.matchId, 'online');
   saveProgress();
   onlineActive = true;
@@ -2247,7 +2299,12 @@ function showMatchOnline(info) {
   netFx = [];
   emoteUi.lastSent = { A: -1e9, B: -1e9 };
   beginMatchPresentation();
-  writeLog(onlineMatch.ranked ? 'Ranked online match started 🏆. Your towers are at the bottom.' : 'Friendly online match started (no trophies). Your towers are at the bottom.');
+  if (onlineMatch.eventId) {
+    const ev = Events.EVENT_MAP[onlineMatch.eventId];
+    state.aiTag = ev ? `${ev.icon} ${evName(ev, onlineMatch.tier)}` : '';
+    onlineEventStarted(info);
+  }
+  writeLog(onlineMatch.eventId ? 'Online event match started (casual, no trophies). Your towers are at the bottom.' : onlineMatch.ranked ? 'Ranked online match started 🏆. Your towers are at the bottom.' : 'Friendly online match started (no trophies). Your towers are at the bottom.');
   scrollToBattle();
 }
 
@@ -2304,6 +2361,7 @@ function handleOnlineVictory(winner, info, forfeit) {
   if (netFx.length) { handleFx(netFx); netFx = []; }
   const won = winner === mySide;
   const draw = winner === 'draw';
+  if (om && om.eventId) { onlineEventFinished(om, winner, last, forfeit); return; } // event rewards replace the normal ones
   let cardAward = null;
   let goldBonus = 0;
   const reason = forfeit ? 'Opponent left the match' : endReasonText(last && last.endReason);
@@ -2349,7 +2407,7 @@ function joinQueue() {
   if (!socket.connected && ui.lobbyStatus) ui.lobbyStatus.textContent = 'Connecting to game server (can take up to a minute if it was asleep)...';
   const doJoin = () => {
     if (!inQueue) return; // cancelled while connecting
-    socket.emit('join_queue', { deck: onlineDeckPayload() });
+    socket.emit('join_queue', { deck: onlineDeckPayload(), ...onlineEventPayload() });
     if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Searching for opponent...';
   };
   if (socket.connected) {
@@ -2535,7 +2593,8 @@ function bindCore() {
       activeDeck: 0,
       rankedAi: true,
       roadEmotes: {},
-      evo: Evo.fresh()
+      evo: Evo.fresh(),
+      events: Events.freshProgress()
     };
     unlockInitial();
     state.progress.aiDeck = [...AI_DEFAULT_DECK];
@@ -2568,8 +2627,14 @@ function unlockPrototype() {
   arena = ArenaView.create(ui.arena);
   arena.onCue = (cue) => Sound.play(cue === 'double' ? 'double' : 'overtime');
   bindCore();
+  bindEvents();
   renderAchievements();
   renderRoadBadge();
+  if (!state.progress.events.seen.news) {
+    state.progress.events.seen.news = 1;
+    saveProgress();
+    setTimeout(() => toast('🎪', 'New: Special Events!', 'Chaos Mode, a boss battle, survival waves, a weekly challenge and a fresh line-up every day. Tap 🎪 Events.'), 2100);
+  }
   if (!state.progress.road.seenNews) {
     state.progress.road.seenNews = 1;
     saveProgress();
@@ -2612,6 +2677,7 @@ function gameFrame(ts) {
   }
   renderStatus();
   renderDecks();
+  renderEventBar();
   syncEmoteButtons();
   renderArena();
 }

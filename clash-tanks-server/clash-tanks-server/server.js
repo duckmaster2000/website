@@ -33,12 +33,15 @@ const PORT = process.env.PORT || 3001;
 
 // Health check endpoint for Render / uptime monitors
 app.get('/', (_req, res) => res.send('Clash Tanks server OK'));
-app.get('/health', (_req, res) => res.json({ status: 'ok', rooms: rooms.size }));
+app.get('/health', (_req, res) => res.json({ status: 'ok', rooms: rooms.size, queues: Object.fromEntries([...queues].map(([k, q]) => [k || 'ranked', q.size])) }));
 
 // ─── Game rules ────────────────────────────────────────────────────────────
 // The whole match simulation (arena, cards, combat, towers, clock) is shared with the
 // browser, so online matches play exactly like local ones.
 const Sim = require('./shared/clash-sim');
+// Special events: the server builds every event match itself (rules, modifier schedule, decks)
+// from its own seed, so both players always get the same, untampered configuration.
+const Events = require('./shared/events');
 
 const TICK_MS = Sim.MATCH.step * 1000; // 20 simulation steps per second
 
@@ -49,31 +52,58 @@ const socketRoom = new Map(); // socketId → code
 
 // ─── Matchmaking ───────────────────────────────────────────────────────────
 
-const matchQueue = new Set(); // socketIds, in the order they joined
+// One queue per ruleset: '' is the normal ranked ladder, 'chaos:wild' etc. are event queues.
+// Players are only ever paired with someone playing the same event and tier.
+const queues = new Map(); // key -> Set of socketIds, in the order they joined
+const socketQueue = new Map(); // socketId -> key
 
-function addToMatchQueue(socketId) {
-  matchQueue.add(socketId);
-  console.log(`[Queue] ${socketId} added. Queue size: ${matchQueue.size}`);
+function addToMatchQueue(socketId, key) {
+  removeFromMatchQueue(socketId);
+  if (!queues.has(key)) queues.set(key, new Set());
+  queues.get(key).add(socketId);
+  socketQueue.set(socketId, key);
+  console.log(`[Queue ${key || 'ranked'}] ${socketId} added. Size: ${queues.get(key).size}`);
 }
 
 function removeFromMatchQueue(socketId) {
-  matchQueue.delete(socketId);
+  const key = socketQueue.get(socketId);
+  if (key == null) return;
+  socketQueue.delete(socketId);
+  const q = queues.get(key);
+  if (q) { q.delete(socketId); if (q.size === 0) queues.delete(key); }
 }
 
-// Pair players first-come, first-served as soon as two are waiting
-function runMatchmaker() {
-  for (const id of matchQueue) {
-    if (!io.sockets.sockets.get(id)?.connected) matchQueue.delete(id);
+// Pair players first-come, first-served as soon as two are waiting in the same queue
+function runMatchmaker(key) {
+  const q = queues.get(key);
+  if (!q) return;
+  for (const id of q) {
+    if (!io.sockets.sockets.get(id)?.connected) { q.delete(id); socketQueue.delete(id); }
   }
-  while (matchQueue.size >= 2) {
-    const [a, b] = matchQueue;
-    matchQueue.delete(a);
-    matchQueue.delete(b);
-    startQueueMatch(a, b);
+  while (q.size >= 2) {
+    const [a, b] = q;
+    q.delete(a); q.delete(b);
+    socketQueue.delete(a); socketQueue.delete(b);
+    startQueueMatch(a, b, key);
   }
+  if (q.size === 0) queues.delete(key);
 }
 
-function startQueueMatch(idA, idB) {
+// An event the client asked for, checked on the server: known, playable online, open right now
+// (by the server's clock), and a real tier. Returns { eventId, tier } or { error }.
+function eventRequest(eventId, tier) {
+  if (!eventId) return { event: null };
+  const ev = Events.EVENT_MAP[String(eventId)];
+  if (!ev || !ev.modes.includes('online')) return { error: 'That event cannot be played online.' };
+  const open = Events.availability(ev.id, Date.now());
+  if (!open.ok) return { error: `${ev.name} is not available right now. ${open.reason || ''}`.trim() };
+  const t = ev.tiers ? (ev.tiers.find((x) => x.id === tier) || ev.tiers[0]).id : null;
+  return { event: { eventId: ev.id, tier: t } };
+}
+
+function queueKey(event) { return event ? `${event.eventId}:${event.tier || ''}` : ''; }
+
+function startQueueMatch(idA, idB, key) {
   const sockA = io.sockets.sockets.get(idA);
   const sockB = io.sockets.sockets.get(idB);
   if (!sockA || !sockB) return;
@@ -86,8 +116,9 @@ function startQueueMatch(idA, idB) {
     state: null,
     interval: null,
     rematchVotes: 0,
-    ranked: true, // matchmaking games count for trophies; private rooms and rematches are friendly
+    ranked: !key, // the normal queue counts for trophies; event queues, private rooms and rematches are friendly
     matchNo: 0,
+    event: key ? { eventId: key.split(':')[0], tier: key.split(':')[1] || null } : null,
   };
   rooms.set(code, room);
   socketRoom.set(idA, code);
@@ -97,8 +128,7 @@ function startQueueMatch(idA, idB) {
   console.log(`[Match] Room ${code}: ${idA} vs ${idB}`);
   sockA.emit('room_joined', { code, side: 'A' });
   sockB.emit('room_joined', { code, side: 'B' });
-  startRoom(room);
-  io.to(code).emit('match_start', matchInfo(room));
+  if (startRoom(room)) io.to(code).emit('match_start', matchInfo(room));
 }
 
 
@@ -121,17 +151,49 @@ function deckOf(socketId) {
 // What clients need to know about the match that is starting. The id is unique per match, so a
 // client can make sure a result is only ever counted once.
 function matchInfo(room) {
-  return { code: room.code, ranked: !!room.ranked, matchId: `${room.code}-${room.matchNo}-${room.startedAt}` };
+  const info = { code: room.code, ranked: !!room.ranked, matchId: `${room.code}-${room.matchNo}-${room.startedAt}` };
+  if (room.event) {
+    info.eventId = room.event.eventId;
+    info.tier = room.event.tier;
+    if (room.eventLaw) info.law = room.eventLaw;
+  }
+  return info;
+}
+
+// Build the match: a normal battle, or an event match configured entirely on the server
+function createRoomMatch(room, seed) {
+  const decks = { A: deckOf(room.sockets.A), B: deckOf(room.sockets.B) };
+  room.eventLaw = null;
+  if (!room.event) return Sim.createMatch({ seed, decks });
+  const { eventId, tier } = room.event;
+  // Own-deck events: a deck that breaks the event's deck rules is swapped for a legal loaner
+  const legal = {};
+  ['A', 'B'].forEach((side, i) => {
+    const res = Events.legalDeckFor(eventId, decks[side], seed + i + 1);
+    legal[side] = res.entries;
+    if (res.loaner) io.sockets.sockets.get(room.sockets[side])?.emit('deck_loaner', { problems: res.problems || [] });
+  });
+  const all = legal.A.concat(legal.B);
+  const level = all.length ? Math.round(all.reduce((s, e) => s + (Number(e.level) || 1), 0) / all.length) : 1;
+  const hasEvo = all.some((e) => e.evo);
+  const cfg = Events.buildMatch(eventId, { seed, tier, decks: legal, hasEvo, level, now: Date.now() });
+  room.eventLaw = cfg.law ? cfg.law.id : null;
+  return Sim.createMatch({ seed, rules: cfg.rules, decks: cfg.decks });
 }
 
 function startRoom(room) {
   if (room.interval) clearInterval(room.interval);
   room.matchNo = (room.matchNo || 0) + 1;
   room.startedAt = Date.now();
-  room.state = Sim.createMatch({
-    seed: Math.floor(Math.random() * 2147483647),
-    decks: { A: deckOf(room.sockets.A), B: deckOf(room.sockets.B) },
-  });
+  try {
+    room.state = createRoomMatch(room, Math.floor(Math.random() * 2147483647));
+  } catch (err) {
+    // A broken event config must never strand players: tell them and close the room
+    console.error(`[Room ${room.code}] could not start:`, err);
+    io.to(room.code).emit('room_error', { msg: 'The match could not be started. Please try again.' });
+    destroyRoom(room.code);
+    return false;
+  }
   room.lastTick = Date.now();
   room.acc = 0;
   room.rematchVotes = 0;
@@ -155,6 +217,7 @@ function startRoom(room) {
       room.interval = null;
     }
   }, TICK_MS);
+  return true;
 }
 
 function destroyRoom(code) {
@@ -182,8 +245,11 @@ function leaveCurrentRoom(socket) {
 io.on('connection', socket => {
   console.log(`connect  ${socket.id}`);
 
-  socket.on('create_room', ({ deck } = {}) => {
+  socket.on('create_room', ({ deck, eventId, tier } = {}) => {
+    const req = eventRequest(eventId, tier);
+    if (req.error) { socket.emit('room_error', { msg: req.error }); return; }
     socket.data.deck = Sim.normalizeDeck(deck, Sim.EVO_RULES.slots.online);
+    removeFromMatchQueue(socket.id);
     leaveCurrentRoom(socket);
     const code = generateCode();
     const room = {
@@ -195,11 +261,12 @@ io.on('connection', socket => {
       rematchVotes: 0,
       ranked: false,
       matchNo: 0,
+      event: req.event,
     };
     rooms.set(code, room);
     socketRoom.set(socket.id, code);
     socket.join(code);
-    socket.emit('room_created', { code, side: 'A' });
+    socket.emit('room_created', { code, side: 'A', eventId: req.event?.eventId || null, tier: req.event?.tier || null });
     console.log(`Room ${code} created by ${socket.id}`);
   });
 
@@ -212,11 +279,12 @@ io.on('connection', socket => {
     leaveCurrentRoom(socket);
     room.players.push(socket.id);
     room.sockets.B = socket.id;
+    removeFromMatchQueue(socket.id);
     socketRoom.set(socket.id, upper);
     socket.join(upper);
-    socket.emit('room_joined', { code: upper, side: 'B' });
-    startRoom(room);
-    io.to(upper).emit('match_start', matchInfo(room));
+    // The room's event decides the rules; the joiner plays whatever the creator picked
+    socket.emit('room_joined', { code: upper, side: 'B', eventId: room.event?.eventId || null, tier: room.event?.tier || null });
+    if (startRoom(room)) io.to(upper).emit('match_start', matchInfo(room));
     console.log(`Room ${upper} started`);
   });
 
@@ -252,19 +320,21 @@ io.on('connection', socket => {
     if (room.rematchVotes >= 2) {
       room.rematchVotes = 0;
       room.ranked = false; // rematches are friendly, so two players can't farm trophies off each other
-      startRoom(room);
-      io.to(code).emit('match_start', matchInfo(room));
+      if (startRoom(room)) io.to(code).emit('match_start', matchInfo(room)); // same event, fresh seed
     } else {
       socket.emit('rematch_waiting', {});
     }
   });
 
-  socket.on('join_queue', ({ deck } = {}) => {
+  socket.on('join_queue', ({ deck, eventId, tier } = {}) => {
+    const req = eventRequest(eventId, tier);
+    if (req.error) { socket.emit('queue_error', { msg: req.error }); return; }
     socket.data.deck = Sim.normalizeDeck(deck, Sim.EVO_RULES.slots.online);
     leaveCurrentRoom(socket);
-    addToMatchQueue(socket.id);
-    socket.emit('queue_waiting', {});
-    runMatchmaker(); // match right away if someone is already waiting
+    const key = queueKey(req.event);
+    addToMatchQueue(socket.id, key);
+    socket.emit('queue_waiting', { eventId: req.event?.eventId || null, tier: req.event?.tier || null });
+    runMatchmaker(key); // match right away if someone is already waiting
   });
 
   socket.on('leave_queue', () => {

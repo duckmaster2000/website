@@ -76,6 +76,8 @@
     const motion = new Map();                // id -> { x, y, moving }
     let lastNow = performance.now();
     const watch = { time: -1, double: false, phase: 'regular' };
+    let ribbons = [];                        // small notices at the top of the arena (events)
+    const reduceMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     // ── Coordinates ──
     const sx = (x) => (flip ? W - x : x) * scale;
@@ -636,6 +638,7 @@
       }
       drawStatus(u, x, y, r, face, team, now);
       if (u.evo) drawEvoCrest(u, x, y, r, now);
+      if (u.form || u.boss || u.mn) drawEventBadge(u, x, y, r, now);
       if (u.wind && !u.melee) {
         ctx.strokeStyle = 'rgba(255,230,120,0.9)';
         ctx.lineWidth = 2;
@@ -1273,9 +1276,10 @@
       for (const f of list) {
         if (f.type === 'emote') { showEmote(f.owner, f.emote); continue; }
         if (f.type === 'crown') {
-          announce('CROWN!', { sub: `${names[f.owner] || TEAM[f.owner].name} takes a tower`, color: TEAM[f.owner].light });
+          if (!f.hill) announce('CROWN!', { sub: `${names[f.owner] || TEAM[f.owner].name} takes a tower`, color: TEAM[f.owner].light });
           continue;
         }
+        if (eventFx(f)) continue;
         const e = Object.assign({ born: now }, f);
         switch (f.type) {
           case 'deploy': e.life = 520; break;
@@ -1303,7 +1307,7 @@
           case 'spell':
             e.life = f.kind === 'firebomb' ? 750 : f.kind === 'shock' ? 420 : f.kind === 'frost' ? 800 : 520;
             e.parts = Array.from({ length: f.kind === 'rocket' ? 6 : 14 }, () => ({ a: Math.random() * Math.PI * 2, d: Math.random(), v: 0.6 + Math.random() * 0.8 }));
-            shake = Math.max(shake, f.kind === 'firebomb' ? 7 : f.kind === 'shock' || f.kind === 'frost' ? 3 : 2.5);
+            shake = Math.max(shake, f.kind === 'firebomb' || f.kind === 'slam' ? 7 : f.kind === 'shock' || f.kind === 'frost' || f.kind === 'meteor' ? 4 : 2.5);
             break;
           case 'death':
             e.life = f.big ? 650 : 450;
@@ -1595,6 +1599,21 @@
           const d = R * (0.2 + p.d * 0.8) * k;
           drawSprite('❄️', x + Math.cos(p.a) * d, y + Math.sin(p.a) * d, scale * (0.35 + (i % 3) * 0.1), 1 - t);
         });
+      } else if (e.kind === 'meteor' || e.kind === 'slam') {
+        // Hazard landing: a dust ring and debris (meteor = orange, boss slam = steel)
+        const k = easeOut(clamp(t * 1.8, 0, 1));
+        const hot = e.kind === 'meteor';
+        ctx.globalAlpha = 1 - t;
+        ctx.fillStyle = hot ? 'rgba(255,140,40,0.45)' : 'rgba(170,180,200,0.45)';
+        ctx.beginPath(); ctx.arc(x, y, R * k, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = hot ? 'rgba(255,230,160,0.95)' : 'rgba(230,236,255,0.95)';
+        ctx.lineWidth = Math.max(2, scale * 0.14 * (1 - t));
+        ctx.beginPath(); ctx.arc(x, y, R * (0.4 + 0.7 * k), 0, Math.PI * 2); ctx.stroke();
+        e.parts.forEach((p) => {
+          const d = R * (0.2 + p.v * 0.8 * k);
+          ctx.fillStyle = hot ? `rgba(120,60,30,${1 - t})` : `rgba(90,96,110,${1 - t})`;
+          ctx.fillRect(x + Math.cos(p.a) * d, y + Math.sin(p.a) * d - (1 - t) * scale * 0.3, scale * 0.16, scale * 0.16);
+        });
       } else if (e.kind === 'shock') {
         ctx.fillStyle = `rgba(170,240,255,${0.45 * (1 - t)})`;
         ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.fill();
@@ -1625,6 +1644,230 @@
           ctx.fillStyle = `rgba(255,${170 + Math.round(p.v * 40)},70,${0.85 * (1 - t)})`;
           ctx.beginPath(); ctx.arc(px, py, scale * (0.2 + k * 0.45), 0, Math.PI * 2); ctx.fill();
         });
+      }
+    }
+
+    // ── Special events: modifier areas, telegraphed hazards, the hill, badges and notices ──
+    // Gameplay timing always comes from the snapshot (zone age/left/wait), so an interrupted
+    // animation can never desync what you see from what the engine does.
+    const EVENT_ZONES = new Set(['cHaste', 'cSlow', 'cHeal', 'storm', 'impact', 'slam', 'meteorField']);
+    const pulse = (now, ms) => (reduceMotion ? 0.5 : 0.5 + 0.5 * Math.sin(now / ms));
+
+    // A small notice that slides in at the top of the arena (doesn't cover the fight)
+    function ribbon(text, opts) {
+      const o = opts || {};
+      ribbons.push({ text, icon: o.icon || '', color: o.color || '#ffe680', born: null, life: o.life || 2400 });
+      if (ribbons.length > 3) ribbons.shift();
+    }
+
+    function drawRibbons(now) {
+      ribbons = ribbons.filter((r) => r.born == null || now - r.born < r.life);
+      ribbons.forEach((r, i) => {
+        if (r.born == null) r.born = now;
+        const t = (now - r.born) / r.life;
+        const inK = easeOut(clamp(t * 6, 0, 1));
+        const outK = t > 0.85 ? (t - 0.85) / 0.15 : 0;
+        const y = scale * (2.6 + i * 0.95);
+        const size = Math.max(10, scale * 0.42);
+        ctx.font = `800 ${size}px "Space Grotesk",sans-serif`;
+        const label = `${r.icon ? `${r.icon}  ` : ''}${r.text}`;
+        const w = ctx.measureText(label).width + scale * 0.9;
+        ctx.globalAlpha = (1 - outK) * inK;
+        ctx.fillStyle = 'rgba(6,12,26,0.82)';
+        roundRect(ctx, canvas.width / 2 - w / 2, y - size * 0.95, w, size * 1.9, size * 0.5);
+        ctx.fill();
+        ctx.strokeStyle = r.color;
+        ctx.lineWidth = Math.max(1, scale * 0.05);
+        ctx.stroke();
+        ctx.fillStyle = '#fff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, canvas.width / 2, y + 1);
+        ctx.globalAlpha = 1;
+      });
+    }
+
+    // Engine event fx -> notices and banners. Returns true if it handled f.
+    function eventFx(f) {
+      const M = Sim.MODIFIERS;
+      switch (f.type) {
+        case 'modOn': {
+          const d = M[f.id];
+          if (d) ribbon(d.name, { icon: d.icon, color: MOD_COLOR[d.cat] || '#ffe680' });
+          return true;
+        }
+        case 'modOff': return true;
+        case 'hillMove': ribbon('The hill moved!', { icon: '⛰️', color: '#ffd35f' }); return true;
+        case 'hillCrown': announce('HILL CROWN!', { sub: `${names[f.owner] || TEAM[f.owner].name} held the hill`, color: TEAM[f.owner].light }); return true;
+        case 'wave': ribbon(`Wave ${f.n} of ${f.total}`, { icon: '🌊', color: '#ff9a7a' }); return true;
+        case 'bossSpawn': announce('IRON COLOSSUS', { sub: 'Bring it down before time runs out!', color: '#ffb36c', big: true, urgent: true }); shake = Math.max(shake, 8); return true;
+        case 'bossSummon': ribbon('Guards summoned: it takes half damage!', { icon: '⚙️', color: '#ffb36c', life: 3200 }); return true;
+        case 'bossEnrage': announce('ENRAGED!', { sub: 'Faster attacks, more slams', color: '#ff6b6b' }); return true;
+        case 'bossSlam': return true; // the warning circle is drawn from the zone itself
+        case 'deckSwap': announce('DECKS SWAPPED!', { sub: 'New hand, new plan', color: '#c38bff' }); return true;
+        default: return false;
+      }
+    }
+
+    const MOD_COLOR = { battlefield: '#7dffb0', elixir: '#e48bff', card: '#7fc8ff', troop: '#ffb347', evolution: '#ffcf3a', tower: '#ff8a8a', time: '#ff6b6b' };
+
+    function drawEventZone(z, now) {
+      const x = sx(z.x);
+      const y = sy(z.y);
+      const R = z.r * scale;
+      const fadeOut = z.left != null ? clamp(z.left / 0.6, 0, 1) : 1;
+      // Telegraphs are fully visible for their whole warning (their age only starts once they land)
+      const fadeIn = z.wait > 0 ? 1 : clamp((z.age || 0) / 0.4, 0, 1);
+      ctx.save();
+      ctx.globalAlpha = fadeIn * fadeOut;
+      switch (z.kind) {
+        case 'cHaste': case 'cSlow': case 'cHeal': {
+          // Each kind gets its own colour AND its own pattern and icon, so it reads without colour
+          const col = z.kind === 'cHaste' ? [120, 255, 200] : z.kind === 'cSlow' ? [150, 110, 70] : [120, 255, 140];
+          ctx.fillStyle = `rgba(${col.join(',')},${z.kind === 'cSlow' ? 0.42 : 0.18})`;
+          ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = `rgba(${col.join(',')},0.85)`;
+          ctx.lineWidth = Math.max(1.5, scale * 0.07);
+          ctx.setLineDash(z.kind === 'cHaste' ? [scale * 0.5, scale * 0.25] : z.kind === 'cSlow' ? [scale * 0.15, scale * 0.15] : []);
+          ctx.lineDashOffset = reduceMotion ? 0 : -now / 40;
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.clip();
+          if (z.kind === 'cHaste') {
+            // Chevrons streaming forward
+            ctx.strokeStyle = 'rgba(200,255,235,0.55)';
+            ctx.lineWidth = Math.max(1.5, scale * 0.08);
+            for (let i = -2; i <= 2; i++) {
+              const off = ((now / 18 + i * scale * 0.9) % (scale * 4.5)) - scale * 2.25;
+              const yy = y + (reduceMotion ? i * scale * 0.9 : off);
+              ctx.beginPath(); ctx.moveTo(x - R * 0.45, yy + scale * 0.25); ctx.lineTo(x, yy - scale * 0.15); ctx.lineTo(x + R * 0.45, yy + scale * 0.25); ctx.stroke();
+            }
+          } else if (z.kind === 'cSlow') {
+            ctx.fillStyle = 'rgba(70,45,25,0.5)';
+            for (let i = 0; i < 7; i++) { const a = i * 2.2; const d = R * ((i * 0.37) % 0.8); ctx.beginPath(); ctx.ellipse(x + Math.cos(a) * d, y + Math.sin(a) * d, scale * 0.35, scale * 0.18, a, 0, Math.PI * 2); ctx.fill(); }
+          } else {
+            for (let i = 0; i < 8; i++) {
+              const k = reduceMotion ? 0.5 : (now / 1200 + i / 8) % 1;
+              drawSprite('➕', x + Math.cos(i * 2.4) * R * 0.6, y + Math.sin(i * 2.4) * R * 0.5 - k * scale, scale * 0.35, 0.8 * (1 - k));
+            }
+          }
+          ctx.restore();
+          ctx.save();
+          ctx.globalAlpha = fadeIn * fadeOut * 0.9;
+          drawSprite(z.kind === 'cHaste' ? '💨' : z.kind === 'cSlow' ? '🟫' : '⛲', x, y - R * 0.75, scale * 0.6, 0.9);
+          break;
+        }
+        case 'storm': {
+          const g = ctx.createRadialGradient(x, y, R * 0.1, x, y, R);
+          g.addColorStop(0, 'rgba(90,70,160,0.15)');
+          g.addColorStop(1, 'rgba(60,40,140,0.5)');
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = 'rgba(200,180,255,0.9)';
+          ctx.lineWidth = Math.max(1.5, scale * 0.08);
+          for (let i = 0; i < 3; i++) {
+            const a0 = (reduceMotion ? 0 : now / 300) + (i * Math.PI * 2) / 3;
+            ctx.beginPath(); ctx.arc(x, y, R * (0.45 + i * 0.2), a0, a0 + 1.6); ctx.stroke();
+          }
+          if (!reduceMotion && Math.random() < 0.15) {
+            ctx.strokeStyle = 'rgba(255,255,220,0.9)';
+            ctx.beginPath(); ctx.moveTo(x, y - R); ctx.lineTo(x + scale * 0.3, y - R * 0.3); ctx.lineTo(x - scale * 0.2, y); ctx.lineTo(x + scale * 0.2, y + R * 0.4); ctx.stroke();
+          }
+          drawSprite('🌀', x, y, scale * 0.8, 0.85);
+          break;
+        }
+        case 'impact': case 'slam': {
+          // Telegraph: a filling ring that closes as the hit approaches (with the seconds left)
+          if (!(z.wait > 0)) break;
+          const total = z.warn || 1.5;
+          const k = clamp(1 - z.wait / total, 0, 1);
+          const red = z.kind === 'slam' ? '255,90,70' : '255,150,40';
+          ctx.fillStyle = `rgba(${red},${0.12 + 0.2 * k})`;
+          ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = `rgba(${red},${0.6 + 0.4 * pulse(now, 60)})`;
+          ctx.lineWidth = Math.max(2, scale * 0.1);
+          ctx.setLineDash([scale * 0.3, scale * 0.2]);
+          ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = `rgba(${red},0.35)`;
+          ctx.beginPath(); ctx.arc(x, y, R * k, 0, Math.PI * 2); ctx.fill();
+          drawSprite(z.kind === 'slam' ? '⚠️' : '☄️', x, y, scale * 0.75, 0.95);
+          outlinedText(z.wait.toFixed(1), x, y + R * 0.55, Math.max(9, scale * 0.38), '#fff', 'rgba(0,0,0,0.8)', 800);
+          break;
+        }
+        default: break;
+      }
+      ctx.restore();
+    }
+
+    function drawHill(h, now) {
+      const x = sx(h.x);
+      const y = sy(h.y);
+      const R = h.r * scale;
+      const holder = h.holder ? TEAM[h.holder] : null;
+      ctx.save();
+      ctx.fillStyle = holder ? holder.main : 'rgba(255,211,95,1)';
+      ctx.globalAlpha = 0.16 + 0.08 * pulse(now, 300);
+      ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = holder ? holder.light : '#ffd35f';
+      ctx.lineWidth = Math.max(2, scale * 0.1);
+      ctx.setLineDash([scale * 0.35, scale * 0.18]);
+      ctx.lineDashOffset = reduceMotion ? 0 : -now / 60;
+      ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
+      // Both meters as arcs around the hill: you on your side, the opponent on theirs
+      const me = flip ? 'B' : 'A';
+      const foe = flip ? 'A' : 'B';
+      [[me, Math.PI / 2], [foe, -Math.PI / 2]].forEach(([side, mid]) => {
+        const frac = clamp(h[side] / h.points, 0, 1);
+        ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+        ctx.lineWidth = Math.max(3, scale * 0.2);
+        ctx.beginPath(); ctx.arc(x, y, R + scale * 0.25, mid - 1.2, mid + 1.2); ctx.stroke();
+        ctx.strokeStyle = TEAM[side].main;
+        ctx.beginPath(); ctx.arc(x, y, R + scale * 0.25, mid - 1.2, mid - 1.2 + 2.4 * frac); ctx.stroke();
+      });
+      drawSprite('⛰️', x, y, scale * 0.85, 0.95);
+      // Where it goes next, in the last 8 seconds
+      if (h.moveIn != null && h.moveIn < 8) {
+        const nx = sx(h.nx);
+        const ny = sy(h.ny);
+        ctx.globalAlpha = 0.5 + 0.4 * pulse(now, 120);
+        ctx.strokeStyle = '#ffd35f';
+        ctx.lineWidth = Math.max(1.5, scale * 0.06);
+        ctx.setLineDash([scale * 0.15, scale * 0.15]);
+        ctx.beginPath(); ctx.arc(nx, ny, R, 0, Math.PI * 2); ctx.stroke();
+        ctx.setLineDash([]);
+        outlinedText(`⛰️ ${Math.ceil(h.moveIn)}`, nx, ny, Math.max(9, scale * 0.45), '#ffd35f', 'rgba(0,0,0,0.8)', 800);
+      }
+      ctx.restore();
+    }
+
+    // Size Roulette forms, the boss and its guards
+    function drawEventBadge(u, x, y, r, now) {
+      if (u.form) {
+        const mega = u.form === 'mega';
+        const bx = x + r * 0.85;
+        const by = y + r * 0.7;
+        const br = Math.max(5, scale * 0.24);
+        ctx.fillStyle = mega ? '#ff7a3d' : '#59d6ff';
+        ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        outlinedText(mega ? 'M' : 'T', bx, by + 1, br * 1.3, '#fff', 'rgba(0,0,0,0.5)', 900);
+      }
+      if (u.boss) {
+        ctx.strokeStyle = `rgba(255,180,90,${0.5 + 0.4 * pulse(now, 200)})`;
+        ctx.lineWidth = Math.max(2, scale * 0.12);
+        ctx.beginPath(); ctx.arc(x, y, r * 1.25, 0, Math.PI * 2); ctx.stroke();
+      }
+      if (u.mn) {
+        ctx.strokeStyle = 'rgba(255,180,90,0.7)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath(); ctx.arc(x, y, r * 1.15, 0, Math.PI * 2); ctx.stroke();
+        ctx.setLineDash([]);
       }
     }
 
@@ -1791,6 +2034,7 @@
       const dt = Math.min(0.1, (now - lastNow) / 1000);
       lastNow = now;
       ctx.save();
+      if (reduceMotion) shake = 0;
       if (shake > 0.2) {
         ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
         shake *= 0.88;
@@ -1809,8 +2053,16 @@
         ground.sort((a, b) => a.y - b.y);
         air.sort((a, b) => a.y - b.y);
         const zones = view.zones || [];
-        zones.forEach((z) => { if (z.kind !== 'roll' && z.kind !== 'blade') drawZoneDecal(z, now); });
+        if (view.ev && view.ev.hill) drawHill(view.ev.hill, now);
+        const telegraph = (z) => z.kind === 'impact' || z.kind === 'slam';
+        zones.forEach((z) => {
+          if (telegraph(z)) return;
+          if (EVENT_ZONES.has(z.kind)) drawEventZone(z, now);
+          else if (z.kind !== 'roll' && z.kind !== 'blade') drawZoneDecal(z, now);
+        });
         ground.forEach((d) => (d.kind === 't' ? drawTower(d.e, now, dt) : drawUnit(d.e, now, dt)));
+        // Hazard warnings go on top of troops and towers so they can't be missed
+        zones.forEach((z) => { if (telegraph(z)) drawEventZone(z, now); });
         zones.forEach((z) => { if (z.kind === 'roll' || z.kind === 'blade') drawZoneObject(z, now); });
         if (view.units.some((u) => u.tgt)) {
           const byId = new Map();
@@ -1824,6 +2076,7 @@
         drawGhost(o.ghost);
         drawEmotes(view, now);
         drawHud(view, now);
+        drawRibbons(now);
         drawBanner(now);
         pruneMotion(now);
       }
@@ -1843,6 +2096,7 @@
     function reset() {
       effects = [];
       banners = [];
+      ribbons = [];
       emotes.A = null;
       emotes.B = null;
       hpShown.clear();
@@ -1850,7 +2104,7 @@
     }
 
     resize();
-    const api = { render, resize, toWorld, addFx, announce, showEmote, setNames, setTheme, reset, onCue: null, get flip() { return flip; }, get theme() { return themeName; } };
+    const api = { render, resize, toWorld, addFx, announce, ribbon, showEmote, setNames, setTheme, reset, onCue: null, get flip() { return flip; }, get theme() { return themeName; } };
     return api;
   }
 

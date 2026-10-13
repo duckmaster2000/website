@@ -259,6 +259,11 @@
     { slug: 'rockshard', name: 'Rock Shard', icon: '🧱', rarity: 'common', cost: 0, role: 'titan fragment', hp: 650, dmg: 65, cd: 1.5, range: 0.6, speed: 0.75, targets: 'buildings', proj: 'melee', radius: 0.6 },
     { slug: 'bonegiant', name: 'Bone Giant', icon: '☠️', rarity: 'common', cost: 0, role: 'crypt guardian', hp: 520, dmg: 90, cd: 1.4, range: 0.6, speed: 0.9, targets: 'ground', proj: 'melee', radius: 0.6 },
     { slug: 'stormsprite', name: 'Storm Sprite', icon: '🌩', rarity: 'common', cost: 0, role: 'zeppelin sprite', air: true, hp: 110, dmg: 42, cd: 1.2, range: 2.0, speed: 1.5, targets: 'any', proj: 'spark', splash: 0.8, radius: 0.35 },
+    // Event boss and its summons (Boss Battle event). The boss's phases live in `mech.boss`, see "Bosses".
+    // A troop-smasher: full damage to troops, 45% to buildings and towers (structureMult)
+    { slug: 'colossus', name: 'Iron Colossus', icon: '🤖', rarity: 'legendary', cost: 0, role: 'event boss', hp: 4400, dmg: 135, cd: 1.8, range: 0.9, speed: 0.55, targets: 'ground', proj: 'melee', splash: 1.2, radius: 1.1, structureMult: 0.45,
+      mech: { boss: { slamEvery: 7, slamEnraged: 4.5, slamDelay: 1.6, slamRadius: 2.2, slamDmg: 230, slamTower: 0.25, summonAt: [0.7, 0.4], summon: { card: 'ironling', count: 3 }, guardMult: 0.5, enrageBelow: 0.35, enrageMult: 1.35 } } },
+    { slug: 'ironling', name: 'Ironling', icon: '⚙️', rarity: 'common', cost: 0, role: 'boss guard', hp: 240, dmg: 36, cd: 1.1, range: 0.5, speed: 1.2, targets: 'ground', proj: 'melee', radius: 0.42, structureMult: 0.3 },
   ];
 
   // Which Trophy Road arena (0-9) unlocks each original card into chests and rewards.
@@ -910,33 +915,327 @@
     }
   }
 
+  // ─── Match rules ─────────────────────────────────────────────────────────
+  //
+  // Every match runs on its own rules object. A normal battle gets a fresh copy of DEFAULT_RULES;
+  // special events (shared/events.js) build a different one. The engine only ever reads rules from
+  // the match it is running (`state.rules`), so nothing an event changes can leak into the next
+  // battle. Rules describe mechanics, never event names: an event is just a combination of these.
+  const DEFAULT_RULES = {
+    eventId: null,             // which event built these rules (for display and results only)
+    regulation: 180,           // seconds of regular time
+    overtime: 60,              // seconds of sudden-death overtime (0 = none)
+    elixirPhases: [{ at: 0, mult: 1 }, { at: 120, mult: 2 }], // generation multiplier from each time on
+    overtimeMult: 2,
+    startElixir: 5,
+    maxElixir: 10,
+    crownsToWin: 0,            // >0: reaching this many crowns wins on the spot (1 = sudden death)
+    timeout: 'crowns',         // when time runs out: 'crowns' (normal), 'survive' (A wins if its King stands), 'defend' (B wins)
+    noTowers: [],              // sides that play without crown towers (survival / boss: the scripted side)
+    guard: false,              // troops with nothing to attack hold a line in front of their own bridge
+    cardMods: [],              // [{ when: {...}, cost, hp, dmg, speed, radius, splash, lifetime, count }] baked into the deck
+    evo: { cycleDelta: 0, startCharged: false, disabled: false, all: false },
+    killRefund: 0,             // fraction of a killed enemy troop's elixir paid to the side that killed it
+    knockOnHit: 0,             // single-target hits knock ground troops back this far (tiles)
+    spellEcho: 0,              // damage spells repeat at this fraction ~1 s after they land; lingering ones last longer
+    sizeRoll: null,            // { tiny, mega } chances: each card in hand is rolled Tiny / Normal / Mega
+    buildingElixir: 0,         // generation bonus per living friendly building (up to 3)
+    deckSwaps: [],             // [{ at, A: [ids], B: [ids] }]: both hands are replaced at `at`
+    deckLevel: 0,              // card level for swapped-in decks (0 = each side's average level)
+    hill: null,                // { spots: [{x,y}], every, r, rate, points }: King of the Hill
+    waves: null,               // [{ at, units: [{ card, n, lane, level }] }]: scripted attackers for side B
+    boss: null,                // { at, card, lane, level }: a scripted boss for side B
+    modifiers: [],             // [{ id, at, dur }]: timed modifiers (see MODIFIERS)
+    modWarn: 4,                // seconds of warning before a modifier starts
+  };
+
+  const RULE_LIMITS = { regulation: [20, 600], overtime: [0, 180], startElixir: [0, 20], maxElixir: [4, 20] };
+  const SIZE_FORMS = {
+    tiny: { name: 'Tiny', hp: 0.6, dmg: 0.75, speed: 1.3, radius: 0.65, cost: -1 },
+    mega: { name: 'Mega', hp: 1.6, dmg: 1.3, speed: 0.8, radius: 1.3, cost: 1 },
+  };
+
+  function num(v, def, lo, hi) {
+    const n = Number(v);
+    return Number.isFinite(n) ? clamp(n, lo, hi) : def;
+  }
+
+  /**
+   * Clean up a rules object (from an event, the server, or a test): fill defaults, clamp numbers,
+   * drop unknown modifiers and malformed entries. Always returns a brand-new object.
+   */
+  function normalizeRules(raw) {
+    const r = raw && typeof raw === 'object' ? raw : {};
+    const d = DEFAULT_RULES;
+    const out = {
+      eventId: r.eventId ? String(r.eventId).slice(0, 40) : null,
+      label: r.label ? String(r.label).slice(0, 60) : null,
+      regulation: num(r.regulation, d.regulation, ...RULE_LIMITS.regulation),
+      overtime: num(r.overtime, d.overtime, ...RULE_LIMITS.overtime),
+      overtimeMult: num(r.overtimeMult, d.overtimeMult, 0.25, 4),
+      startElixir: num(r.startElixir, d.startElixir, ...RULE_LIMITS.startElixir),
+      maxElixir: num(r.maxElixir, d.maxElixir, ...RULE_LIMITS.maxElixir),
+      crownsToWin: Math.floor(num(r.crownsToWin, 0, 0, 3)),
+      timeout: ['crowns', 'survive', 'defend'].includes(r.timeout) ? r.timeout : 'crowns',
+      noTowers: (Array.isArray(r.noTowers) ? r.noTowers : []).filter((s) => s === 'A' || s === 'B'),
+      guard: !!r.guard,
+      killRefund: num(r.killRefund, 0, 0, 1),
+      knockOnHit: num(r.knockOnHit, 0, 0, 1),
+      spellEcho: num(r.spellEcho, 0, 0, 1),
+      buildingElixir: num(r.buildingElixir, 0, 0, 0.5),
+      deckLevel: Math.floor(num(r.deckLevel, 0, 0, 14)),
+      modWarn: num(r.modWarn, d.modWarn, 0, 10),
+    };
+    out.startElixir = Math.min(out.startElixir, out.maxElixir);
+    const phases = Array.isArray(r.elixirPhases) && r.elixirPhases.length ? r.elixirPhases : d.elixirPhases;
+    out.elixirPhases = phases
+      .map((p) => ({ at: num(p && p.at, 0, 0, 900), mult: num(p && p.mult, 1, 0.1, 5) }))
+      .sort((a, b) => a.at - b.at);
+    if (out.elixirPhases[0].at > 0) out.elixirPhases.unshift({ at: 0, mult: 1 });
+    out.cardMods = (Array.isArray(r.cardMods) ? r.cardMods : []).slice(0, 12).filter((m) => m && typeof m === 'object').map((m) => ({
+      when: m.when && typeof m.when === 'object' ? { ...m.when } : {},
+      cost: Math.round(num(m.cost, 0, -3, 3)),
+      hp: num(m.hp, 1, 0.2, 4), dmg: num(m.dmg, 1, 0.2, 4), speed: num(m.speed, 1, 0.3, 2.5),
+      radius: num(m.radius, 1, 0.4, 2), splash: num(m.splash, 1, 0.5, 2), lifetime: num(m.lifetime, 1, 0.3, 3),
+      count: num(m.count, 1, 1, 3),
+    }));
+    const e = r.evo && typeof r.evo === 'object' ? r.evo : {};
+    out.evo = { cycleDelta: Math.round(num(e.cycleDelta, 0, -3, 3)), startCharged: !!e.startCharged, disabled: !!e.disabled, all: !!e.all };
+    out.sizeRoll = r.sizeRoll && typeof r.sizeRoll === 'object'
+      ? { tiny: num(r.sizeRoll.tiny, 0, 0, 0.5), mega: num(r.sizeRoll.mega, 0, 0, 0.5) }
+      : null;
+    const cleanIds = (list) => (Array.isArray(list) ? list : []).map(String).filter((id) => CARD_MAP[id] && !CARD_MAP[id].token).slice(0, MAX_DECK);
+    out.deckSwaps = (Array.isArray(r.deckSwaps) ? r.deckSwaps : []).slice(0, 6)
+      .map((s) => ({ at: num(s && s.at, 0, 1, 900), A: cleanIds(s && s.A), B: cleanIds(s && s.B) }))
+      .filter((s) => s.A.length >= 4 && s.B.length >= 4)
+      .sort((a, b) => a.at - b.at);
+    if (r.hill && Array.isArray(r.hill.spots) && r.hill.spots.length) {
+      out.hill = {
+        spots: r.hill.spots.slice(0, 4).map((p) => ({ x: num(p.x, MID_X, 1, W - 1), y: num(p.y, H / 2, 1, H - 1) })),
+        every: num(r.hill.every, 40, 5, 300),
+        r: num(r.hill.r, 2.2, 1, 4),
+        rate: num(r.hill.rate, 5, 0.5, 50),
+        points: num(r.hill.points, 100, 10, 1000),
+      };
+    } else out.hill = null;
+    out.waves = Array.isArray(r.waves) ? r.waves.slice(0, 40).map((w) => ({
+      at: num(w && w.at, 0, 0, 900),
+      units: (Array.isArray(w && w.units) ? w.units : []).slice(0, 8)
+        .filter((u) => u && CARD_MAP[u.card])
+        .map((u) => ({ card: String(u.card), n: Math.floor(num(u.n, 1, 1, 6)), lane: u.lane === 1 ? 1 : 0, level: Math.floor(num(u.level, 1, 1, 14)) })),
+    })).filter((w) => w.units.length).sort((a, b) => a.at - b.at) : null;
+    if (out.waves && !out.waves.length) out.waves = null;
+    out.boss = r.boss && CARD_MAP[r.boss.card] && CARD_MAP[r.boss.card].mech && CARD_MAP[r.boss.card].mech.boss
+      ? { at: num(r.boss.at, 3, 0, 120), card: String(r.boss.card), lane: r.boss.lane === 1 ? 1 : 0, level: Math.floor(num(r.boss.level, 1, 1, 14)), extraSummon: !!r.boss.extraSummon }
+      : null;
+    out.modifiers = (Array.isArray(r.modifiers) ? r.modifiers : []).slice(0, 40)
+      .filter((m) => m && MODIFIERS[m.id])
+      .map((m) => ({ id: m.id, at: num(m.at, 0, 0, 900), dur: num(m.dur, MODIFIERS[m.id].dur, 1, 900) }))
+      .sort((a, b) => a.at - b.at);
+    return out;
+  }
+
+  // Does a card match a card-mod filter? (every listed condition must hold)
+  function cardMatches(c, when) {
+    const troop = !c.spell && !c.building;
+    if (when.all) return true;
+    if (when.spell != null && !!c.spell !== !!when.spell) return false;
+    if (when.building != null && !!c.building !== !!when.building) return false;
+    if (when.troop != null && troop !== !!when.troop) return false;
+    if (when.swarm != null && (troop && c.swarmCount > 1) !== !!when.swarm) return false;
+    if (when.tank && !(troop && c.hp >= 600)) return false;
+    if (when.ranged && !(troop && c.range >= 3)) return false;
+    if (when.splash && !(c.splash > 0 && !c.spell)) return false;
+    if (when.minCost != null && c.cost < when.minCost) return false;
+    if (when.maxCost != null && c.cost > when.maxCost) return false;
+    return true;
+  }
+
+  // Card stats with the event's card mods baked in (per match; the shared card table is never touched)
+  function applyCardMods(stats, mods) {
+    if (!mods || !mods.length) return stats;
+    let s = stats;
+    for (const m of mods) {
+      if (!cardMatches(s, m.when)) continue;
+      s = {
+        ...s,
+        cost: clamp(s.cost + m.cost, 1, 10),
+        hpScaled: Math.round(s.hpScaled * m.hp),
+        dmgScaled: +(s.dmgScaled * m.dmg).toFixed(2),
+        speed: s.building ? 0 : r2(s.speed * m.speed),
+        radius: r2(s.radius * m.radius),
+        splash: r2(s.splash * m.splash),
+        lifetime: s.lifetime ? r2(s.lifetime * m.lifetime) : s.lifetime,
+        swarmCount: s.swarmCount > 1 ? Math.min(10, Math.ceil(s.swarmCount * m.count)) : s.swarmCount,
+      };
+    }
+    return s;
+  }
+
+  // ─── Timed modifiers (Chaos Mode and friends) ────────────────────────────
+  //
+  // A modifier is switched on and off at fixed match times (rules.modifiers, chosen before the
+  // match by shared/events.js from a seed, so every client and the server agree). While active it
+  // contributes to a small set of named effects. Effects from several modifiers are combined by a
+  // fixed policy per effect (MOD_STACK) and clamped (MOD_CAPS), so two speed boosts can never
+  // multiply into something absurd. Nothing saves and restores stats: the effects are re-read
+  // every step, so switching a modifier off can't overwrite some other buff.
+  //
+  //   cat     battlefield | elixir | card | troop | evolution | tower | time
+  //   sev     1 mild .. 3 wild (Chaos intensity caps the severity it may pick)
+  //   group   only one modifier per group can be active at once (e.g. two elixir-rate changes)
+  //   fx      effect contributions while active (see MOD_STACK)
+  //   zones   lingering areas it places (removed when it ends); positions are mirrored for fairness
+  //   start   one-off effect when it switches on
+  //   needs   'evo': only picked when someone has an Evolution equipped
+  const MODIFIERS = {
+    jetstream: { name: 'Jet Stream', icon: '💨', cat: 'battlefield', sev: 1, dur: 20, weight: 3, group: 'zone',
+      desc: 'Both bridges become speed lanes: troops on them move and attack 40% faster.',
+      zones: [{ kind: 'cHaste', x: 3.5, y: 16, r: 2.4, mult: 1.4 }, { kind: 'cHaste', x: 14.5, y: 16, r: 2.4, mult: 1.4 }] },
+    mudslide: { name: 'Mudslide', icon: '🟫', cat: 'battlefield', sev: 1, dur: 20, weight: 3, group: 'zone',
+      desc: 'Four mud pits (two on each side, mirrored) slow troops and buildings inside by 40%.',
+      zones: [{ kind: 'cSlow', x: 4.5, y: 20.5, r: 2.1, mult: 0.6, mirror: true }, { kind: 'cSlow', x: 13.5, y: 20.5, r: 2.1, mult: 0.6, mirror: true }] },
+    springs: { name: 'Healing Springs', icon: '⛲', cat: 'battlefield', sev: 1, dur: 20, weight: 2, group: 'zone',
+      desc: 'A spring on each side heals every troop standing in it by 30 HP a second, friend or foe.',
+      zones: [{ kind: 'cHeal', x: MID_X, y: 21.5, r: 2.4, perSec: 30, mirror: true }] },
+    meteors: { name: 'Meteor Shower', icon: '☄️', cat: 'battlefield', sev: 2, dur: 18, weight: 2, group: 'hazard',
+      desc: 'Every 4 s a meteor marks a spot on each side (mirrored) and lands 1.5 s later: 150 damage and a knockback to troops and buildings. Towers are spared.',
+      zones: [{ kind: 'meteorField', x: MID_X, y: H / 2, r: 0, every: 4, delay: 1.5, hitR: 1.6, dmg: 150 }] },
+    storm: { name: 'Eye of the Storm', icon: '🌀', cat: 'battlefield', sev: 2, dur: 20, weight: 2, group: 'hazard',
+      desc: 'A storm drifts back and forth along the river, dealing 40 damage a second to troops and buildings inside.',
+      zones: [{ kind: 'storm', x: 3, y: 16, r: 2.3, perSec: 40, speed: 1.6 }] },
+    surge: { name: 'Elixir Surge', icon: '💧', cat: 'elixir', sev: 1, dur: 10, weight: 3, group: 'elixir',
+      desc: 'Both players get +3 elixir right away, then elixir flows twice as fast for 10 s.',
+      fx: { elixir: 2 }, start: { elixir: 3 } },
+    drought: { name: 'Drought', icon: '🏜️', cat: 'elixir', sev: 2, dur: 15, weight: 2, group: 'elixir',
+      desc: 'Elixir flows at half speed for 15 s. Spend wisely.',
+      fx: { elixir: 0.5 } },
+    sale: { name: 'Clearance Sale', icon: '🏷️', cat: 'elixir', sev: 1, dur: 12, weight: 2, group: 'cost',
+      desc: 'Every card costs 1 less (never below 1) for 12 s.',
+      fx: { cost: -1 } },
+    highroller: { name: 'High Rollers', icon: '🎰', cat: 'elixir', sev: 2, dur: 15, weight: 2, group: 'cost',
+      desc: 'Cards that cost 5 or more cost 2 less for 15 s.',
+      fx: { costHeavy: -2 } },
+    bounty: { name: 'Bounty Hunters', icon: '💰', cat: 'elixir', sev: 1, dur: 20, weight: 2,
+      desc: 'Killing an enemy troop refunds 30% of its elixir (at most 2 per kill).',
+      fx: { refund: 0.3 } },
+    arcane: { name: 'Arcane Surge', icon: '🔮', cat: 'card', sev: 1, dur: 20, weight: 2,
+      desc: 'Spells deal 40% more damage and cover 20% more area.',
+      fx: { spellDmg: 1.4, spellRadius: 1.2 } },
+    eagleeye: { name: 'Eagle Eye', icon: '🎯', cat: 'card', sev: 1, dur: 20, weight: 2,
+      desc: 'Ranged troops (range 3+) get +1.5 range.',
+      fx: { rangeAdd: 1.5 } },
+    bulwark: { name: 'Bulwark', icon: '🧱', cat: 'card', sev: 1, dur: 20, weight: 2,
+      desc: 'Buildings take 40% less damage and attack 30% faster.',
+      fx: { buildIn: 0.6, buildAtk: 1.3 } },
+    frenzy: { name: 'Swarm Frenzy', icon: '🐝', cat: 'card', sev: 1, dur: 18, weight: 2,
+      desc: 'Troops from swarm cards attack 35% faster.',
+      fx: { swarmAtk: 1.35 } },
+    overclock: { name: 'Overclock', icon: '⚡', cat: 'troop', sev: 2, dur: 12, weight: 2, group: 'speed',
+      desc: 'All troops move and attack 30% faster.',
+      fx: { move: 1.3, atk: 1.3 } },
+    glass: { name: 'Glass Cannons', icon: '🥂', cat: 'troop', sev: 2, dur: 15, weight: 2,
+      desc: 'Troops deal 50% more damage but also take 30% more.',
+      fx: { dmgOut: 1.5, dmgIn: 1.3 } },
+    pinball: { name: 'Pinball', icon: '🎱', cat: 'troop', sev: 2, dur: 15, weight: 2,
+      desc: 'Every single-target hit knocks ground troops back half a tile.',
+      fx: { knock: 0.5 } },
+    rattle: { name: 'Death Rattle', icon: '💀', cat: 'troop', sev: 2, dur: 18, weight: 2,
+      desc: 'Troops that die burst for 20% of their max HP (up to 150) to enemy troops and buildings nearby.',
+      fx: { deathBurst: 0.2 } },
+    aegis: { name: 'Aegis', icon: '🛡️', cat: 'troop', sev: 1, dur: 15, weight: 2,
+      desc: 'Every troop on the field (and every troop deployed for 15 s) gets a shield worth 25% of its max HP.',
+      fx: { shieldPct: 0.25 }, start: { shield: 0.25 } },
+    growth: { name: 'Growth Spurt', icon: '🌱', cat: 'troop', sev: 2, dur: 15, weight: 1,
+      desc: 'Troops deployed for the next 15 s come out big: +40% HP, +15% damage, 10% slower.',
+      fx: { grow: 1 } },
+    evorush: { name: 'Evolution Rush', icon: '✦', cat: 'evolution', sev: 1, dur: 25, weight: 3, needs: 'evo',
+      desc: 'Each play charges an equipped Evolution twice, and evolved troops deal 15% more damage.',
+      fx: { evoCharge: 1, evoDmg: 1.15 } },
+    towerfury: { name: 'Tower Fury', icon: '🏰', cat: 'tower', sev: 2, dur: 15, weight: 2, group: 'tower',
+      desc: 'Crown towers fire 50% faster. A bad time to attack.',
+      fx: { towerAtk: 1.5 } },
+    finale: { name: 'Final Frenzy', icon: '🔥', cat: 'time', sev: 1, dur: 30, weight: 0, group: 'elixir', fixed: true,
+      desc: 'The last 30 seconds: elixir flows 50% faster on top of double elixir, and towers fire 30% faster.',
+      fx: { elixir: 1.5, towerAtk: 1.3 } },
+  };
+
+  // How each effect combines across active modifiers, and the range it is held to
+  const MOD_STACK = {
+    move: 'mul', atk: 'mul', dmgOut: 'mul', dmgIn: 'mul', spellDmg: 'mul', spellRadius: 'mul', elixir: 'mul',
+    towerAtk: 'mul', buildIn: 'mul', buildAtk: 'mul', swarmAtk: 'mul', evoDmg: 'mul',
+    cost: 'add', costHeavy: 'add', rangeAdd: 'add', evoCharge: 'add',
+    refund: 'max', knock: 'max', deathBurst: 'max', shieldPct: 'max', grow: 'max',
+  };
+  const MOD_CAPS = {
+    move: [0.5, 1.7], atk: [0.5, 1.7], dmgOut: [0.5, 1.8], dmgIn: [0.6, 1.6], spellDmg: [0.5, 1.6], spellRadius: [0.7, 1.4],
+    elixir: [0.25, 3.5], towerAtk: [0.5, 1.8], buildIn: [0.4, 1.5], buildAtk: [0.5, 1.6], swarmAtk: [1, 1.6], evoDmg: [1, 1.3],
+    cost: [-2, 2], costHeavy: [-2, 0], rangeAdd: [0, 2], evoCharge: [0, 1],
+    refund: [0, 0.5], knock: [0, 0.8], deathBurst: [0, 0.25], shieldPct: [0, 0.3], grow: [0, 1],
+  };
+  const NO_FX = Object.freeze(Object.fromEntries(Object.keys(MOD_STACK).map((k) => [k, MOD_STACK[k] === 'mul' ? 1 : 0])));
+
+  // Combine the effects of every active modifier (deliberate stacking, then clamped)
+  function combineModFx(activeIds) {
+    if (!activeIds.length) return NO_FX;
+    const fx = { ...NO_FX };
+    for (const id of activeIds) {
+      const def = MODIFIERS[id];
+      if (!def || !def.fx) continue;
+      for (const k of Object.keys(def.fx)) {
+        const v = def.fx[k];
+        if (MOD_STACK[k] === 'mul') fx[k] *= v;
+        else if (MOD_STACK[k] === 'add') fx[k] += v;
+        else if (MOD_STACK[k] === 'max') fx[k] = Math.max(fx[k], v);
+      }
+    }
+    for (const k of Object.keys(fx)) fx[k] = clamp(fx[k], MOD_CAPS[k][0], MOD_CAPS[k][1]);
+    return Object.freeze(fx);
+  }
+
   // ─── Match setup ─────────────────────────────────────────────────────────
 
-  function createPlayer(side, deck) {
+  // Load a deck into a player's hand/stats. Used at match start and when an event swaps decks.
+  function loadDeck(p, deck, rules) {
     const ids = deck.map((c) => c.id);
-    const cards = {};
-    const cooldowns = {};
-    const evo = {}; // equipped Evolutions: cardId -> { need, charge }
+    const er = rules.evo;
+    p.cards = {};
+    p.cooldowns = {};
+    p.evo = {}; // equipped Evolutions: cardId -> { need, charge }
+    p.size = {}; // Size Roulette: cardId -> 'tiny' | 'mega' for the copy in hand
     deck.forEach((c) => {
-      cards[c.id] = getCardStatsAtLevel(c.id, c.level, c.abilityUnlocked, c.mastery);
-      cooldowns[c.id] = 0;
-      const def = c.evo && evolutionOf(c.id);
-      if (def) evo[c.id] = { need: def.cycles, charge: EVO_RULES.startCharged ? def.cycles : 0 };
+      p.cards[c.id] = applyCardMods(getCardStatsAtLevel(c.id, c.level, c.abilityUnlocked, c.mastery), rules.cardMods);
+      p.cooldowns[c.id] = 0;
+      // Events can switch Evolutions off, or hand out every card's Evolution for this match only
+      const def = !er.disabled && (c.evo || er.all) && evolutionOf(c.id);
+      if (def) {
+        const need = Math.max(0, def.cycles + er.cycleDelta);
+        p.evo[c.id] = { need, charge: EVO_RULES.startCharged || er.startCharged ? need : 0 };
+      }
     });
-    return {
+    p.hand = ids.slice(0, 4);
+    p.queue = ids.slice(4);
+  }
+
+  function createPlayer(side, deck, rules) {
+    const p = {
       side,
-      elixir: MATCH.startElixir,
+      elixir: rules.startElixir,
       crowns: 0,
-      hand: ids.slice(0, 4),
-      queue: ids.slice(4),
-      cards,
-      cooldowns,
+      hand: [],
+      queue: [],
+      cards: {},
+      cooldowns: {},
       damageDealt: 0,
       cardsPlayed: 0,
       evoPlayed: 0,
-      evo,
+      evo: {},
+      size: {},
+      kills: 0,
       emoteLog: [],
     };
+    loadDeck(p, deck, rules);
+    return p;
   }
 
   // Is this player's next play of cardId going to be evolved?
@@ -1010,19 +1309,59 @@
       nav: createNav(),
       hash: null,
       byId: new Map(),
+      // Event runtime (all of it lives on the match, so it disappears with the match)
+      rules: normalizeRules(o.rules),
+      mods: { next: 0, active: [] }, // timed modifiers: index of the next to start, and the running ones
+      modFx: NO_FX,                  // their combined effects (see combineModFx)
+      hill: null,                    // King of the Hill state
+      waveNo: 0,                     // survival: waves sent so far
+      boss: null,                    // boss battle: { id, spawned, summons, enraged }
+      swapNo: 0,                     // deck swaps done
     };
+    const rules = state.rules;
     ['A', 'B'].forEach((side) => {
-      state.players[side] = createPlayer(side, normalizeDeck(o.decks && o.decks[side]));
+      const p = createPlayer(side, normalizeDeck(o.decks && o.decks[side]), rules);
+      state.players[side] = p;
+      p.hand.forEach((id) => rollSize(state, p, id));
+      if (rules.noTowers.includes(side)) return;
       const t = (o.towers && o.towers[side]) || {};
       const stats = towerStats(t.towerLevel, t.kingLevel, { tower: t.towerMult, king: t.kingMult });
       state.towers.push(makeTower(side, 'princess', 0, stats));
       state.towers.push(makeTower(side, 'princess', 1, stats));
       state.towers.push(makeTower(side, 'king', -1, stats));
     });
+    if (rules.hill) state.hill = { idx: 0, pts: { A: 0, B: 0 }, holder: null, movedAt: 0 };
+    if (rules.boss) state.boss = { id: null, spawned: false, summons: 0, enraged: false };
     state.towers.forEach((t) => state.byId.set(t.id, t));
     rebuildObstacles(state);
     buildHash(state);
     return state;
+  }
+
+  // Size Roulette: roll the form of a card as it comes into hand
+  function rollSize(state, p, cardId) {
+    const sr = state.rules.sizeRoll;
+    if (!sr) return;
+    const c = p.cards[cardId];
+    if (!c || c.spell || c.building) { delete p.size[cardId]; return; }
+    const r = nextRandom(state);
+    if (r < sr.tiny) p.size[cardId] = 'tiny';
+    else if (r < sr.tiny + sr.mega) p.size[cardId] = 'mega';
+    else delete p.size[cardId];
+  }
+
+  /** What a card costs this player right now (event card mods, Size Roulette and active modifiers included). */
+  function playCost(state, side, cardId) {
+    const p = state.players[side];
+    const c = p && p.cards[cardId];
+    if (!c) return Infinity;
+    let cost = c.cost;
+    const form = p.size[cardId];
+    if (form) cost += SIZE_FORMS[form].cost;
+    const fx = state.modFx;
+    cost += fx.cost;
+    if (c.cost >= 5) cost += fx.costHeavy;
+    return clamp(cost, 1, 10);
   }
 
   // ─── Deployment ──────────────────────────────────────────────────────────
@@ -1155,10 +1494,29 @@
       genT: 0,
       healT: 0,
       healedAt: -9,
+      baseRange: stats.range,
+      form: null,
+      boss: !!(stats.mech && stats.mech.boss),
     };
+    // Modifiers that apply to troops as they land (Eagle Eye range, Aegis shields)
+    if (u.kind === 'troop') applyModToUnit(state, u, true);
     state.units.push(u);
     state.byId.set(u.id, u);
     return u;
+  }
+
+  // Derived stats that depend on active modifiers, always recomputed from the unit's base values
+  function applyModToUnit(state, u, landing) {
+    const fx = state.modFx;
+    u.range = u.baseRange + (u.kind === 'troop' && u.baseRange >= 3 ? fx.rangeAdd : 0);
+    if (landing && fx.shieldPct > 0) giveShield(u, fx.shieldPct);
+  }
+
+  function giveShield(u, pct) {
+    const amount = Math.round(u.hpMax * pct);
+    if (amount <= (u.shield || 0)) return;
+    u.shield = amount;
+    u.shieldMax = Math.max(u.shieldMax || 0, amount);
   }
 
   // Spawn a token troop (skeleton, drone, ...) at the given level; tokens carry no elixir value
@@ -1183,9 +1541,30 @@
 
   function cycleHand(p, cardId) {
     const idx = p.hand.indexOf(cardId);
-    if (idx < 0 || p.queue.length === 0) return;
+    if (idx < 0 || p.queue.length === 0) return null;
     p.hand[idx] = p.queue.shift();
     p.queue.push(cardId);
+    return p.hand[idx];
+  }
+
+  // Cycle a played card out of the hand; the card that comes in gets its own Size Roulette roll
+  function cycleCard(state, p, cardId) {
+    delete p.size[cardId];
+    const incoming = cycleHand(p, cardId);
+    if (incoming) rollSize(state, p, incoming);
+  }
+
+  // Stats for a Size Roulette form ('tiny' / 'mega') or a Growth Spurt troop ('grown')
+  function sizedStats(stats, form) {
+    const f = form === 'grown' ? { hp: 1.4, dmg: 1.15, speed: 0.9, radius: 1.15 } : SIZE_FORMS[form];
+    if (!f) return stats;
+    return {
+      ...stats,
+      hpScaled: Math.round(stats.hpScaled * f.hp),
+      dmgScaled: +(stats.dmgScaled * f.dmg).toFixed(2),
+      speed: r2(stats.speed * f.speed),
+      radius: r2(clamp(stats.radius * f.radius, 0.25, 1.3)),
+    };
   }
 
   /** Play a card. Returns { ok: true, units } or { ok: false, reason }. */
@@ -1195,15 +1574,17 @@
     const stats = p && p.cards[cardId];
     if (!stats) return { ok: false, reason: 'Unknown card' };
     if (!p.hand.includes(cardId)) return { ok: false, reason: 'Card not in hand' };
-    if (p.elixir < stats.cost) return { ok: false, reason: 'Not enough elixir' };
+    const cost = playCost(state, side, cardId);
+    if (p.elixir < cost) return { ok: false, reason: 'Not enough elixir' };
     if ((p.cooldowns[cardId] || 0) > state.time) return { ok: false, reason: 'Card is recharging' };
     const px = Number(x);
     const py = Number(y);
     if (!canDeploy(state, side, px, py, stats)) return { ok: false, reason: "Can't deploy there" };
 
-    p.elixir = Math.max(0, p.elixir - stats.cost);
+    p.elixir = Math.max(0, p.elixir - cost);
     p.cooldowns[cardId] = state.time + stats.deployCdScaled;
     p.cardsPlayed += 1;
+    const form = p.size[cardId] || null;
 
     // Evolution cycle: only a play that passed every check above counts. A charged card comes
     // out evolved and starts charging again; otherwise this play adds one charge.
@@ -1211,17 +1592,19 @@
     let evolved = false;
     if (cycle) {
       if (cycle.charge >= cycle.need) { evolved = true; cycle.charge = 0; p.evoPlayed += 1; }
-      else cycle.charge += 1;
+      else cycle.charge = Math.min(cycle.need, cycle.charge + 1 + state.modFx.evoCharge);
     }
-    const play = evolved ? evolvedStats(stats) : stats;
+    let play = evolved ? evolvedStats(stats) : stats;
+    if (form) play = sizedStats(play, form);
+    else if (state.modFx.grow && !stats.spell && !stats.building) play = sizedStats(play, 'grown');
     if (evolved) pushFx(state, { type: 'evolve', x: px, y: py, owner: side, cardId, name: play.evo.name });
 
     if (stats.spell) {
       castSpell(state, side, play, px, py);
-      state.castLog.push({ seq: state.nextId++, owner: side, cost: stats.cost, cardId });
+      state.castLog.push({ seq: state.nextId++, owner: side, cost, cardId });
       if (state.castLog.length > 24) state.castLog.shift();
-      cycleHand(p, cardId);
-      pushFx(state, { type: 'cast', x: px, y: py, owner: side, r: stats.splash, cardId, cost: stats.cost, evo: evolved ? 1 : 0 });
+      cycleCard(state, p, cardId);
+      pushFx(state, { type: 'cast', x: px, y: py, owner: side, r: play.splash, cardId, cost, evo: evolved ? 1 : 0 });
       return { ok: true, units: [], evolved };
     }
 
@@ -1239,13 +1622,14 @@
         const cy = py + Math.sin(ang) * ring;
         if (stats.air || walkablePoint(state.nav, cx, cy, false)) { sx = cx; sy = cy; }
       }
-      units.push(spawnUnit(state, side, play, clamp(sx, 0.4, W - 0.4), clamp(sy, 0.4, H - 0.4), MATCH.deployTime + tunnel + i * 0.05, stats.cost / count));
+      units.push(spawnUnit(state, side, play, clamp(sx, 0.4, W - 0.4), clamp(sy, 0.4, H - 0.4), MATCH.deployTime + tunnel + i * 0.05, cost / count));
     }
+    if (form) units.forEach((u) => { u.form = form; });
     // Swarm members of one play know each other (for pack mechanics like Scrap Rally)
     if (count > 1) units.forEach((u) => { u.pack = units[0].id; });
     if (stats.building) rebuildObstacles(state);
-    cycleHand(p, cardId);
-    pushFx(state, { type: 'deploy', x: px, y: py, owner: side, r: count > 1 ? 1.4 : 1, cardId, cost: stats.cost, evo: evolved ? 1 : 0 });
+    cycleCard(state, p, cardId);
+    pushFx(state, { type: 'deploy', x: px, y: py, owner: side, r: count > 1 ? 1.4 : 1, cardId, cost, evo: evolved ? 1 : 0, form: form || undefined });
     return { ok: true, units, evolved };
   }
 
@@ -1255,10 +1639,26 @@
     return { kind: stats.proj, towerMult: stats.towerMult, knockback: stats.knockback, stun: stats.stun, freeze: stats.freeze, cost: stats.cost };
   }
 
-  function castSpell(state, side, stats, x, y) {
-    if (stats.zone) { addZone(state, side, stats, x, y); return; }
+  function castSpell(state, side, statsIn, x, y) {
+    let stats = statsIn;
+    if (state.modFx.spellRadius !== 1) stats = { ...stats, splash: r2(stats.splash * state.modFx.spellRadius) };
+    const echo = state.rules.spellEcho;
+    if (stats.zone) {
+      const z = addZone(state, side, stats, x, y);
+      if (echo > 0) echoZoneSpell(state, z, echo);
+      return;
+    }
     const spec = spellSpec(stats);
     const evoSpell = stats.evo && stats.evo.spell;
+    const king = state.towers.find((t) => t.owner === side && t.tower === 'king');
+    const fromX = king ? king.x : x;
+    const fromY = king ? king.y : y;
+    if (echo > 0) {
+      // Spellstorm: the spell rings out again at the same spot just after it lands
+      const flight = stats.instant || stats.proj === 'shock' ? 0 : dist(fromX, fromY, x, y) / (PROJ_SPEED[stats.proj] || 15) + ((stats.waves || 1) - 1) * 0.22;
+      makeZone(state, { kind: 'echo', owner: side, cardId: stats.id, x, y, r: stats.splash, delay: flight + 0.9, total: stats.dmgScaled * echo,
+        spec: { kind: stats.proj, towerMult: stats.towerMult, knockback: stats.knockback * 0.5, stun: stats.stun, freeze: stats.freeze * 0.5, cost: 0 } });
+    }
     if (evoSpell && evoSpell.seek) { castSeekingBarrage(state, side, stats, x, y, evoSpell.seek, spec); return; }
     if (evoSpell && evoSpell.afterZone) spec.afterZone = { ...evoSpell.afterZone, total: stats.dmgScaled * evoSpell.afterZone.dmgMult, level: stats.level };
     const waves = stats.waves || 1;
@@ -1271,9 +1671,6 @@
       }
       return;
     }
-    const king = state.towers.find((t) => t.owner === side && t.tower === 'king');
-    const fromX = king ? king.x : x;
-    const fromY = king ? king.y : y;
     for (let i = 0; i < waves; i++) {
       state.projectiles.push({
         id: `p${state.nextId++}`,
@@ -1295,9 +1692,24 @@
     }
   }
 
+  // Spellstorm echo for lingering spells: areas last longer (same strength per second), and
+  // one-shot zones (laser, boulder) strike a second time; troop drops bring a couple more.
+  function echoZoneSpell(state, z, echo) {
+    if (['dot', 'slow', 'haste', 'heal', 'pull'].includes(z.kind)) {
+      z.dur *= 1 + echo;
+      z.total *= 1 + echo;
+    } else if (z.kind === 'laser' || z.kind === 'roll') {
+      const again = { ...z, id: `z${state.nextId++}`, total: z.total * echo, delay: (z.delay || 0) + 1, age: 0, hit: z.hit ? new Set() : null, travelled: 0 };
+      state.zones.push(again);
+    } else if (z.kind === 'spawn') {
+      z.count += 1; // one extra trooper
+    }
+  }
+
   // Stun (or freeze) a troop, building or tower. Interrupts wind-ups, charges, dashes and ramp-ups.
-  function stunEntity(e, dur, freeze) {
-    if (!e || e.hp <= 0 || !(dur > 0)) return;
+  function stunEntity(e, dur0, freeze) {
+    if (!e || e.hp <= 0 || !(dur0 > 0)) return;
+    const dur = e.boss ? dur0 * 0.5 : dur0; // bosses shrug off half of every stun and freeze
     e.stunT = Math.max(e.stunT || 0, dur);
     if (freeze) e.frozenT = Math.max(e.frozenT || 0, dur);
     e.windupT = 0;
@@ -1318,7 +1730,7 @@
       const gap = e.kind === 'tower' ? boxDist(x, y, e) : dist(x, y, e.x, e.y) - e.radius;
       if (gap <= radius) hit.push(e);
     });
-    const src = { id: null, owner, structureMult: 1 };
+    const src = { id: null, owner, structureMult: 1, spell: !spec.hazard };
     for (const e of hit) {
       if (dmg > 0) applyDamage(state, src, e, e.kind === 'tower' ? dmg * spec.towerMult : dmg);
       if (spec.freeze > 0) stunEntity(e, spec.freeze, true);
@@ -1361,6 +1773,7 @@
   }
 
   function knockBack(state, e, fromX, fromY, amount) {
+    if (e.boss) return; // bosses can't be shoved around
     let dx = e.x - fromX;
     let dy = e.y - fromY;
     const d = Math.hypot(dx, dy);
@@ -1520,8 +1933,10 @@
     if (!state.zones.length) return;
     for (const z of state.zones) {
       if (z.done) continue;
+      if (z.until != null && state.time >= z.until) { z.done = true; continue; }
       if (z.delay > 0) { z.delay -= dt; if (z.delay > 0) continue; }
-      const src = z.source || { id: null, owner: z.owner, structureMult: 1 };
+      if (updateEventZone(state, z, dt)) { z.age += dt; continue; }
+      const src = z.source || { id: null, owner: z.owner, structureMult: 1, spell: true };
       switch (z.kind) {
         case 'dot': {
           const per = zoneTicks(z, dt);
@@ -1542,7 +1957,7 @@
         }
         case 'pull': {
           eachInZone(state, z, false, (e) => {
-            if (e.kind !== 'troop' || e.invuln) return;
+            if (e.kind !== 'troop' || e.invuln || e.boss) return;
             const d = dist(e.x, e.y, z.x, z.y);
             if (d < 0.2) return;
             const stepLen = Math.min(d - 0.1, z.pull * dt);
@@ -1607,8 +2022,8 @@
           break;
         }
         case 'echo': {
-          // Overload's aftershock (fires once, after its delay)
-          applySpell(state, z.owner, { kind: 'shock', towerMult: z.towerMult, knockback: 0, stun: z.stun, freeze: 0, cost: 0, evo: 1 }, z.x, z.y, z.r, z.total);
+          // Overload's aftershock / a Spellstorm echo (fires once, after its delay)
+          applySpell(state, z.owner, z.spec || { kind: 'shock', towerMult: z.towerMult, knockback: 0, stun: z.stun, freeze: 0, cost: 0, evo: 1 }, z.x, z.y, z.r, z.total);
           z.done = true;
           break;
         }
@@ -1755,6 +2170,16 @@
     if (target.kind !== 'troop') amt *= source.structureMult || 1;
     if (target.kind === 'tower') amt *= source.crownMult || 1;
     if (target.kind === 'troop' && auraProtected(state, target)) amt *= 0.75;
+    // Timed modifiers (already combined and capped in state.modFx)
+    const fx = state.modFx;
+    if (fx !== NO_FX) {
+      if (source.spell) amt *= fx.spellDmg;
+      if (source.kind === 'troop') amt *= source.evo ? fx.dmgOut * fx.evoDmg : fx.dmgOut;
+      if (target.kind === 'troop') amt *= fx.dmgIn;
+      else if (target.kind === 'building') amt *= fx.buildIn;
+    }
+    // A boss guarded by its summons takes reduced damage until they fall
+    if (target.boss && state.boss && state.boss.guard) amt *= target.mech.boss.guardMult;
     target.hitT = state.time;
     if (target.shield > 0) {
       // Shields soak the hit; whatever is left over when they break is lost
@@ -1799,7 +2224,7 @@
   }
 
   function damageSource(u) {
-    return { id: u.id, owner: u.owner, structureMult: u.structureMult, crownMult: u.crownMult || 1 };
+    return { id: u.id, owner: u.owner, structureMult: u.structureMult, crownMult: u.crownMult || 1, kind: u.kind, evo: !!u.evo, x: u.x, y: u.y };
   }
 
   // Spark Spirit: hit the target, then arc to nearby enemies, stunning each one
@@ -1906,6 +2331,7 @@
         splashDamage(state, src, t.x, t.y, u.splash, dmg, canHitAir);
       } else {
         applyDamage(state, src, t, dmg, heavy);
+        hitKnock(state, u.x, u.y, t);
         pushFx(state, { type: 'hit', x: t.x, y: t.y, owner: u.owner, style: 'melee' });
       }
       // Melee shockwave every Nth hit, centred on the target
@@ -1980,6 +2406,11 @@
     }
 
     const k = timeScale(u);
+    // Timed modifiers scale movement and attack speed separately (troops / buildings)
+    const fx = state.modFx;
+    const rage = u.boss && state.boss && state.boss.enraged ? u.mech.boss.enrageMult : 1;
+    const kMove = k * (u.kind === 'troop' ? fx.move : 1) * rage;
+    const kAtk = k * rage * (u.kind === 'troop' ? fx.atk * (u.pack ? fx.swarmAtk : 1) : u.building ? fx.buildAtk : 1);
     const m = u.mech;
     if (u.em) updateEvolvedUnit(state, u, dt);
     if (m) {
@@ -1987,10 +2418,11 @@
       if (m.elixir) updateElixirPump(state, u, dt);
       if (m.heal) updateHealer(state, u, dt);
       if (m.taunt) updateTaunt(state, u, dt);
+      if (m.boss) updateBoss(state, u, dt);
     }
     if (u.targets === 'none') return; // spawners, pumps and decoys never attack
 
-    u.atkCd -= dt * k;
+    u.atkCd -= dt * kAtk;
     if (u.dashing) { updateDash(state, u, dt); return; }
     const t = updateTargeting(state, u, dt);
 
@@ -2013,7 +2445,7 @@
         u.windupT = 0;
         return;
       }
-      u.windupT -= dt * k;
+      u.windupT -= dt * kAtk;
       faceToward(u, t.x, t.y, dt);
       if (u.windupT <= 0) fireAttack(state, u, t);
       return;
@@ -2024,7 +2456,7 @@
       u.vy = 0;
       u.stuckT = 0;
       faceToward(u, t.x, t.y, dt);
-      if (m && m.ramp) u.rampT += dt * k;
+      if (m && m.ramp) u.rampT += dt * kAtk;
       if (u.atkCd <= 0) {
         u.locked = true;
         u.atkCd = u.cd;
@@ -2037,7 +2469,25 @@
     if (m && m.ramp) u.rampT = 0;
     if (m && m.dash && t && startDash(state, u, t)) return;
 
-    if (!u.building && t) moveToward(state, u, t, dt, k);
+    if (!u.building && t) moveToward(state, u, t, dt, kMove);
+    else if (!t && !u.building && state.rules.guard) holdGuardLine(state, u, dt, kMove);
+  }
+
+  // With no enemy towers to march on (survival, boss battles), troops hold a line in front of
+  // their own bridge in their lane instead of standing wherever they landed.
+  function holdGuardLine(state, u, dt, rate) {
+    const lane = u.x < MID_X ? 0 : 1;
+    const gx = BRIDGES[lane].cx + (u.x < BRIDGES[lane].cx ? -0.6 : 0.6);
+    const gy = u.owner === 'A' ? RIVER.y1 + 2.2 : RIVER.y0 - 2.2;
+    if (dist(u.x, u.y, gx, gy) < 1.2) { u.vx = 0; u.vy = 0; return; }
+    moveToward(state, u, { id: `guard-${lane}-${u.owner}`, kind: 'point', x: gx, y: gy, radius: 0.2, hp: 1 }, dt, rate);
+  }
+
+  // Pinball rules: a single-target hit pushes a ground troop away from whoever hit it
+  function hitKnock(state, fromX, fromY, t) {
+    const k = Math.max(state.rules.knockOnHit, state.modFx.knock);
+    if (!(k > 0) || t.kind !== 'troop' || t.air || t.hp <= 0 || t.invuln || t.boss) return;
+    knockBack(state, t, fromX, fromY, k);
   }
 
   // ─── Evolution mechanics ─────────────────────────────────────────────────
@@ -2202,7 +2652,7 @@
   function giveElixir(state, side, amount, x, y) {
     const p = state.players[side];
     if (!p) return;
-    p.elixir = clamp(p.elixir + amount, 0, MATCH.maxElixir);
+    p.elixir = clamp(p.elixir + amount, 0, state.rules.maxElixir);
     pushFx(state, { type: 'elixir', x, y, owner: side, amt: amount });
   }
 
@@ -2440,7 +2890,7 @@
     if (t.hp <= 0) return;
     if (t.frozenT > 0) t.frozenT -= dt;
     if (t.stunT > 0) { t.stunT -= dt; return; }
-    t.atkCd -= dt;
+    t.atkCd -= dt * state.modFx.towerAtk;
     if (!t.active) return;
     let target = t.targetId ? state.byId.get(t.targetId) : null;
     const valid = (e) => e && e.hp > 0 && e.owner !== t.owner && e.kind !== 'tower' && !e.hidden && dist(t.x, t.y, e.x, e.y) - e.radius <= t.range;
@@ -2489,6 +2939,7 @@
         if (p.cluster) scatterCluster(state, p);
       } else if (t && t.hp > 0) {
         applyDamage(state, p.source, t, p.dmg);
+        hitKnock(state, p.sx, p.sy, t);
         if (p.slow) setSlow(t, p.slow.mult, p.slow.dur);
         if (p.chainStun) stunEntity(t, p.chainStun, false);
         pushFx(state, { type: 'hit', x: p.tx, y: p.ty, owner: p.owner, style: p.style });
@@ -2522,6 +2973,308 @@
     }
   }
 
+  // ─── Event runtime ───────────────────────────────────────────────────────
+  //
+  // Everything below only does something when the match's rules ask for it, so a normal battle
+  // runs exactly as before. All timing uses the match clock (state.time), never the wall clock.
+
+  function anyEvo(state) {
+    return Object.keys(state.players.A.evo).length + Object.keys(state.players.B.evo).length > 0;
+  }
+
+  // Switch timed modifiers on and off, then recombine their effects
+  function updateModifiers(state) {
+    const plan = state.rules.modifiers;
+    if (!plan.length) return;
+    const M = state.mods;
+    let changed = false;
+    for (let i = M.active.length - 1; i >= 0; i--) {
+      if (state.time >= M.active[i].end) { endModifier(state, M.active[i]); M.active.splice(i, 1); changed = true; }
+    }
+    while (M.next < plan.length && plan[M.next].at <= state.time) {
+      if (startModifier(state, plan[M.next++])) changed = true;
+    }
+    if (changed) {
+      state.modFx = combineModFx(M.active.map((a) => a.id));
+      for (const u of state.units) if (u.kind === 'troop') applyModToUnit(state, u, false);
+    }
+  }
+
+  function startModifier(state, m) {
+    const def = MODIFIERS[m.id];
+    const M = state.mods;
+    // The same modifier again only refreshes its timer: it never stacks with itself
+    const same = M.active.find((a) => a.id === m.id);
+    if (same) {
+      same.end = Math.max(same.end, state.time + m.dur);
+      state.zones.forEach((z) => { if (z.modKey === same.key) z.until = same.end; });
+      return false;
+    }
+    // Safety nets (the schedule builder already avoids these): one per group, and requirements
+    if (def.group && M.active.some((a) => MODIFIERS[a.id].group === def.group)) return false;
+    if (def.needs === 'evo' && !anyEvo(state)) return false;
+    const a = { id: m.id, key: `m${state.nextId++}`, start: state.time, end: state.time + m.dur };
+    M.active.push(a);
+    if (def.start && def.start.elixir) {
+      ['A', 'B'].forEach((side) => {
+        const king = state.towers.find((t) => t.owner === side && t.tower === 'king');
+        giveElixir(state, side, def.start.elixir, king ? king.x : MID_X, king ? king.y : (side === 'A' ? H - 2 : 2));
+      });
+    }
+    if (def.start && def.start.shield) state.units.forEach((u) => { if (u.kind === 'troop' && u.hp > 0) giveShield(u, def.start.shield); });
+    (def.zones || []).forEach((zd) => placeModZone(state, a, zd));
+    pushFx(state, { type: 'modOn', id: m.id, dur: m.dur });
+    return true;
+  }
+
+  function endModifier(state, a) {
+    state.zones.forEach((z) => { if (z.modKey === a.key) z.done = true; });
+    pushFx(state, { type: 'modOff', id: a.id });
+  }
+
+  // Modifier areas belong to nobody (owner 'X'), so they affect both sides; `mirror` adds the
+  // point-reflected copy so each side gets exactly the same layout.
+  function placeModZone(state, a, zd) {
+    const add = (x, y) => makeZone(state, {
+      kind: zd.kind, owner: 'X', modKey: a.key, modId: a.id, x, y, r: zd.r, mult: zd.mult || 1, perSec: zd.perSec || 0,
+      every: zd.every || 0, hitR: zd.hitR || 0, dmg: zd.dmg || 0, hitDelay: zd.delay || 0, vx: zd.speed || 0,
+      until: a.end, born: state.time, tickT: zd.every ? 1 : 0,
+    });
+    add(zd.x, zd.y);
+    if (zd.mirror) add(W - zd.x, H - zd.y);
+  }
+
+  // Chaos areas, boss slams and meteors (called from updateZones). Returns true if it handled z.
+  function updateEventZone(state, z, dt) {
+    switch (z.kind) {
+      case 'cHaste':
+        eachInZone(state, z, false, (e) => setHaste(e, z.mult, 0.25));
+        return true;
+      case 'cSlow':
+        eachInZone(state, z, false, (e) => setSlow(e, z.mult, 0.25));
+        return true;
+      case 'cHeal':
+        z.tickT -= dt;
+        if (z.tickT <= 0) {
+          z.tickT += 0.5;
+          eachInZone(state, z, false, (e) => { if (e.kind === 'troop' && healEntity(state, e, z.perSec * 0.5) > 0) e.healedAt = state.time; });
+        }
+        return true;
+      case 'storm': {
+        z.x += z.vx * dt;
+        if (z.x > W - 2.5) { z.x = W - 2.5; z.vx = -Math.abs(z.vx); }
+        if (z.x < 2.5) { z.x = 2.5; z.vx = Math.abs(z.vx); }
+        z.tickT -= dt;
+        if (z.tickT <= 0) {
+          z.tickT += 0.5;
+          const src = { id: null, owner: 'X', structureMult: 1 };
+          eachInZone(state, z, false, (e) => { if (e.kind !== 'tower' && !e.hidden) applyDamage(state, src, e, z.perSec * 0.5); });
+        }
+        return true;
+      }
+      case 'meteorField':
+        // Every few seconds: a telegraphed impact on each side, at mirrored spots
+        z.tickT -= dt;
+        if (z.tickT <= 0) {
+          z.tickT += z.every;
+          const x = 2 + nextRandom(state) * (W - 4);
+          const y = RIVER.y1 + 1.5 + nextRandom(state) * (H - RIVER.y1 - 5);
+          [[x, y], [W - x, H - y]].forEach(([px, py]) => {
+            makeZone(state, { kind: 'impact', owner: 'X', x: px, y: py, r: z.hitR, delay: z.hitDelay, total: z.dmg, warnDur: z.hitDelay });
+          });
+        }
+        return true;
+      case 'impact':
+      case 'slam':
+        // Lands once its warning has run out (the delay is handled by updateZones)
+        applySpell(state, z.owner, { kind: z.kind === 'slam' ? 'slam' : 'meteor', towerMult: z.kind === 'slam' ? 0.25 : 0, knockback: z.kind === 'slam' ? 1.0 : 0.6, stun: 0, freeze: 0, cost: 0, hazard: true }, z.x, z.y, z.r, z.total);
+        z.done = true;
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  // King of the Hill: whoever has more troop strength on the hill fills their meter; a full
+  // meter is worth a crown. The hill hops between spots on a fixed timetable.
+  function updateHill(state, dt) {
+    const cfg = state.rules.hill;
+    const hs = state.hill;
+    if (!cfg || !hs || !state.running) return;
+    const idx = Math.floor(state.time / cfg.every) % cfg.spots.length;
+    if (idx !== hs.idx) {
+      hs.idx = idx;
+      pushFx(state, { type: 'hillMove', x: cfg.spots[idx].x, y: cfg.spots[idx].y });
+    }
+    const spot = cfg.spots[hs.idx];
+    const power = { A: 0, B: 0 };
+    for (const e of state.units) {
+      if (e.kind !== 'troop' || e.hp <= 0 || e.deployT > 0 || !(e.owner in power)) continue;
+      if (dist(e.x, e.y, spot.x, spot.y) > cfg.r + e.radius * 0.5) continue;
+      power[e.owner] += Math.max(0.35, e.costShare || 0) * (0.4 + 0.6 * e.hp / e.hpMax);
+    }
+    hs.power = power;
+    const lead = power.A > power.B ? 'A' : power.B > power.A ? 'B' : null;
+    hs.holder = lead;
+    if (!lead) return;
+    // Contested hills fill slower: the bigger the edge, the faster the meter
+    const share = clamp((power[lead] - power[enemyOf(lead)]) / power[lead], 0.25, 1);
+    hs.pts[lead] += cfg.rate * share * dt;
+    if (hs.pts[lead] >= cfg.points) {
+      hs.pts[lead] = 0;
+      const pl = state.players[lead];
+      pl.crowns = Math.min(3, pl.crowns + 1);
+      pl.hillCrowns = (pl.hillCrowns || 0) + 1;
+      pushFx(state, { type: 'hillCrown', owner: lead, x: spot.x, y: spot.y });
+      pushFx(state, { type: 'crown', owner: lead, crowns: pl.crowns, hill: 1 });
+    }
+  }
+
+  // Survival: scripted attackers for side B arrive on a timetable, behind their bridges
+  function updateWaves(state) {
+    const waves = state.rules.waves;
+    if (!waves) return;
+    while (state.waveNo < waves.length && waves[state.waveNo].at <= state.time) {
+      const w = waves[state.waveNo++];
+      w.units.forEach((g, gi) => {
+        const stats = getCardStatsAtLevel(g.card, g.level, false, 0);
+        if (!stats || stats.spell || stats.building) return;
+        const count = (stats.swarmCount || 1) * g.n;
+        const bx = BRIDGES[g.lane].cx;
+        const by = RIVER.y0 - 3 - (gi % 3) * 0.9;
+        for (let i = 0; i < count; i++) {
+          const spot = spawnSpot(state, bx, by, stats.air, 0.6 + count * 0.12, i * 2 + gi);
+          if (!spot) continue;
+          spawnUnit(state, 'B', stats, spot.x, spot.y, 0.8 + i * 0.05, stats.cost / (stats.swarmCount || 1));
+        }
+      });
+      pushFx(state, { type: 'wave', n: state.waveNo, total: waves.length });
+    }
+  }
+
+  function updateBossSpawn(state) {
+    const b = state.rules.boss;
+    const bs = state.boss;
+    if (!b || !bs || bs.spawned || state.time < b.at) return;
+    bs.spawned = true;
+    const x = BRIDGES[b.lane].cx;
+    const y = RIVER.y0 - 3.5;
+    const u = spawnToken(state, 'B', b.card, x, y, b.level, 1.5);
+    if (!u) return;
+    u.costShare = 10; // the AI's threat estimates should treat it as a huge push
+    bs.id = u.id;
+    pushFx(state, { type: 'bossSpawn', x, y, owner: 'B', cardId: b.card });
+  }
+
+  // ─── Bosses ──────────────────────────────────────────────────────────────
+  //
+  // Iron Colossus: telegraphed ground slams aimed at the biggest cluster of your troops and
+  // buildings (1.6 s warning circle), summons guards at 70% and 40% HP (it takes half damage while
+  // any are alive), and enrages under 35% HP (faster everything, slams more often). It can't be
+  // knocked back or pulled, and stuns and freezes last half as long on it.
+  // Phases are checked every step, even while the boss is stunned or frozen
+  function updateBossPhases(state) {
+    const bs = state.boss;
+    if (!bs || !bs.id) return;
+    const u = state.byId.get(bs.id);
+    if (!u || u.hp <= 0) { bs.guard = false; return; }
+    const cfg = u.mech.boss;
+    const frac = u.hp / u.hpMax;
+    const marks = cfg.summonAt.concat(state.rules.boss && state.rules.boss.extraSummon ? [0.2] : []);
+    while (bs.summons < marks.length && frac <= marks[bs.summons]) {
+      bs.summons++;
+      for (let i = 0; i < cfg.summon.count; i++) {
+        const spot = spawnSpot(state, u.x, u.y, false, 1.6, i * 3 + bs.summons);
+        if (!spot) continue;
+        const m = spawnToken(state, u.owner, cfg.summon.card, spot.x, spot.y, u.level, 0.6);
+        if (m) { m.bossMinion = true; m.costShare = 1; }
+      }
+      pushFx(state, { type: 'bossSummon', x: u.x, y: u.y, owner: u.owner });
+    }
+    bs.guard = state.units.some((o) => o.bossMinion && o.hp > 0);
+    if (!bs.enraged && frac <= cfg.enrageBelow) {
+      bs.enraged = true;
+      pushFx(state, { type: 'bossEnrage', x: u.x, y: u.y, owner: u.owner });
+    }
+  }
+
+  // The slam (only while the boss is up and acting)
+  function updateBoss(state, u, dt) {
+    const cfg = u.mech.boss;
+    const bs = state.boss;
+    if (!bs) return;
+    if (u.slamT == null) u.slamT = cfg.slamEvery * 0.6;
+    u.slamT -= dt;
+    if (u.slamT > 0) return;
+    const pt = slamPoint(state, u);
+    if (!pt) { u.slamT = 0.5; return; }
+    u.slamT = bs.enraged ? cfg.slamEnraged : cfg.slamEvery;
+    makeZone(state, { kind: 'slam', owner: u.owner, x: pt.x, y: pt.y, r: cfg.slamRadius, delay: cfg.slamDelay, warnDur: cfg.slamDelay, total: cfg.slamDmg * u.lvlScale });
+    pushFx(state, { type: 'bossSlam', x: pt.x, y: pt.y, owner: u.owner, r: cfg.slamRadius });
+  }
+
+  // Where the boss slams: the densest group of enemy troops/buildings near it, else a tower in reach
+  function slamPoint(state, u) {
+    let best = null;
+    let bestScore = 0;
+    for (const e of state.units) {
+      if (e.owner === u.owner || e.hp <= 0 || e.air || e.hidden || dist(u.x, u.y, e.x, e.y) > 6) continue;
+      let score = 0;
+      for (const o of state.units) {
+        if (o.owner === u.owner || o.hp <= 0 || o.air || o.hidden) continue;
+        if (dist(e.x, e.y, o.x, o.y) <= 2.2) score += 0.5 + (o.costShare || 0);
+      }
+      if (score > bestScore) { bestScore = score; best = { x: e.x, y: e.y }; }
+    }
+    if (best) return best;
+    for (const t of state.towers) {
+      if (t.owner === u.owner || t.hp <= 0 || boxDist(u.x, u.y, t) > 4) continue;
+      return { x: clamp(u.x, t.x - t.half, t.x + t.half), y: clamp(u.y, t.y - t.half, t.y + t.half) };
+    }
+    return null;
+  }
+
+  // Deck Roulette: both hands are replaced by new decks at fixed times
+  function updateDeckSwaps(state) {
+    const swaps = state.rules.deckSwaps;
+    while (state.swapNo < swaps.length && swaps[state.swapNo].at <= state.time) {
+      const sw = swaps[state.swapNo++];
+      ['A', 'B'].forEach((side) => {
+        const p = state.players[side];
+        const ids = Object.keys(p.cards);
+        const avg = ids.length ? Math.round(ids.reduce((n, id) => n + (p.cards[id].level || 1), 0) / ids.length) : 1;
+        const lvl = state.rules.deckLevel || avg;
+        loadDeck(p, sw[side].map((id) => ({ id, level: lvl })), { ...state.rules, evo: { ...state.rules.evo, disabled: true } });
+        p.hand.forEach((id) => rollSize(state, p, id));
+      });
+      pushFx(state, { type: 'deckSwap', n: state.swapNo });
+    }
+  }
+
+  // Scavenger refunds, Death Rattle bursts, kill counts and the boss's defeat
+  function onUnitKilled(state, u) {
+    const foe = enemyOf(u.owner);
+    const killer = state.players[foe];
+    if (u.kind === 'troop' && killer) killer.kills += 1;
+    if (u.boss && state.boss) state.boss.dead = true;
+    const refund = Math.max(state.rules.killRefund, state.modFx.refund);
+    // Only real kills pay: not kamikazes, not tokens (no elixir value), not troops nobody touched
+    if (refund > 0 && killer && u.kind === 'troop' && u.costShare > 0 && !u.kamikazed && state.time - u.hitT < 1) {
+      const amt = Math.min(2, Math.round(u.costShare * refund * 10) / 10);
+      if (amt > 0) giveElixir(state, foe, amt, u.x, u.y);
+    }
+    const burst = state.modFx.deathBurst;
+    if (burst > 0 && u.kind === 'troop' && !u.kamikazed) {
+      const dmg = Math.min(150, u.hpMax * burst);
+      const src = { id: null, owner: u.owner, structureMult: 1 };
+      queryHash(state, u.x, u.y, 1.5, (e) => {
+        if (e.hp <= 0 || e.owner === u.owner || e.kind === 'tower' || e.hidden) return;
+        if (dist(u.x, u.y, e.x, e.y) - e.radius <= 1.5) applyDamage(state, src, e, dmg);
+      });
+      pushFx(state, { type: 'splash', x: u.x, y: u.y, r: 1.5, owner: u.owner, rattle: 1 });
+    }
+  }
+
   // ─── Deaths, crowns and the clock ────────────────────────────────────────
 
   function processDeaths(state) {
@@ -2536,6 +3289,7 @@
         changed = true;
         if (u.building) navDirty = true;
         pushFx(state, { type: 'death', x: u.x, y: u.y, owner: u.owner, air: u.air, big: u.radius >= 0.6 || u.building, cardId: u.cardId });
+        onUnitKilled(state, u);
         if (u.special.includes('deathBomb') && !u.kamikazed) {
           splashDamage(state, damageSource(u), u.x, u.y, 1.5, u.dmg * 0.6, false);
         }
@@ -2605,32 +3359,71 @@
     return low;
   }
 
+  function tiebreak(state) {
+    // Whoever's weakest tower has more health left wins
+    const la = lowestTowerFraction(state, 'A');
+    const lb = lowestTowerFraction(state, 'B');
+    if (Math.abs(la - lb) < 0.001) endMatch(state, 'draw', 'tiebreak');
+    else endMatch(state, la > lb ? 'A' : 'B', 'tiebreak');
+  }
+
   function updateClock(state) {
     if (!state.running) return;
+    const r = state.rules;
     const a = state.players.A.crowns;
     const b = state.players.B.crowns;
-    if (state.phase === 'regular' && state.time >= MATCH.regulation) {
+    // Crown races (sudden death = 1 crown, King of the Hill = 3): the first to reach it wins
+    if (r.crownsToWin > 0 && Math.max(a, b) >= r.crownsToWin && a !== b) {
+      endMatch(state, a > b ? 'A' : 'B', r.crownsToWin === 1 ? 'firstCrown' : 'crownRace');
+      return;
+    }
+    if (r.waves && state.waveNo >= r.waves.length && !state.units.some((u) => u.owner === 'B' && u.hp > 0)) {
+      endMatch(state, 'A', 'survived');
+      return;
+    }
+    if (state.boss && state.boss.dead) { endMatch(state, 'A', 'boss'); return; }
+    if (state.phase === 'regular' && state.time >= r.regulation) {
+      // Survival: holding out to the end is a win. Boss: letting the clock run out is a loss.
+      if (r.timeout === 'survive') { endMatch(state, 'A', 'survived'); return; }
+      if (r.timeout === 'defend') { endMatch(state, 'B', 'timeout'); return; }
       if (a !== b) { endMatch(state, a > b ? 'A' : 'B', 'crowns'); return; }
+      if (r.overtime <= 0) { tiebreak(state); return; }
       state.phase = 'overtime';
     }
     if (state.phase === 'overtime') {
       if (a !== b) { endMatch(state, a > b ? 'A' : 'B', 'overtime'); return; }
-      if (state.time >= MATCH.regulation + MATCH.overtime) {
-        // Tiebreaker: whoever's weakest tower has more health left wins
-        const la = lowestTowerFraction(state, 'A');
-        const lb = lowestTowerFraction(state, 'B');
-        if (Math.abs(la - lb) < 0.001) endMatch(state, 'draw', 'tiebreak');
-        else endMatch(state, la > lb ? 'A' : 'B', 'tiebreak');
-      }
+      if (state.time >= r.regulation + r.overtime) tiebreak(state);
     }
   }
 
+  // Elixir generation multiplier from the clock (the rules' phases or overtime) and timed modifiers
+  function phaseMult(state) {
+    const r = state.rules;
+    if (state.phase === 'overtime') return r.overtimeMult;
+    let m = 1;
+    for (const ph of r.elixirPhases) if (state.time >= ph.at) m = ph.mult;
+    return m;
+  }
+
   function elixirMultiplier(state) {
-    return state.time >= MATCH.doubleElixirAt ? 2 : 1;
+    return phaseMult(state) * state.modFx.elixir;
+  }
+
+  // Elixir per second for one side (Fortress rules add a bonus per living building, up to 3)
+  function elixirRate(state, side) {
+    let m = elixirMultiplier(state);
+    const be = state.rules.buildingElixir;
+    if (be > 0) {
+      let n = 0;
+      for (const u of state.units) if (u.owner === side && u.building && u.hp > 0 && u.deployT <= 0) n++;
+      m *= 1 + be * Math.min(3, n);
+    }
+    return MATCH.elixirPerSec * m;
   }
 
   function timeLeft(state) {
-    const end = state.phase === 'overtime' ? MATCH.regulation + MATCH.overtime : MATCH.regulation;
+    const r = state.rules;
+    const end = state.phase === 'overtime' ? r.regulation + r.overtime : r.regulation;
     return Math.max(0, end - state.time);
   }
 
@@ -2639,11 +3432,15 @@
     const dt = dtIn || MATCH.step;
     if (!state.running) return;
     state.time += dt;
+    updateModifiers(state);
+    updateDeckSwaps(state);
+    updateWaves(state);
+    updateBossSpawn(state);
 
-    const mult = elixirMultiplier(state);
+    const maxElixir = state.rules.maxElixir;
     ['A', 'B'].forEach((side) => {
       const p = state.players[side];
-      p.elixir = clamp(p.elixir + MATCH.elixirPerSec * mult * dt, 0, MATCH.maxElixir);
+      p.elixir = clamp(p.elixir + elixirRate(state, side) * dt, 0, maxElixir);
     });
 
     buildHash(state);
@@ -2656,6 +3453,8 @@
     for (const t of state.towers) updateTower(state, t, dt);
     updateZones(state, dt);
     updateProjectiles(state, dt);
+    updateHill(state, dt);
+    updateBossPhases(state);
     processDeaths(state);
     updateClock(state);
   }
@@ -2677,8 +3476,17 @@
         evoPlayed: p.evoPlayed,
         // Evolution charge per equipped card: [charge, need]. Both players see both (like the real game).
         evo: Object.fromEntries(Object.keys(p.evo).map((id) => [id, [p.evo[id].charge, p.evo[id].need]])),
+        // What each card in hand (and next) costs right now, when an event changes it
+        cost: costsChanged ? Object.fromEntries(p.hand.concat(p.queue[0] ? [p.queue[0]] : []).map((id) => [id, playCost(state, p.side, id)])) : undefined,
+        size: Object.keys(p.size).length ? { ...p.size } : undefined,
+        // Card levels in hand during events (event decks can differ from your collection)
+        lvl: r.eventId ? Object.fromEntries(p.hand.map((id) => [id, p.cards[id] ? p.cards[id].level : 1])) : undefined,
+        kills: p.kills,
+        hill: p.hillCrowns || undefined,
       };
     };
+    const r = state.rules;
+    const costsChanged = r.cardMods.length > 0 || !!r.sizeRoll || state.modFx.cost !== 0 || state.modFx.costHeavy !== 0;
     const since = (t) => r2(Math.min(9, state.time - t));
     return {
       time: r2(state.time),
@@ -2688,6 +3496,9 @@
       phase: state.phase,
       timeLeft: r2(timeLeft(state)),
       double: elixirMultiplier(state) > 1,
+      elixirMult: r2(elixirMultiplier(state)),
+      maxElixir: r.maxElixir,
+      ev: eventSnapshot(state),
       units: state.units.map((u) => ({
         id: u.id, owner: u.owner, cardId: u.cardId,
         x: r2(u.x), y: r2(u.y),
@@ -2716,6 +3527,10 @@
         dv: u.evo && state.time - u.divedAt < 0.5 ? 1 : undefined,
         stk: u.em && u.em.stackHits && u.stack ? u.stack : undefined,
         rly: u.rally ? r2(u.rally) : undefined,
+        form: u.form || undefined,
+        boss: u.boss ? 1 : undefined,
+        mn: u.bossMinion ? 1 : undefined,
+        grd: u.boss && state.boss && state.boss.guard ? 1 : undefined,
       })),
       towers: state.towers.map((t) => ({
         id: t.id, owner: t.owner, tower: t.tower, x: t.x, y: t.y,
@@ -2729,6 +3544,10 @@
         age: r2(z.age), dur: r2(z.dur || 0), wait: z.delay > 0 ? r2(z.delay) : 0,
         back: z.returning ? 1 : undefined,
         evo: z.evo ? 1 : undefined,
+        // Event areas: their modifier, remaining time, and how long the warning lasts
+        mod: z.modId || undefined,
+        left: z.until != null ? r2(Math.max(0, z.until - state.time)) : undefined,
+        warn: z.warnDur || undefined,
       })),
       projectiles: state.projectiles.filter((p) => !(p.delay > 0)).map((p) => {
         const total = dist(p.sx, p.sy, p.tx, p.ty) || 1;
@@ -2743,6 +3562,49 @@
       }),
       players: { A: player(state.players.A), B: player(state.players.B) },
     };
+  }
+
+  // Event state the HUD needs: active and announced modifiers, hill, waves, boss, deck swaps
+  function eventSnapshot(state) {
+    const r = state.rules;
+    const out = {};
+    if (r.eventId) out.id = r.eventId;
+    if (r.modifiers.length) {
+      out.mods = state.mods.active.map((a) => ({ id: a.id, left: r2(Math.max(0, a.end - state.time)), dur: r2(a.end - a.start) }));
+      // Only modifiers inside the warning window are announced: nobody sees further ahead than that
+      const next = [];
+      for (let i = state.mods.next; i < r.modifiers.length; i++) {
+        const lead = r.modifiers[i].at - state.time;
+        if (lead > r.modWarn) break;
+        next.push({ id: r.modifiers[i].id, in: r2(Math.max(0, lead)) });
+      }
+      out.next = next;
+    }
+    if (state.hill) {
+      const cfg = r.hill;
+      const spot = cfg.spots[state.hill.idx];
+      const moveIn = cfg.every - (state.time % cfg.every);
+      const nextSpot = cfg.spots[(state.hill.idx + 1) % cfg.spots.length];
+      out.hill = {
+        x: spot.x, y: spot.y, r: cfg.r, points: cfg.points,
+        A: r2(state.hill.pts.A), B: r2(state.hill.pts.B), holder: state.hill.holder,
+        moveIn: cfg.spots.length > 1 ? r2(moveIn) : null, nx: nextSpot.x, ny: nextSpot.y,
+      };
+    }
+    if (r.waves) {
+      const nxt = r.waves[state.waveNo];
+      out.wave = { n: state.waveNo, total: r.waves.length, nextIn: nxt ? r2(Math.max(0, nxt.at - state.time)) : null, left: state.units.reduce((n, u) => n + (u.owner === 'B' && u.hp > 0 ? 1 : 0), 0) };
+    }
+    if (state.boss) {
+      const u = state.boss.id ? state.byId.get(state.boss.id) : null;
+      out.boss = {
+        cardId: r.boss.card, spawned: state.boss.spawned, inSec: state.boss.spawned ? 0 : r2(Math.max(0, r.boss.at - state.time)),
+        hp: u ? Math.round(Math.max(0, u.hp)) : 0, hpMax: u ? u.hpMax : 0,
+        guard: state.boss.guard ? 1 : 0, enraged: state.boss.enraged ? 1 : 0, phase: state.boss.summons,
+      };
+    }
+    if (r.deckSwaps.length && state.swapNo < r.deckSwaps.length) out.swapIn = r2(r.deckSwaps[state.swapNo].at - state.time);
+    return out;
   }
 
   function takeFx(state) {
@@ -2765,7 +3627,8 @@
       thinkT: 1.5,
       rand: rng,
       // What the AI has *seen* the opponent spend (it can't see their elixir, so it estimates)
-      foeElixir: MATCH.startElixir,
+      foeElixir: 5,
+      init: false,
       seenSeq: 0,
       emo: { init: false, mine: 3, theirs: 3, scanT: 0, peakThreat: 0, queued: null, lastAt: -99, seenEmoteT: -1, endDone: false },
     };
@@ -2776,7 +3639,9 @@
   // Track the opponent's elixir from what they visibly play (troops landing, spells flying)
   function trackFoeElixir(state, brain, dt) {
     const foe = enemyOf(brain.side);
-    brain.foeElixir = clamp(brain.foeElixir + MATCH.elixirPerSec * elixirMultiplier(state) * dt, 0, MATCH.maxElixir);
+    // It knows the rules everyone can read (start/max elixir, the visible elixir rate), not the opponent's bar
+    if (!brain.init) { brain.init = true; brain.foeElixir = state.rules.startElixir; }
+    brain.foeElixir = clamp(brain.foeElixir + MATCH.elixirPerSec * elixirMultiplier(state) * dt, 0, state.rules.maxElixir);
     let maxSeq = brain.seenSeq;
     for (const u of state.units) {
       if (u.owner !== foe) continue;
@@ -2869,14 +3734,26 @@
     };
   }
 
+  // A telegraphed hazard (meteor mark, boss slam) or the storm is about to hit this spot.
+  // Everyone sees these warnings on the arena, so avoiding them is fair play.
+  function hazardAt(state, x, y) {
+    for (const z of state.zones) {
+      if (z.done) continue;
+      if ((z.kind === 'impact' || (z.kind === 'slam' && z.owner !== 'X')) && z.delay > 0 && dist(x, y, z.x, z.y) <= z.r + 0.8) return true;
+      if (z.kind === 'storm' && dist(x, y, z.x, z.y) <= z.r + 1.5) return true;
+    }
+    return false;
+  }
+
   function findDeploySpot(state, side, card, x, y) {
-    if (canDeploy(state, side, x, y, card)) return { x, y };
+    const ok = (px, py) => canDeploy(state, side, px, py, card) && (card.spell || !hazardAt(state, px, py));
+    if (ok(x, y)) return { x, y };
     for (let ring = 0.5; ring <= 3; ring += 0.5) {
       for (let a = 0; a < 8; a++) {
         const ang = (a / 8) * Math.PI * 2;
         const px = clamp(x + Math.cos(ang) * ring, 0.6, W - 0.6);
         const py = clamp(y + Math.sin(ang) * ring, 0.6, H - 0.6);
-        if (canDeploy(state, side, px, py, card)) return { x: px, y: py };
+        if (ok(px, py)) return { x: px, y: py };
       }
     }
     return null;
@@ -3055,9 +3932,11 @@
         const { value: raw, count } = spellValue(state, brain, c, pt, ctx);
         // An evolved spell does more (burning ground, aftershock, homing rockets)
         let value = raw * (evoReady(state.players[side], c.id) ? 1.25 : 1);
+        // Arcane Surge / Spellstorm: spells hit harder right now, so they're worth casting sooner
+        value *= state.modFx.spellDmg * (1 + state.rules.spellEcho * 0.6);
         // Prefer clearing threats on our own side of the river
         if (ownHalf(side, pt.y) && kind !== 'spawn') value *= 1.15;
-        const need = c.cost * (smart ? 1.05 : 1.5);
+        const need = playCost(state, side, c.id) * (smart ? 1.05 : 1.5);
         const enough = kind === 'spawn' || kind === 'haste' || kind === 'heal' ? count >= 1 : (count >= 2 || value >= 20);
         if (enough && value >= need && (!best || value - c.cost > best.score)) {
           best = { cardId: c.id, x: clamp(pt.x, 0.6, W - 0.6), y: clamp(pt.y, 0.6, H - 0.6), score: value - c.cost };
@@ -3071,7 +3950,7 @@
     const side = brain.side;
     const foe = enemyOf(side);
     const p = state.players[side];
-    const options = p.hand.map((id) => p.cards[id]).filter((c) => c && c.cost <= p.elixir && (p.cooldowns[c.id] || 0) <= state.time);
+    const options = p.hand.map((id) => p.cards[id]).filter((c) => c && playCost(state, side, c.id) <= p.elixir && (p.cooldowns[c.id] || 0) <= state.time);
     if (options.length === 0) return null;
     const troops = options.filter((c) => !c.spell);
 
@@ -3110,10 +3989,34 @@
       }
     }
 
+    // Read the event: what's on now (and what has been announced) changes how freely it spends
+    const fx = state.modFx;
+    const scale = state.rules.maxElixir / 10;
+    const cheapNow = fx.cost < 0 || fx.costHeavy < 0 || fx.elixir > 1.2;
+    const conserve = fx.elixir < 1 || (state.rules.killRefund > 0 && !cheapNow);
+
+    // King of the Hill: keep a presence on the hill
+    const hill = state.hill && state.rules.hill;
+    if (hill) {
+      const spot = hill.spots[state.hill.idx];
+      const mineOnHill = (state.hill.power && state.hill.power[side]) || 0;
+      const foeOnHill = (state.hill.power && state.hill.power[foe]) || 0;
+      if (mineOnHill <= foeOnHill && p.elixir >= 3.5 * scale) {
+        const contester = troops.filter((c) => !c.building && c.targets !== 'air' && !c.anywhere)
+          .sort((a, b) => (foeOnHill > 0 ? dps(b) - dps(a) : a.cost - b.cost))[0];
+        if (contester) {
+          const spotOk = findDeploySpot(state, side, contester, spot.x, side === 'A' ? RIVER.y1 + 1 : RIVER.y0 - 1);
+          if (spotOk) return { cardId: contester.id, x: spotOk.x, y: spotOk.y };
+        }
+      }
+    }
+
     // 2) Offense: build a push in the weaker enemy lane; don't sit at full elixir
     const enemyPrincesses = [princessOf(state, foe, 0), princessOf(state, foe, 1)];
+    if (!enemyPrincesses[0] || !enemyPrincesses[1]) return null; // nothing to attack (survival / boss)
     let attackLane = 0;
-    if (enemyPrincesses[0].hp <= 0) attackLane = 0;
+    if (hill) attackLane = hill.spots[state.hill.idx].x < MID_X ? 0 : 1;
+    else if (enemyPrincesses[0].hp <= 0) attackLane = 0;
     else if (enemyPrincesses[1].hp <= 0) attackLane = 1;
     else attackLane = enemyPrincesses[0].hp / enemyPrincesses[0].hpMax <= enemyPrincesses[1].hp / enemyPrincesses[1].hpMax ? 0 : 1;
     const laneX = TOWER_LAYOUT.princessX[attackLane];
@@ -3126,12 +4029,12 @@
       if (survivors.reduce((sum, u) => sum + u.costShare * (u.hp / u.hpMax), 0) >= 3.5) tank = survivors[0];
     }
 
-    const leaking = p.elixir >= brain.profile.leakAt;
+    const leaking = p.elixir >= brain.profile.leakAt * scale;
     const doubleTime = elixirMultiplier(state) > 1;
     // Punish when the opponent has (visibly) just spent a lot
     const foeLow = brain.foeElixir < 3;
-    const aggression = Math.min(0.95, brain.profile.aggression * (doubleTime ? 1.5 : 1) + (foeLow ? 0.3 : 0));
-    const wantsPush = leaking || (p.elixir >= (foeLow ? 5 : 7) && brain.rand() < aggression);
+    const aggression = Math.min(0.95, brain.profile.aggression * (doubleTime ? 1.5 : 1) + (foeLow ? 0.3 : 0) + (cheapNow ? 0.25 : 0) - (conserve ? 0.2 : 0));
+    const wantsPush = leaking || (p.elixir >= (foeLow ? 5 : 7) * scale && brain.rand() < aggression);
     const calm = lanes[0].threatValue + lanes[1].threatValue < 0.5;
 
     // An elixir pump when things are quiet (and only one at a time)
@@ -3193,6 +4096,13 @@
         const spot = findDeploySpot(state, side, spawner, s.x, s.y);
         if (spot) return { cardId: spawner.id, x: spot.x, y: spot.y };
       }
+      // A hand of nothing but spells (spell-heavy event decks): chip the weaker tower instead of
+      // sitting at full elixir, which also cycles the hand toward troops. Events only, so normal
+      // battles keep exactly the AI they always had.
+      const chip = !state.rules.eventId ? null : options.filter((c) => c.spell && !c.friendly && (c.dmg > 0 || (c.zone && c.zone.kind === 'spawn')))
+        .sort((a, b) => playCost(state, side, a.id) - playCost(state, side, b.id))[0];
+      const tower = enemyPrincesses[attackLane].hp > 0 ? enemyPrincesses[attackLane] : state.towers.find((t) => t.owner === foe && t.tower === 'king' && t.hp > 0);
+      if (chip && tower) return { cardId: chip.id, x: tower.x, y: tower.y };
     }
     return null;
   }
@@ -3294,5 +4204,6 @@
     createAi, aiUpdate, aiDecide, buildAiDeck, aiEvoPicks,
     TOKEN_CARDS, MAX_ARENA,
     EVOLUTIONS, EVO_RULES, evolutionOf, evoReady, evolvedStats,
+    DEFAULT_RULES, normalizeRules, MODIFIERS, MOD_STACK, MOD_CAPS, combineModFx, playCost, SIZE_FORMS, cardMatches, applyCardMods,
   };
 });

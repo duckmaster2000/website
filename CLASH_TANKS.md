@@ -14,10 +14,12 @@ Notes on the prototype tank game at `caleb-liu.com/prototype.html`: what was cha
 | Trophy Road screen, rank display, deck editor | `prototype_road.js` | Browser |
 | **Evolution progression rules**: shards, Wild Shards, unlocks, slot validation | `clash-tanks-server/clash-tanks-server/shared/evo-progress.js` | Browser (tested in Node) |
 | Evolution collection, unlock celebration, deck-slot toggles, hand indicator | `prototype_evo.js` | Browser |
+| **Special events rules**: catalog, Chaos scheduler, deck rules/draft, rotation, rewards, challenges, achievements, save clean-up | `clash-tanks-server/clash-tanks-server/shared/events.js` | Browser **and** server (Online) |
+| Event Hub, event details, Draft screen, in-battle event bar, event results | `prototype_events.js` | Browser |
 | Emote artwork (animated faces drawn with canvas paths) | `prototype_emotes.js` | Browser |
 | Page logic (menus, progression, chests, decks, lobby, input, sound) | `prototype_v4.js`, `prototype.html`, `prototype.css` | Browser |
 | Online server (matchmaking, rooms, runs the engine) | `clash-tanks-server/clash-tanks-server/server.js` | Render |
-| Tests | `clash-tanks-server/clash-tanks-server/test/*.test.js` (sim, trophy, evolution, evo-progress) | `npm test` |
+| Tests | `clash-tanks-server/clash-tanks-server/test/*.test.js` (sim, trophy, evolution, evo-progress, events) | `npm test` |
 
 **One engine for every mode.** Local PvP, vs AI and Online all use the same `clash-sim.js`, so they always play by identical rules. Change gameplay **only** in that file. Don't put a second copy of the rules in the server.
 
@@ -39,8 +41,10 @@ The page loads the engine straight from the server folder (`<script src="clash-t
    - `prototype_arena.js`
    - `prototype_emotes.js`
    - `prototype_road.js`
-   - `prototype_evo.js` (new)
-   - `clash-tanks-server/clash-tanks-server/shared/evo-progress.js` (new)
+   - `prototype_evo.js`
+   - `prototype_events.js` (new)
+   - `clash-tanks-server/clash-tanks-server/shared/evo-progress.js`
+   - `clash-tanks-server/clash-tanks-server/shared/events.js` (new; the server needs it too)
    - `clash-tanks-server/clash-tanks-server/shared/`
    - `clash-tanks-server/clash-tanks-server/test/`
 2. Render redeploys the server by itself.
@@ -298,6 +302,76 @@ Mirror matches (same deck both sides, only one side has the Evolution, 240 AI-vs
 4. Optional: a `theme-evo-<theme>` colour in `prototype.css`, an effect in `prototype_arena.js` (`addFx`/`drawEffects`), and a sound in `Sound` (`prototype_v4.js`).
 5. Optional: shards on the Trophy Road (`EVO_STOPS` in `shared/trophy-road.js`, at an unused trophy count).
 6. Add a test in `test/evolution.test.js` and run the mirror-match check (see Testing) to keep it around 50–60%.
+
+### 12. Special events (Chaos Mode, rotating events, boss, survival, weekly challenges)
+Open them with **🎪 Events** in the top bar. Battle rules live in the shared engine, so every event that can be played in more than one mode plays identically in **vs AI, Local PvP and Online**.
+
+#### How it is built
+- **Per-match rules (engine).** `createMatch({ rules })` gives every match its own cleaned copy of `DEFAULT_RULES` (`normalizeRules`), stored on `state.rules`. The clock, elixir phases, max/start elixir, crown races, timeouts, card mods, Evolution rules, kill refunds, knockback, spell echoes, Size Roulette, deck swaps, the hill, waves, the boss and timed modifiers are all read from there. Nothing global changes, so a normal battle after an event is a normal battle. **Verified:** 180 normal AI-vs-AI matches play out identically (to 1/100) on the old and new engine, and a golden-result test locks this in.
+- **Events are data** (`shared/events.js`, `EVENTS`): name, rules text, win/loss text, deck rules, modes, schedule, tiers, rewards, and a `build(ctx)` that returns engine rules (+ decks for draft/mirror/roulette). The engine never sees event names.
+- **Timed modifiers** (`MODIFIERS` in `clash-sim.js`): 23 modifiers in 7 categories. Each has a duration, severity, weight, optional `group` (only one per group at a time), effect contributions (`fx`), optional mirrored zones and a one-off `start`. Effects combine through a fixed policy per effect (`MOD_STACK`: multiply / add / highest-wins) and are clamped (`MOD_CAPS`), and are re-read every step instead of saving and restoring stats. The same modifier again only refreshes its timer.
+- **Chaos schedule** (`buildChaosSchedule`): picked before the match from the seed with weighted selection, max-active, one-per-group, ≤2 per category, excluded pairs, no recent repeats, a gentle first pick, Evolution modifiers only when someone has an Evolution, and nothing past full time. Online the **server** builds it (clients only see it through snapshots: active modifiers and the ones inside the 4 s warning window).
+- **Fairness:** battlefield zones are point-mirrored, hazards land in mirrored pairs, global effects hit both sides, event towers are the same for both sides (no AI HP bonus), and decks the event hands out are at the same level for both sides (your average level; online, the average of both players).
+- **Rotation** (`rotation(now)`): permanent events (Chaos, Boss Battle, Last Stand), 4 daily events from the rotating pool (different categories, never yesterday's events), a weekly challenge (alternates Chaos Gauntlet / Rising Ladder), Chaos featured at weekends, tomorrow's line-up shown. Derived from the UTC date.
+- **Progress** (`state.progress.events`, saved with the rest): records per event, daily reward counters, settled match ids, the pending match, challenge runs, achievements, badges and the chosen title. `settleMatch` applies a result at most once per match id; `normalizeProgress` cleans old or broken saves (unknown events dropped, numbers clamped).
+
+#### Events
+| Event | Modes | What changes |
+|---|---|---|
+| 🌀 **Chaos Mode** (Mild / Wild / Extreme / Total) | AI, PvP, Online | Timed modifiers; higher tiers = more, overlapping, wilder ones; Total adds a match-long Chaos Law. Win a tier to unlock the next. |
+| ⚗️ Elixir Overload | AI, PvP, Online | Start 7, 2× elixir, 3× in the last minute |
+| ⚔️ Sudden Death | AI, PvP, Online | First tower wins; 2:30, 1.5× elixir, no overtime |
+| 🃏 Draft Duel | AI | 8 rounds of 2 cards: keep one, the AI gets the other |
+| 🪞 Mirror Match | AI, PvP, Online | Both sides get the same random deck (and Evolution) |
+| 🎡 Deck Roulette | AI, PvP, Online | Random decks, both replaced at 2:00 and 1:00 left |
+| 🦴 Scavenger | AI, PvP, Online | 0.55× elixir; kills refund 45% of the troop's cost |
+| 🌩️ Spellstorm | AI, PvP, Online | 3+ spells, spells −1 cost, damage spells echo at 50% |
+| 🐜 Swarm Wars | AI, PvP, Online | Swarm troops only, swarms +50% units, splash −25% |
+| 🦣 Heavyweights | AI, PvP, Online | Nothing under 3 elixir, max elixir 14, tanks +15% speed |
+| 🏯 Fortress Wars | AI, PvP, Online | 2+ buildings, buildings cheaper/tougher/longer, +12% elixir each |
+| ⛰️ King of the Hill | AI, PvP, Online | Hold the hill (hops between bridges) to fill a meter worth a crown; 3 crowns wins |
+| 🎱 Pinball Panic | AI, PvP, Online | Single-target hits knock ground troops back; troops +15% speed |
+| 🎲 Size Roulette | AI, PvP, Online | Each troop card in hand rolls Tiny / Normal / Mega (shown on the card) |
+| ✦ Evolution Frenzy | AI, PvP, Online | Every Evolution card evolved-capable for the match, cycles −1 |
+| 🛡️ Last Stand | AI | 10 scripted waves (weekly), dwindling elixir, no enemy towers, scored |
+| 🤖 Boss Battle (Normal / Hard / Nightmare) | AI | Iron Colossus: telegraphed slams, guard summons (½ damage while alive), enrage, resists stuns; scored |
+| 🌪️ Chaos Gauntlet / 🪜 Rising Ladder | AI (weekly) | 5-round runs with 3 lives; round and final prizes once a week |
+
+Boss and survival levels follow your average card level (boss Hard +3, Nightmare +4). Tuned with AI runs: the AI beats Last Stand ~75% of the time, the boss ~70% (Normal), ~20% (Hard), ~4% (Nightmare).
+
+#### Rewards and the rules around them
+- Gold for playing (6 a day per event) and for wins (3 rewarded wins a day per event, scaled by AI difficulty), a one-time first-win prize per event/tier (gold, chest, sometimes Wild Shards), win milestones, challenge prizes, 12 event achievements and 10 cosmetic badges (pick one as your nameplate title). Event matches replace the normal battle rewards (no double pay) and never touch trophies.
+- **No rewards, records or unlocks:** local PvP events (one device), matches where an online opponent leaves in the first 30 s (shown as "No contest"). **No rewards or achievements:** admin mode and the `?events=all` dev override.
+- **Leaving:** once you play a card, closing the page or starting something else counts as a loss (once). In a challenge that costs a life. Leaving before playing a card is free.
+- **Online:** event queues are separate per event and tier (`join_queue` / `create_room` take `eventId`, `tier`). The server refuses events that aren't online events or aren't open by its own clock, builds the whole config itself, swaps illegal decks for a legal loaner (`deck_loaner`), and marks event matches casual.
+
+#### Adding a special event
+1. Add an entry to `EVENTS` in `shared/events.js`: `id`, `name`, `icon`, `art`, `category`, `difficulty`, `deck` (`own`/`draft`/`mirror`/`roulette`), `modes`, `schedule`, texts (`tagline`, `desc`, `rules`, `win`, `loss`, `random`, `fixed`), `rewards`, optional `deckRules`, `tiers`, `score`.
+2. Write `build(c)` returning `{ rules }` using existing engine rules (see `DEFAULT_RULES`). Only add a new engine rule when nothing fits; add it to `DEFAULT_RULES` and `normalizeRules`, then implement it where the engine already handles that concern.
+3. Add an `art-<name>` gradient in `prototype.css`.
+4. Run `npm test`: the catalog test builds every event and tier; add a test for any new rule.
+
+#### Adding a Chaos modifier
+1. Add an entry to `MODIFIERS` in `shared/clash-sim.js`: `name`, `icon`, `cat`, `sev`, `dur`, `weight`, `desc`, optional `group`, `needs`, and its effect: `fx` (existing keys in `MOD_STACK`), `zones` (existing kinds `cHaste`, `cSlow`, `cHeal`, `storm`, `meteorField`; `mirror: true` for fairness) and/or `start`.
+2. A new effect key needs a `MOD_STACK` policy, a `MOD_CAPS` range, and one hook where that value is used (look at how `move`, `dmgIn` or `towerAtk` are read).
+3. Add conflicts to `CHAOS_EXCLUDE` in `shared/events.js` if it must never pair with something.
+4. Optional: drawing in `drawEventZone` (`prototype_arena.js`) and a sound in `Sound`.
+5. Run `npm test`: the schedule test checks every limit for every tier over 250 seeds.
+
+#### Testing done (step 12)
+- **130 automated tests** (`npm test`, 43 new in `test/events.test.js`): defaults and no-leak, rule clean-up, every elixir rule, card mods, spell echoes, Size Roulette, deck swaps, Evolution Frenzy, sudden death, the hill (filling, contesting, moving, crown race), survival waves/guard line/timeouts, the boss (telegraph, guards, enrage, immunities, both endings), modifier lifecycle/warnings/clean-up/stacking/caps, cost floors, meteors (mirrored, both sides, towers spared, nothing after the final whistle), bounded crowd fights, Aegis and Evolution Rush, deterministic AI-vs-AI Chaos at every tier, every PvP event in a full AI-vs-AI match with legal moves, the AI in survival/boss, hazard avoidance, the catalog, deck validation and loaners (60 seeds per event), the draft, Chaos schedule limits (250 seeds × 4 tiers), rotation (60 days), duplicate results, daily caps, PvP/void/abandon policies, tier unlocks, challenge runs and weekly prizes, achievements/badges/milestones, scores, save clean-up, performance (a ~110-unit fight costs ~0.5–0.6 ms per 50 ms step with or without four stacked modifiers), and the golden normal-battle regression.
+- **Headless Chrome:** hub → details → Chaos match → modifiers in the event bar → engaged → win → rewards, save and tier unlock → next normal battle is clean; Total Chaos AI-vs-AI; boss (guard, bar), King of the Hill, Size Roulette badges, Last Stand, the draft flow, an illegal Spellstorm deck (explained, then a loaner), a challenge run with a reload mid-round (one life lost, once) and "next round" from the results, local PvP (nothing recorded), a failed event start (back to a normal battle), a corrupted save, rapid event switching, meteor telegraphs, and 375 px phone screens (no horizontal scrolling). No console errors.
+- **Two-window online:** server refuses PvE/closed/unknown events; both players get the same server-built Chaos match and see the same modifier at the same time; card plays mark the match engaged; a forfeit after 30 s pays once, an early one is "No contest"; an illegal Fortress Wars deck gets a server loaner and the discounted building costs reach the client.
+- **AI-vs-AI fairness (40 matches per event, decks swapped between sides):** no event or tier shows a side bias beyond what normal battles already have (the existing engine/AI favours side B slightly: 32–43 on the same seeds with the original engine).
+
+#### Known limitations
+- **No accounts:** event progress and rewards are client-side like everything else, so a determined player can edit their save. The server validates event availability, deck legality and the whole battle, but not rewards.
+- **The schedule follows each device's clock** (UTC date). It is the same for everyone with a correct clock, but it is not pushed from a server, and changing the clock shows another day's line-up (one-time rewards still can't be claimed twice).
+- **Draft Duel is vs AI only** (an online draft would need a synchronised draft phase). **Boss Battle, Last Stand and the challenges are single player**; there is no co-op mode.
+- **No leaderboards:** scores and records are personal bests.
+- Balance comes from AI-vs-AI runs, which don't play like people (they don't really dodge telegraphs or plan around announced modifiers beyond simple rules). Expect retuning from real play.
+- The AI plays only the visible information (active and announced modifiers, telegraphs); it does not plan ahead for Deck Roulette swaps or Size Roulette forms.
+- The AI has a pre-existing habit of idling at full elixir when its whole hand is spells; it's fixed for event matches only, so normal battles stay byte-for-byte as before.
 
 ### 10. Fix: placing a swarm froze the game
 Swarm members land a moment apart, which made the drop-in animation compute a negative shadow size; the canvas threw and the frame loop stopped. The renderer now clamps it, and the frame loop keeps running even if a frame throws (the error is logged).

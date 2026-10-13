@@ -19,6 +19,7 @@ function escapeHtml(s) {
 
 // Nameplate line under each player's name
 function rankLine(side) {
+  if (state.eventMatch || (state.viewSource === 'online' && onlineMatch && onlineMatch.eventId)) return eventRankLine(side);
   const road = state.progress.road;
   const online = state.viewSource === 'online';
   const isMe = online ? side === mySide : side === 'A';
