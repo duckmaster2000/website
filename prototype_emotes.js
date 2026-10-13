@@ -13,15 +13,37 @@
     { id: 'angry', name: 'Grrr!', starter: true },
     { id: 'surprised', name: 'Whoa!', starter: true },
     { id: 'gg', name: 'Good game', starter: true },
-    { id: 'celebrate', name: 'Party!', starter: false },
-    { id: 'cool', name: 'Too easy', starter: false },
-    { id: 'facepalm', name: 'Seriously?', starter: false },
-    { id: 'king', name: 'King laugh', starter: false },
+    { id: 'celebrate', name: 'Party!', starter: true },
+    { id: 'cool', name: 'Too easy', starter: true },
+    { id: 'facepalm', name: 'Seriously?', starter: true },
+    { id: 'king', name: 'King laugh', starter: true },
     // Trophy Road emotes
-    { id: 'heart', name: 'Love it', starter: false },
-    { id: 'thinking', name: 'Hmm…', starter: false },
-    { id: 'sleepy', name: 'Zzz', starter: false },
-    { id: 'trophy', name: 'Champion', starter: false },
+    { id: 'heart', name: 'Love it', starter: true },
+    { id: 'thinking', name: 'Hmm…', starter: true },
+    { id: 'sleepy', name: 'Zzz', starter: true },
+    { id: 'trophy', name: 'Champion', starter: true },
+    { id: 'fire', name: 'On fire!', starter: true, emoji: '🔥' },
+    { id: 'skull', name: 'Rekt', starter: true, emoji: '💀' },
+    { id: 'clap', name: 'Well played', starter: true, emoji: '👏' },
+    { id: 'wave', name: 'Hi!', starter: true, emoji: '👋' },
+    { id: 'sweat', name: 'Close one', starter: true, emoji: '😅' },
+    { id: 'mindblown', name: 'Mind blown', starter: true, emoji: '🤯' },
+    { id: 'rocket', name: 'To the moon', starter: true, emoji: '🚀' },
+    { id: 'crown', name: 'Crown me', starter: true, emoji: '👑' },
+    { id: 'shield', name: 'Defended!', starter: true, emoji: '🛡️' },
+    { id: 'boom', name: 'Boom!', starter: true, emoji: '💥' },
+    { id: 'sad', name: 'Oh no', starter: true, emoji: '😢' },
+    { id: 'wink', name: 'Hehe', starter: true, emoji: '😉' },
+    { id: 'eyes', name: 'I see you', starter: true, emoji: '👀' },
+    { id: 'sorry', name: 'Oops', starter: true, emoji: '🙏' },
+    { id: 'flex', name: 'Strong!', starter: true, emoji: '💪' },
+    { id: 'zap', name: 'Zap!', starter: true, emoji: '⚡' },
+    { id: 'ice', name: 'Chill', starter: true, emoji: '🧊' },
+    { id: 'ghost', name: 'Boo!', starter: true, emoji: '👻' },
+    { id: 'popcorn', name: 'Watching', starter: true, emoji: '🍿' },
+    { id: 'think2', name: 'Plotting', starter: true, emoji: '😈' },
+    { id: 'lol', name: 'LOL', starter: true, emoji: '🤣' },
+    { id: 'salute', name: 'Respect', starter: true, emoji: '🫡' },
   ];
 
   const INK = '#5b3200';
@@ -549,8 +571,26 @@
     },
   };
 
+  // Simple emotes: an animated emoji on a glowing badge
+  function emojiArt(g, ch, cx, cy, R, t) {
+    const bob = Math.sin(t * 4) * R * 0.08;
+    const pulse = 1 + Math.sin(t * 6) * 0.05;
+    const grad = g.createRadialGradient(cx, cy, R * 0.1, cx, cy, R);
+    grad.addColorStop(0, 'rgba(255,255,255,0.35)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grad;
+    g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.fill();
+    g.font = `${Math.round(R * 1.45 * pulse)}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`;
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.translate(cx, cy + bob);
+    g.rotate(Math.sin(t * 3) * 0.08);
+    g.fillText(ch, 0, R * 0.08);
+  }
+
   function draw(g, id, cx, cy, R, t) {
-    const fn = ART[id];
+    const meta = EMOTES.find((e) => e.id === id);
+    const fn = ART[id] || (meta && meta.emoji ? (gg, x, y, r, tt) => emojiArt(gg, meta.emoji, x, y, r, tt) : null);
     if (!fn) return;
     g.save();
     fn(g, cx, cy, R, t || 0);

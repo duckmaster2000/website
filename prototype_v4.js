@@ -223,6 +223,12 @@ function unlockInitial() {
   // Everyone gets the basic defensive building so that role is available from the start
   const turret = cardProgress('boltturret');
   if (!turret.unlocked) { turret.unlocked = true; turret.copies += 1; }
+  // ...the new cards (one version each), so they show up and can go in a deck right away
+  CARD_LIBRARY.forEach((c) => {
+    if (!c.solo || c.token) return;
+    const cp = cardProgress(c.id);
+    if (!cp.unlocked) { cp.unlocked = true; cp.copies += 1; }
+  });
   // ...and the spells
   SPELL_IDS.forEach((id) => {
     const cp = cardProgress(id);
@@ -2567,7 +2573,7 @@ function unlockPrototype() {
   if (!state.progress.road.seenNews) {
     state.progress.road.seenNews = 1;
     saveProgress();
-    setTimeout(() => toast('🏆', 'New: Trophy Road!', 'Win ranked battles to climb 10 arenas and unlock 28 new cards, emotes and chests.'), 1500);
+    setTimeout(() => toast('🏆', 'New: Trophy Road!', '28 new cards and 36 emotes are unlocked for you. Win ranked battles to climb 10 arenas for gold and chests.'), 1500);
   }
   if (!state.progress.seenSpellNews) {
     state.progress.seenSpellNews = true;

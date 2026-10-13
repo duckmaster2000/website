@@ -302,6 +302,10 @@ Mirror matches (same deck both sides, only one side has the Evolution, 240 AI-vs
 ### 10. Fix: placing a swarm froze the game
 Swarm members land a moment apart, which made the drop-in animation compute a negative shadow size; the canvas threw and the frame loop stopped. The renderer now clamps it, and the frame loop keeps running even if a frame throws (the error is logged).
 
+### 11. Fix: new cards hidden, few emotes
+- **New cards:** the 28 new cards were all locked behind the Trophy Road (300–5000 🏆), so on a normal save they only appeared greyed out at the bottom of the collection. They're now unlocked for everyone on load (old saves too). Their Trophy Road milestones now give +4 copies instead.
+- **Emotes:** all 14 original emotes are free, and 22 new animated emoji emotes were added (36 in total). The ids are in `Sim.EMOTE_IDS` (the server checks against them) and the art is in `prototype_emotes.js` (an `emoji` field draws an animated badge). The emote wheel scrolls.
+
 ## Testing done
 
 - **Step 11 (Evolutions):** 87 automated tests (`npm test`): the cycle (exact evolve pattern, reset, independent charges, failed plays never advance it, unequipped never evolves, fresh per match), deck slot limits, one test per Evolution ability, core-rule interactions (air targeting, freeze, building expiry), a heavy battle with every Evolution at once (stays fast, no runaway spawns), shard/Wild Shard/unlock/overflow/equip rules, save clean-up, and Trophy Road shard stops. Headless Chrome: claim → unlock celebration → equip (locked, full and success feedback) → ranked match charging → ready glow → evolved deploy → saved across reload; a staged battle with all 15 Evolutions and evolved spells (no errors); an AI match with Evolutions on both sides; online: server caps a tampered 3-Evolution deck at 2, both clients see charges, and the third Brawler comes out evolved on the server. Earlier sweeps (Trophy Road, all cards, swarm freeze) re-run clean.

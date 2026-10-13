@@ -45,7 +45,8 @@
   const PROJ_SPEED = { slug: 13, spark: 15, shell: 10, mortar: 6, beam: 26, flare: 11, arrow: 15, bolt: 13, pulse: 12, firebomb: 15, rocket: 17, flak: 16, ice: 13, zap: 30 };
 
   // Emotes: ids only (the art lives in the browser). Rate limits keep them fun, not spammy.
-  const EMOTE_IDS = ['laugh', 'thumbs', 'cry', 'angry', 'surprised', 'celebrate', 'facepalm', 'cool', 'gg', 'king', 'trophy', 'sleepy', 'heart', 'thinking'];
+  const EMOTE_IDS = ['laugh', 'thumbs', 'cry', 'angry', 'surprised', 'celebrate', 'facepalm', 'cool', 'gg', 'king', 'trophy', 'sleepy', 'heart', 'thinking',
+    'fire', 'skull', 'clap', 'wave', 'sweat', 'mindblown', 'rocket', 'crown', 'shield', 'boom', 'sad', 'wink', 'eyes', 'sorry', 'flex', 'zap', 'ice', 'ghost', 'popcorn', 'think2', 'lol', 'salute'];
   const EMOTE_RULES = { minGap: 2, window: 20, maxInWindow: 5 };
 
   // ─── Cards ───────────────────────────────────────────────────────────────

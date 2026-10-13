@@ -1682,6 +1682,8 @@ body.mode-ai #ptAiDeckPanel {
   to { opacity: 1; transform: translateX(-50%) scale(1); }
 }
 .emote-grid {
+  max-height: 260px;
+  overflow-y: auto;
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0.35rem;
