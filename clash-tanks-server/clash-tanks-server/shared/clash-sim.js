@@ -42,6 +42,10 @@
     deployTime: 1,          // troops can't act for this long after landing
   };
 
+  // Timers run down in float steps of MATCH.step: 0.3 - 6 x 0.05 leaves ~1e-17, not 0. Comparing
+  // against this instead of 0 makes a 0.3 s wind-up land on its 6th step, not a step late.
+  const TIME_EPS = 1e-6;
+
   const PROJ_SPEED = { slug: 13, spark: 15, shell: 10, mortar: 6, beam: 26, flare: 11, arrow: 15, bolt: 13, pulse: 12, firebomb: 15, rocket: 17, flak: 16, ice: 13, zap: 30 };
 
   // Emotes: ids only (the art lives in the browser). Rate limits keep them fun, not spammy.
@@ -900,6 +904,15 @@
     for (const t of state.towers) if (t.hp > 0) add(t);
   }
 
+  // Something that appears between rebuilds (a troop deployed between steps, a token spawned
+  // mid-step) joins the hash at once, so a spell cast on the same tick can still hit it
+  function hashInsert(state, e) {
+    if (!state.hash) return;
+    const c = clamp(Math.floor(e.x / HASH_CELL), 0, HASH_COLS - 1);
+    const r = clamp(Math.floor(e.y / HASH_CELL), 0, HASH_ROWS - 1);
+    state.hash[r * HASH_COLS + c].push(e);
+  }
+
   // Calls fn(entity) for everything whose centre may lie within r (+ the largest body radius)
   function queryHash(state, x, y, r, fn) {
     const reach = r + 2;
@@ -1303,6 +1316,8 @@
       projectiles: [],
       zones: [],             // lingering spell areas (poison, tar, heal, pull, ...)
       castLog: [],           // recent spell casts { seq, owner, cost } (the AI reads what it could see)
+      playLog: [],           // every card played, in order { n, owner, cardId, at, swap }: public, both players see it
+      playSeq: 0,
       fx: [],
       lastEmote: null,
       players: {},
@@ -1458,6 +1473,7 @@
       retargetT: 0,
       atkCd: 0,
       windupT: 0,
+      windupTarget: null,
       lastAtkT: -9,
       hitT: -9,
       lastAttackerId: null,
@@ -1502,6 +1518,7 @@
     if (u.kind === 'troop') applyModToUnit(state, u, true);
     state.units.push(u);
     state.byId.set(u.id, u);
+    hashInsert(state, u);
     return u;
   }
 
@@ -1584,6 +1601,8 @@
     p.elixir = Math.max(0, p.elixir - cost);
     p.cooldowns[cardId] = state.time + stats.deployCdScaled;
     p.cardsPlayed += 1;
+    state.playLog.push({ n: ++state.playSeq, owner: side, cardId, at: state.time, swap: state.swapNo });
+    if (state.playLog.length > 40) state.playLog.shift();
     const form = p.size[cardId] || null;
 
     // Evolution cycle: only a play that passed every check above counts. A charged card comes
@@ -1782,7 +1801,8 @@
     for (const k of [1, 0.5, 0.25]) {
       const nx = clamp(e.x + dx * amount * k, e.radius, W - e.radius);
       const ny = clamp(e.y + dy * amount * k, e.radius, H - e.radius);
-      if (e.air || walkablePoint(state.nav, nx, ny, jump)) {
+      // The whole shove must stay on open ground, not just where it lands (no hopping obstacles)
+      if (e.air || (walkablePoint(state.nav, nx, ny, jump) && lineClear(state.nav, e.x, e.y, nx, ny, jump))) {
         e.x = nx;
         e.y = ny;
         e.path = null;
@@ -2125,8 +2145,10 @@
   }
 
   function updateTargeting(state, u, dt) {
+    const prevId = u.targetId;
+    let why = null;
     let t = u.targetId ? state.byId.get(u.targetId) : null;
-    if (t && !canTarget(u, t)) t = null;
+    if (t && !canTarget(u, t)) { t = null; why = 'previous target gone'; }
     if (!t) u.locked = false;
     // Locked targets are kept until they die or step well out of range (no flip-flopping)
     if (u.locked && t) {
@@ -2142,14 +2164,60 @@
       const candidate = seen || (u.building || u.targets === 'air' ? null : defaultTarget(state, u));
       if (!t) {
         t = candidate;
+        if (t) why = seen ? (seen.mech && seen.mech.taunt ? 'taunted' : 'nearest in sight') : 'marching on tower';
       } else if (candidate && candidate !== t) {
         const tVisible = edgeDist(u, t) <= sight;
         // Hysteresis: only switch to a clearly closer target, or when the current one is out of sight
-        if (!tVisible || edgeDist(u, candidate) < edgeDist(u, t) - 0.75) t = candidate;
+        if (!tVisible || edgeDist(u, candidate) < edgeDist(u, t) - 0.75) {
+          why = !tVisible ? 'old target out of sight' : 'clearly closer target';
+          t = candidate;
+        }
       }
     }
     u.targetId = t ? t.id : null;
+    // Diagnostics only (explainTargeting): why the current target was picked, and since when
+    if (u.targetId !== prevId) { u.targetWhy = u.targetId ? why : why || 'nothing to target'; u.targetSince = state.time; }
     return t;
+  }
+
+  /**
+   * Read-only report of how a unit sees its targets: its current target and why, the ranges it
+   * uses, and every enemy it looked at with the reason each was or wasn't eligible. Changes nothing
+   * (no random draws), so it is safe to call from a debug overlay or a test at any time.
+   */
+  function explainTargeting(state, unitId) {
+    const u = state.byId.get(unitId);
+    if (!u) return null;
+    if (u.kind === 'tower') {
+      const t = u.targetId ? state.byId.get(u.targetId) : null;
+      return { id: u.id, tower: u.tower, active: !!u.active, range: u.range, target: t ? t.id : null, cooldown: r2(Math.max(0, u.atkCd)) };
+    }
+    const sight = u.building ? u.range : u.sight;
+    const candidates = [];
+    const ents = state.units.concat(state.towers);
+    for (const e of ents) {
+      if (e === u || e.owner === u.owner || e.hp <= 0) continue;
+      const d = edgeDist(u, e);
+      let reject = null;
+      if (e.hidden) reject = 'burrowed';
+      else if (u.targets === 'none') reject = 'never attacks';
+      else if (u.targets === 'air' && !e.air) reject = 'only hits air';
+      else if (e.air && u.targets !== 'any' && u.targets !== 'air') reject = "can't hit air";
+      else if (u.targets === 'buildings' && e.kind === 'troop') reject = 'only targets buildings';
+      else if (u.minRange && dist(u.x, u.y, e.x, e.y) < u.minRange) reject = 'inside minimum range';
+      else if (d > sight && !(u.kind === 'troop' && e.mech && e.mech.taunt && d <= e.mech.taunt) && e.kind !== 'tower') reject = 'out of sight';
+      candidates.push({ id: e.id, cardId: e.cardId || e.tower, gap: r2(d), inRange: !reject && inAttackRange(u, e), reject });
+    }
+    candidates.sort((a, b) => (a.reject ? 1 : 0) - (b.reject ? 1 : 0) || a.gap - b.gap);
+    const t = u.targetId ? state.byId.get(u.targetId) : null;
+    return {
+      id: u.id, cardId: u.cardId, targets: u.targets, sight, range: u.range, minRange: u.minRange,
+      target: t ? t.id : null, why: u.targetWhy || null, since: u.targetSince != null ? r2(u.targetSince) : null,
+      pursuing: t && u.targetSince != null ? r2(state.time - u.targetSince) : 0,
+      locked: !!u.locked, retargetIn: r2(Math.max(0, u.retargetT)),
+      attack: u.windupT > 0 ? 'winding up' : u.atkCd > 0 ? 'cooling down' : 'ready',
+      candidates,
+    };
   }
 
   // ─── Combat ──────────────────────────────────────────────────────────────
@@ -2382,10 +2450,34 @@
     return (u.slowT > 0 ? u.slowMult : 1) * (u.hasteT > 0 ? u.hasteMult : 1) * (1 + (u.rally || 0));
   }
 
+  // How fast a unit's attack timers run right now (slow/haste/rally, timed modifiers, boss rage)
+  function attackRate(state, u) {
+    const fx = state.modFx;
+    const rage = u.boss && state.boss && state.boss.enraged ? u.mech.boss.enrageMult : 1;
+    return timeScale(u) * rage * (u.kind === 'troop' ? fx.atk * (u.pack ? fx.swarmAtk : 1) : u.building ? fx.buildAtk : 1);
+  }
+
+  // A unit that was alive when this tick began but was killed earlier in the same tick (by a unit
+  // that happened to update first) still lands an attack that releases this tick. That makes two
+  // units trading blows on the same tick both hit, whatever the update order. Nothing else happens:
+  // no movement, no new wind-up, no retargeting.
+  function releaseOnDeathTick(state, u, dt) {
+    if (!u.live || u.deployT > 0 || u.stunT > 0 || u.dashing || u.targets === 'none') return;
+    const t = u.targetId ? state.byId.get(u.targetId) : null;
+    if (!t || !canTarget(u, t)) return;
+    const k = attackRate(state, u);
+    if (u.windupT > 0) {
+      if (t.id !== u.windupTarget || edgeDist(u, t) > u.range + 0.5) return;
+      if (u.windupT - dt * k <= TIME_EPS) { u.windupT = 0; fireAttack(state, u, t); }
+    } else if (u.mech && u.mech.ramp && u.atkCd - dt * k <= TIME_EPS && inAttackRange(u, t)) {
+      fireAttack(state, u, t);
+    }
+  }
+
   function updateUnit(state, u, dt) {
     u.px = u.x;
     u.py = u.y;
-    if (u.hp <= 0) return;
+    if (u.hp <= 0) { releaseOnDeathTick(state, u, dt); return; }
     if (u.deployT > 0) { u.deployT -= dt; return; }
 
     if (u.building && u.lifetime > 0) {
@@ -2410,7 +2502,7 @@
     const fx = state.modFx;
     const rage = u.boss && state.boss && state.boss.enraged ? u.mech.boss.enrageMult : 1;
     const kMove = k * (u.kind === 'troop' ? fx.move : 1) * rage;
-    const kAtk = k * rage * (u.kind === 'troop' ? fx.atk * (u.pack ? fx.swarmAtk : 1) : u.building ? fx.buildAtk : 1);
+    const kAtk = attackRate(state, u);
     const m = u.mech;
     if (u.em) updateEvolvedUnit(state, u, dt);
     if (m) {
@@ -2440,14 +2532,18 @@
     if (m && m.ramp && (!t || t.id !== u.rampTarget)) { u.rampT = 0; u.rampTarget = t ? t.id : null; }
 
     if (u.windupT > 0) {
-      // Wind-up can only be cancelled if the target is lost
-      if (!t || edgeDist(u, t) > u.range + 0.5) {
+      // A wind-up belongs to the target it started on. If that target dies, becomes untargetable,
+      // is swapped for another, or gets clear away, the swing is called off before it lands and the
+      // attack timer is handed back (nothing was released). A stun still costs the attack.
+      if (!t || t.id !== u.windupTarget || edgeDist(u, t) > u.range + 0.5) {
         u.windupT = 0;
+        u.windupTarget = null;
+        u.atkCd = Math.min(u.atkCd, 0);
         return;
       }
       u.windupT -= dt * kAtk;
       faceToward(u, t.x, t.y, dt);
-      if (u.windupT <= 0) fireAttack(state, u, t);
+      if (u.windupT <= TIME_EPS) { u.windupT = 0; u.windupTarget = null; fireAttack(state, u, t); }
       return;
     }
 
@@ -2457,12 +2553,11 @@
       u.stuckT = 0;
       faceToward(u, t.x, t.y, dt);
       if (m && m.ramp) u.rampT += dt * kAtk;
-      if (u.atkCd <= 0) {
+      if (u.atkCd <= TIME_EPS) {
         u.locked = true;
         u.atkCd = u.cd;
         const w = windupOf(u);
-        if (w > 0) u.windupT = w;
-        else fireAttack(state, u, t);
+        if (w > 0) { u.windupT = w; u.windupTarget = t.id; } else fireAttack(state, u, t);
       }
       return;
     }
@@ -2887,7 +2982,9 @@
   // ─── Towers ──────────────────────────────────────────────────────────────
 
   function updateTower(state, t, dt) {
-    if (t.hp <= 0) return;
+    // Towers update after troops, so one destroyed earlier this tick still takes the shot that was
+    // due this tick (the same simultaneous-hit rule troops follow)
+    if (t.hp <= 0 && !t.live) return;
     if (t.frozenT > 0) t.frozenT -= dt;
     if (t.stunT > 0) { t.stunT -= dt; return; }
     t.atkCd -= dt * state.modFx.towerAtk;
@@ -2904,7 +3001,7 @@
       });
     }
     t.targetId = target ? target.id : null;
-    if (target && t.atkCd <= 0) {
+    if (target && t.atkCd <= TIME_EPS) {
       t.atkCd = t.cd;
       t.lastAtkT = state.time;
       launchProjectile(state, t, target, t.dmg, { style: t.tower === 'king' ? 'bolt' : 'arrow', splash: 0 });
@@ -3324,16 +3421,18 @@
       return true;
     });
 
+    const kingsDown = [];
     for (const t of state.towers) {
       if (t.hp > 0 || t.destroyed) continue;
       t.hp = 0;
       t.destroyed = true;
+      t.targetId = null;
       navDirty = true;
       const foe = enemyOf(t.owner);
       pushFx(state, { type: 'tower', x: t.x, y: t.y, owner: t.owner, king: t.tower === 'king' });
       if (t.tower === 'king') {
         state.players[foe].crowns = 3;
-        endMatch(state, foe, 'king');
+        kingsDown.push(foe);
       } else {
         state.players[foe].crowns += 1;
         const king = state.towers.find((k) => k.owner === t.owner && k.tower === 'king');
@@ -3341,6 +3440,9 @@
       }
       pushFx(state, { type: 'crown', owner: foe, crowns: state.players[foe].crowns });
     }
+    // Both kings falling on the same tick is a draw, not a win for whichever tower is listed first
+    if (kingsDown.length === 1) endMatch(state, kingsDown[0], 'king');
+    else if (kingsDown.length > 1) endMatch(state, 'draw', 'king');
     if (navDirty) rebuildObstacles(state);
   }
 
@@ -3444,6 +3546,10 @@
     });
 
     buildHash(state);
+    // Who was standing when this tick began: they may still land an attack due this tick even if
+    // something that updates before them kills them (see releaseOnDeathTick)
+    for (const u of state.units) u.live = u.hp > 0;
+    for (const t of state.towers) t.live = t.hp > 0;
     // Stagger update order each step so no side always moves first
     const order = state.units.slice();
     if (Math.floor(state.time / dt) % 2) order.reverse();
@@ -3623,18 +3729,24 @@
     }
     return {
       side,
-      profile: Object.assign({ thinkMin: 0.5, thinkMax: 0.6, strategicChance: 0.7, aggression: 0.35, leakAt: 9.3, emoteChance: 0.55 }, profile || {}),
+      // plan: rank threats and score placements; lookahead: how many plays to try out in a copy of the match
+      profile: Object.assign({ thinkMin: 0.5, thinkMax: 0.6, strategicChance: 0.7, aggression: 0.35, leakAt: 9.3, emoteChance: 0.55, plan: true, lookahead: 2 }, profile || {}),
       thinkT: 1.5,
       rand: rng,
       // What the AI has *seen* the opponent spend (it can't see their elixir, so it estimates)
       foeElixir: 5,
       init: false,
       seenSeq: 0,
+      lastPlan: null,     // the last play it made and why (see planDefense)
+      holdUntil: -1,      // a "hold" verdict stands until then, unless the opponent plays again
+      holdSeq: -1,
+      stats: { decisions: 0, rollouts: 0, steps: 0, ms: 0, maxMs: 0 },
       emo: { init: false, mine: 3, theirs: 3, scanT: 0, peakThreat: 0, queued: null, lastAt: -99, seenEmoteT: -1, endDone: false },
     };
   }
 
   function idSeq(id) { return Number(String(id).slice(1)) || 0; }
+  const clockMs = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
 
   // Track the opponent's elixir from what they visibly play (troops landing, spells flying)
   function trackFoeElixir(state, brain, dt) {
@@ -3946,6 +4058,339 @@
     return best;
   }
 
+  // ─── AI: threats, placements and look-ahead ──────────────────────────────
+  //
+  // The AI reads only what a player could see: units and towers on the board, the cards the
+  // opponent has played (state.playLog / castLog) and the public rules. The opponent's hand and
+  // elixir are never read; brain.foeElixir and foeCycle() are estimates built from what was seen.
+  //
+  // Defence runs in four steps: assessThreats() ranks what is coming and how soon, defenseOptions()
+  // lists legal (card, spot) pairs and scores each spot against the real targeting rules, and with
+  // a look-ahead profile the best few are played out in a throwaway copy of the match (rollout())
+  // next to "hold" (play nothing). The winner, with the numbers behind it, ends up in brain.lastPlan.
+
+  const AI_EVAL = {
+    towerWorth: 14,      // elixir-equivalent of a full princess tower in the material count
+    kingWorth: 26,       // ... of the king (losing it loses the match)
+    winWorth: 200,       // a rollout that ends the match
+    urgencyHalf: 4,      // seconds-to-tower at which a threat counts half as urgent
+    holdMargin: 0.75,    // a defensive play must beat holding by this much (elixir) to be made
+    horizonMin: 3,       // seconds each candidate is played out for (more when the threat is far off)
+    horizonMax: 6,
+    hitWindow: 4,        // seconds of the threat at work that a rollout should include after it arrives
+    workBudget: 6000,    // unit-steps one decision may spend on rollouts (steps x units on the board), so
+                         // a crowded board gets fewer/shorter rollouts; counted, not timed, so it stays deterministic
+    recheck: 0.8,        // after a "hold" verdict, wait this long before re-running rollouts (unless the foe plays)
+  };
+
+  // Where an enemy troop is heading on our side and roughly how long until it gets there.
+  // Ground troops on the far side of the river must go round by the bridge in their lane.
+  function travelTime(u, goal) {
+    const reach = Math.max(0, edgeDist(u, goal) - u.range);
+    if (reach <= 0) return u.deployT > 0 ? u.deployT : 0;
+    let d = reach;
+    const crosses = (u.y < RIVER.y0) !== (goal.y < RIVER.y0);
+    if (!u.air && crosses && !u.special.includes('jump')) {
+      const b = BRIDGES[u.x < MID_X ? 0 : 1];
+      const by = (RIVER.y0 + RIVER.y1) / 2;
+      d = dist(u.x, u.y, b.cx, by) + Math.max(0, dist(b.cx, by, goal.x, goal.y) - targetExtent(goal) - u.range);
+    }
+    return (u.deployT > 0 ? u.deployT : 0) + d / Math.max(0.3, u.speed);
+  }
+
+  /** Rank every visible enemy that is coming for `side`: [{ u, lane, goal, eta, value, towerHit, danger }]. */
+  function assessThreats(state, side) {
+    const foe = enemyOf(side);
+    const out = [];
+    for (const u of state.units) {
+      if (u.owner !== foe || u.hp <= 0 || u.hidden || u.targets === 'none') continue;
+      if (u.building && u.range < 9) continue; // only siege buildings reach our towers from their side
+      // What it is fighting now, if that is ours; otherwise the tower it is walking to
+      const cur = u.targetId ? state.byId.get(u.targetId) : null;
+      const goal = cur && cur.owner === side && cur.hp > 0 ? cur : defaultTarget(state, u);
+      if (!goal) continue;
+      const eta = travelTime(u, goal);
+      const value = u.costShare * (u.hp / u.hpMax) * (u.evo ? 1.35 : 1);
+      // What it does to a tower once it gets there (about five seconds of hitting it)
+      let towerHit = 0;
+      const tower = goal.kind === 'tower' ? goal : null;
+      if (tower && u.targets !== 'air') {
+        const dps = (u.dmg * u.structureMult * (u.swarmCount || 1)) / Math.max(0.4, u.cd);
+        towerHit = (Math.min(tower.hp, dps * 5) / tower.hpMax) * (tower.tower === 'king' ? AI_EVAL.kingWorth : AI_EVAL.towerWorth);
+      }
+      const urgency = 1 / (1 + eta / AI_EVAL.urgencyHalf);
+      out.push({ u, lane: u.x < MID_X ? 0 : 1, goal, eta, value, towerHit, danger: urgency * (value + towerHit) });
+    }
+    out.sort((a, b) => b.danger - a.danger || idSeq(a.u.id) - idSeq(b.u.id));
+    return out;
+  }
+
+  /**
+   * What the AI can infer about the opponent's hand from the cards it has seen played (public).
+   * A played card goes to the back of an (deck - 4) card queue, so it cannot come back until that
+   * many other plays have happened. The deck is at least as big as the number of different cards
+   * seen, which gives a safe lower bound: until enough plays pass, the card is certainly not in hand.
+   * Cards never seen are unknown, never assumed absent.
+   */
+  function foeCycle(state, side) {
+    const foe = enemyOf(side);
+    const plays = state.playLog.filter((p) => p.owner === foe && p.swap === state.swapNo);
+    const seen = new Set(plays.map((p) => p.cardId));
+    const queue = clamp(seen.size - 4, 0, MAX_DECK - 4);
+    const lastAt = new Map();
+    plays.forEach((p, i) => lastAt.set(p.cardId, i));
+    return {
+      seen,
+      // false only when the rules prove it is not in hand right now
+      mayHold(cardId) {
+        if (!lastAt.has(cardId)) return true;
+        return plays.length - 1 - lastAt.get(cardId) >= queue;
+      },
+    };
+  }
+
+  // Splash spells the opponent has shown and could have back in hand (an estimate)
+  function foeSplashReady(cycle) {
+    let n = 0;
+    cycle.seen.forEach((id) => {
+      const c = CARD_MAP[id];
+      if (c && c.spell && !c.friendly && c.dmg > 0 && c.splash >= 1.5 && cycle.mayHold(id)) n++;
+    });
+    return n;
+  }
+
+  // The deterministic part of how well card c answers this lane (null: it can't)
+  function defenderScore(state, brain, c, lane) {
+    if (c.spell || isPump(c) || isSiegeBuilding(c)) return null;
+    if (c.targets === 'buildings' && !c.building) return null;
+    if (c.targets === 'air' && lane.air === 0) return null;
+    if (lane.ground === 0 && lane.air > 0 && !hitsAir(c) && !isTaunt(c)) return null;
+    let s = 0;
+    if (lane.air > 0 && hitsAir(c)) s += 3;
+    if (lane.air > 0 && c.targets === 'air') s += 3;
+    if (lane.air > 0 && !hitsAir(c)) s -= 3;
+    if (lane.count >= 3 && c.splash > 0) s += 4;
+    if (lane.tank && dps(c) >= 120) s += 3;
+    if (lane.tank && c.building) s += 3;
+    if (lane.tank && c.mech && c.mech.ramp) s += 4;
+    if (lane.tank && (isTaunt(c) || isSpawner(c))) s += 2;
+    if (lane.count >= 3 && c.swarmCount >= 3 && !c.splash) s -= 1;
+    s -= Math.abs(c.cost - lane.threatValue) * 0.6;
+    s -= c.cost * 0.25;
+    if (evoReady(state.players[brain.side], c.id)) s += 1.2;
+    return s;
+  }
+
+  // Distance from point p to the segment a-b
+  function segDist(px, py, ax, ay, bx, by) {
+    const vx = bx - ax;
+    const vy = by - ay;
+    const L2 = vx * vx + vy * vy;
+    const t = L2 > 1e-9 ? clamp(((px - ax) * vx + (py - ay) * vy) / L2, 0, 1) : 0;
+    return dist(px, py, ax + vx * t, ay + vy * t);
+  }
+
+  // Candidate spots for defender c against threat th. All are passed through the real deploy check.
+  function defenseSpots(state, side, c, th, laneIdx, legacy) {
+    const L = th.u;
+    const G = th.goal;
+    const laneX = TOWER_LAYOUT.princessX[laneIdx];
+    const inward = laneIdx === 0 ? 1 : -1; // toward the middle of the arena
+    const raw = [legacy];
+    // In its path, a little ahead of it: meets it head on
+    for (const f of [0.35, 0.6]) raw.push({ x: L.x + (G.x - L.x) * f, y: L.y + (G.y - L.y) * f });
+    if (c.building || isTaunt(c)) {
+      // Pull spots: toward the middle, so whatever turns for it walks away from the tower
+      const b = defenseBuildingSpot(side, laneIdx);
+      raw.push(b, { x: b.x + inward, y: toward(side, b.y, 1) });
+    }
+    if (c.range >= 3 || c.targets === 'air') {
+      // Behind the tower, nudged inward; and just outside the threat's reach but inside ours
+      raw.push({ x: laneX + inward * 1.2, y: toward(side, TOWER_LAYOUT.princessY[side], 2.8) });
+      raw.push({ x: L.x, y: toward(side, L.y, Math.min(c.range + 0.5, 5.5)) });
+    }
+    if (c.splash > 0) {
+      // On the middle of the group, a step back
+      const grp = state.units.filter((e) => e.owner === L.owner && e.hp > 0 && dist(e.x, e.y, L.x, L.y) < 3);
+      const cx = grp.reduce((s2, e) => s2 + e.x, 0) / grp.length;
+      const cy = grp.reduce((s2, e) => s2 + e.y, 0) / grp.length;
+      raw.push({ x: cx, y: toward(side, cy, 2.2) });
+    }
+    const out = [];
+    for (const p of raw) {
+      const y = side === 'A' ? clamp(p.y, RIVER.y1 + 0.6, H - 1) : clamp(p.y, 1, RIVER.y0 - 0.6);
+      const ok = findDeploySpot(state, side, c, clamp(p.x, 0.8, W - 0.8), y);
+      // (coordinates stay exactly as checked: rounding could nudge a spot into an illegal cell)
+      if (ok && !out.some((q) => dist(q.x, q.y, ok.x, ok.y) < 0.6)) out.push({ x: ok.x, y: ok.y, legacy: p === legacy });
+    }
+    return out;
+  }
+
+  // How well a spot works against the threat, judged by the real targeting rules:
+  // can our unit reach the threat's path, and will the threat turn to fight it before it reaches the tower?
+  function spotScore(state, side, c, spot, th, splashRisk) {
+    const L = th.u;
+    const G = th.goal;
+    const r = c.radius || 0.5;
+    const probe = { id: 'probe', x: spot.x, y: spot.y, radius: r, kind: c.building ? 'building' : 'troop', owner: side, hp: 1, air: c.air, hidden: false };
+    const notes = [];
+    let s = 0;
+    // Can we engage it? Distance from our spot to the threat's route to its goal
+    const route = segDist(spot.x, spot.y, L.x, L.y, G.x, G.y);
+    const reach = c.building ? c.range + r : Math.max(c.range, c.sight || 5.5);
+    if (route <= reach) { s += 1.5; notes.push('covers its route'); } else s -= 1.5;
+    // Lure: it can target us, and it sees us before it is on its tower
+    if (canTarget(L, probe)) {
+      const sight = L.sight || 5.5;
+      const towerReach = targetExtent(G) + L.range;
+      let lured = false;
+      for (let f = 0; f <= 1.001; f += 0.1) {
+        const px = L.x + (G.x - L.x) * f;
+        const py = L.y + (G.y - L.y) * f;
+        if (dist(px, py, G.x, G.y) - towerReach <= 0 && G.kind === 'tower') break;
+        if (dist(px, py, spot.x, spot.y) - r <= sight) { lured = true; break; }
+      }
+      if (lured) {
+        s += 2;
+        notes.push('pulls it off the tower');
+        // A pull toward the middle drags it further from both towers
+        if (Math.abs(spot.x - MID_X) < Math.abs(G.x - MID_X) - 1) { s += 1; notes.push('toward the middle'); }
+      }
+    } else if (L.targets === 'buildings' && !c.building) {
+      notes.push('it ignores troops: hit it on the way');
+    }
+    // Our unit must have landed before the threat walks past
+    const arrive = dist(L.x, L.y, spot.x, spot.y) / Math.max(0.3, L.speed);
+    if (arrive < MATCH.deployTime * 0.8) { s -= 1; notes.push('lands too late'); }
+    // Swarms next to the enemy's splash, or under a splash spell they may have back
+    if ((c.swarmCount || 1) >= 3) {
+      const splashers = state.units.some((e) => e.owner === L.owner && e.hp > 0 && e.splash > 0 && dist(e.x, e.y, spot.x, spot.y) < 3.5);
+      if (splashers) { s -= 1.5; notes.push('splash nearby'); }
+      s -= splashRisk * 0.4;
+    }
+    // Don't drop it on top of our own crowd
+    let crowd = 0;
+    for (const u of state.units) if (u.owner === side && !u.air && !c.air && u.hp > 0 && dist(u.x, u.y, spot.x, spot.y) < r + u.radius) crowd++;
+    if (crowd >= 2) { s -= 0.8; notes.push('crowded'); }
+    return { score: s, notes };
+  }
+
+  // A private copy of the match for "what if" play. Nothing done to it reaches the real match, and
+  // it gets its own random stream so the AI can't peek at the real match's upcoming rolls.
+  function cloneForRollout(state) {
+    const copy = structuredClone({ ...state, fx: [], hash: null });
+    if (state.modFx === NO_FX) copy.modFx = NO_FX;
+    copy.seed = (state.seed ^ 0x5bd1e995) | 0;
+    buildHash(copy);
+    return copy;
+  }
+
+  // Elixir-equivalent balance for `side`: units (by health left) and towers, mine minus theirs
+  function material(state, side) {
+    if (!state.running) return state.winner === side ? AI_EVAL.winWorth : state.winner === 'draw' ? 0 : -AI_EVAL.winWorth;
+    let m = 0;
+    for (const u of state.units) {
+      if (u.hp <= 0 || !(u.costShare > 0)) continue;
+      const v = u.costShare * (u.hp / u.hpMax);
+      m += u.owner === side ? v : -v;
+    }
+    for (const t of state.towers) {
+      const v = (Math.max(0, t.hp) / t.hpMax) * (t.tower === 'king' ? AI_EVAL.kingWorth : AI_EVAL.towerWorth);
+      m += t.owner === side ? v : -v;
+    }
+    return m;
+  }
+
+  // Play `action` (or nothing) in a copy of the match for `secs` and score the result
+  function rollout(state, side, action, secs, stats) {
+    if (typeof structuredClone !== 'function') return null;
+    const sim = cloneForRollout(state);
+    let cost = 0;
+    if (action) {
+      cost = playCost(sim, side, action.cardId);
+      if (!deploy(sim, side, action.cardId, action.x, action.y).ok) return null;
+    }
+    const steps = Math.round(secs / MATCH.step);
+    for (let i = 0; i < steps && sim.running; i++) step(sim);
+    if (stats) stats.steps += steps;
+    return material(sim, side) - cost;
+  }
+
+  // Pick a defensive play for the most dangerous threat. Returns a plan, a hold verdict, or null.
+  function planDefense(state, brain, troops, lanes, threats) {
+    const side = brain.side;
+    const pr = brain.profile;
+    const th = threats[0];
+    const laneIdx = th.lane;
+    const lane = lanes[laneIdx];
+    const splashRisk = foeSplashReady(foeCycle(state, side));
+    const cands = [];
+    for (const c of troops) {
+      const cs = defenderScore(state, brain, c, lane);
+      if (cs == null) continue;
+      const legacy = legacyDefenseSpot(side, c, th.u, laneIdx);
+      for (const spot of defenseSpots(state, side, c, th, laneIdx, legacy)) {
+        if (refusedHere(state, brain, c.id, spot)) continue;
+        const sp = spotScore(state, side, c, spot, th, splashRisk);
+        cands.push({ cardId: c.id, x: spot.x, y: spot.y, card: cs, spot: sp.score, notes: sp.notes, h: cs + sp.score });
+      }
+    }
+    if (!cands.length) return null;
+    cands.sort((a, b) => b.h - a.h);
+    const why = { kind: 'defend', threat: th.u.cardId, threatId: th.u.id, lane: laneIdx, eta: r2(th.eta), danger: r2(th.danger) };
+    const k = pr.lookahead | 0;
+    if (k <= 0 || typeof structuredClone !== 'function') {
+      return { cardId: cands[0].cardId, x: cands[0].x, y: cands[0].y, why: { ...why, by: 'heuristic', score: r2(cands[0].h), notes: cands[0].notes } };
+    }
+    // Look-ahead: one card per family of spots (best spot each), the top few, against holding
+    const picks = [];
+    for (const cd of cands) {
+      if (picks.length >= k) break;
+      if (!picks.some((p) => p.cardId === cd.cardId)) picks.push(cd);
+    }
+    // ...and the best second spot of the favourite card, if there's budget
+    const alt = cands.find((cd) => cd.cardId === picks[0].cardId && cd !== picks[0]);
+    if (alt && picks.length < k + 1) picks.push(alt);
+    const busy = Math.max(12, state.units.length + state.projectiles.length * 0.25);
+    const stepsAllowed = AI_EVAL.workBudget / busy;
+    // Long enough to see it arrive and hit for a while; shorter when the board is busy
+    const secs = clamp(Math.min(th.eta + AI_EVAL.hitWindow, stepsAllowed * MATCH.step / 2), AI_EVAL.horizonMin * 0.6, AI_EVAL.horizonMax);
+    const maxRuns = Math.max(2, Math.floor(stepsAllowed / Math.round(secs / MATCH.step)));
+    const stats = brain.stats;
+    const hold = rollout(state, side, null, secs, stats);
+    let best = null;
+    const tried = [];
+    for (const cd of picks.slice(0, maxRuns - 1)) {
+      const v = rollout(state, side, cd, secs, stats);
+      if (v == null) continue;
+      tried.push({ cardId: cd.cardId, x: cd.x, y: cd.y, value: r2(v) });
+      if (!best || v > best.v) best = { cd, v };
+    }
+    stats.rollouts += tried.length + 1;
+    if (!best || hold == null) return { cardId: cands[0].cardId, x: cands[0].x, y: cands[0].y, why: { ...why, by: 'heuristic', score: r2(cands[0].h) } };
+    const detail = { ...why, by: 'lookahead', secs: r2(secs), hold: r2(hold), tried };
+    if (best.v < hold + AI_EVAL.holdMargin) return { hold: true, why: { ...detail, verdict: 'hold: no play beats letting it come' } };
+    return { cardId: best.cd.cardId, x: best.cd.x, y: best.cd.y, why: { ...detail, value: r2(best.v), gain: r2(best.v - hold), notes: best.cd.notes } };
+  }
+
+  // A play the match refused a moment ago is not tried again at the same spot right away
+  function refusedHere(state, brain, cardId, spot) {
+    const b = brain.refused;
+    return !!(b && b.until > state.time && b.cardId === cardId && dist(b.x, b.y, spot.x, spot.y) < 0.6);
+  }
+
+  // The spot the AI has always used for a defender (kept as one of the candidates)
+  function legacyDefenseSpot(side, card, lead, laneIdx) {
+    const laneX = TOWER_LAYOUT.princessX[laneIdx];
+    let spot;
+    if (isTaunt(card)) spot = { x: clamp(lead.x, 1.5, W - 1.5), y: toward(side, lead.y, 3.2) };
+    else if (card.building) spot = defenseBuildingSpot(side, laneIdx);
+    else if (card.range >= 3 || card.targets === 'air') spot = { x: laneX, y: toward(side, TOWER_LAYOUT.princessY[side], 2.8) };
+    else spot = { x: lead.x, y: toward(side, lead.y, 2.5) };
+    spot.y = side === 'A' ? clamp(spot.y, RIVER.y1 + 0.6, H - 1) : clamp(spot.y, 1, RIVER.y0 - 0.6);
+    return spot;
+  }
+
   function aiDecide(state, brain) {
     const side = brain.side;
     const foe = enemyOf(side);
@@ -3968,24 +4413,39 @@
     const spell = planSpell(state, brain, options, ctx);
     if (spell) return spell;
 
-    // 1) Defend the more dangerous lane if it isn't already covered
-    const lanePick = lanes[0].threatValue - lanes[0].defenseValue >= lanes[1].threatValue - lanes[1].defenseValue ? 0 : 1;
+    // 1) Defend the more dangerous lane if it isn't already covered. The planner ranks lanes by how
+    // soon and how hard their threats will hit (assessThreats), not just by what has crossed.
+    const planner = brain.profile.plan !== false;
+    const threats = planner ? assessThreats(state, side) : null;
+    let lanePick = lanes[0].threatValue - lanes[0].defenseValue >= lanes[1].threatValue - lanes[1].defenseValue ? 0 : 1;
+    if (threats && threats.length) {
+      const danger = [0, 0];
+      threats.forEach((t) => { danger[t.lane] += t.danger; });
+      lanePick = danger[0] - lanes[0].defenseValue * 0.5 >= danger[1] - lanes[1].defenseValue * 0.5 ? 0 : 1;
+    }
     const lane = lanes[lanePick];
     const need = lane.threatValue - lane.defenseValue * 0.8;
     const leadDeep = lane.lead && (side === 'A' ? lane.lead.y > RIVER.y1 + 1 : lane.lead.y < RIVER.y0 - 1);
-    if (lane.lead && (need >= 1.5 || (leadDeep && need > 0.5))) {
-      const card = chooseDefender(state, brain, troops, lane);
-      if (card) {
-        const lead = lane.lead;
-        const laneX = TOWER_LAYOUT.princessX[lanePick];
-        let spot;
-        if (isTaunt(card)) spot = { x: clamp(lead.x, 1.5, W - 1.5), y: toward(side, lead.y, 3.2) };
-        else if (card.building) spot = defenseBuildingSpot(side, lanePick);
-        else if (card.range >= 3 || card.targets === 'air') spot = { x: laneX, y: toward(side, TOWER_LAYOUT.princessY[side], 2.8) };
-        else spot = { x: lead.x, y: toward(side, lead.y, 2.5) };
-        spot.y = side === 'A' ? clamp(spot.y, RIVER.y1 + 0.6, H - 1) : clamp(spot.y, 1, RIVER.y0 - 0.6);
-        const ok = findDeploySpot(state, side, card, spot.x, spot.y);
-        if (ok) return { cardId: card.id, x: ok.x, y: ok.y };
+    const holding = brain.holdUntil > state.time && brain.holdSeq === state.playSeq;
+    if (lane.lead && (need >= 1.5 || (leadDeep && need > 0.5)) && !holding) {
+      const laneThreats = threats ? threats.filter((t) => t.lane === lanePick) : [];
+      if (planner && laneThreats.length && brain.rand() < brain.profile.strategicChance) {
+        const plan = planDefense(state, brain, troops, lanes, laneThreats);
+        if (plan && plan.hold) {
+          brain.holdUntil = state.time + AI_EVAL.recheck;
+          brain.holdSeq = state.playSeq;
+          brain.lastPlan = plan;
+        } else if (plan) {
+          brain.lastPlan = plan;
+          return plan;
+        }
+      } else {
+        const card = chooseDefender(state, brain, troops, lane);
+        if (card) {
+          const spot = legacyDefenseSpot(side, card, lane.lead, lanePick);
+          const ok = findDeploySpot(state, side, card, spot.x, spot.y);
+          if (ok) return { cardId: card.id, x: ok.x, y: ok.y };
+        }
       }
     }
 
@@ -4033,8 +4493,18 @@
     const doubleTime = elixirMultiplier(state) > 1;
     // Punish when the opponent has (visibly) just spent a lot
     const foeLow = brain.foeElixir < 3;
-    const aggression = Math.min(0.95, brain.profile.aggression * (doubleTime ? 1.5 : 1) + (foeLow ? 0.3 : 0) + (cheapNow ? 0.25 : 0) - (conserve ? 0.2 : 0));
-    const wantsPush = leaking || (p.elixir >= (foeLow ? 5 : 7) * scale && brain.rand() < aggression);
+    // Card cycle (planner only): their buildings and damage spells we've seen are all still cycling
+    let answersDown = false;
+    let incoming = false;
+    if (planner) {
+      const cyc = foeCycle(state, side);
+      const answers = [...cyc.seen].filter((id) => CARD_MAP[id] && (CARD_MAP[id].building || (CARD_MAP[id].spell && CARD_MAP[id].dmg > 0)));
+      answersDown = answers.length > 0 && answers.every((id) => !cyc.mayHold(id));
+      // Something dangerous is on its way (even from the back): keep enough to answer it
+      incoming = threats.some((t) => t.eta < 6 && t.danger >= 2);
+    }
+    const aggression = Math.min(0.95, brain.profile.aggression * (doubleTime ? 1.5 : 1) + (foeLow ? 0.3 : 0) + (cheapNow ? 0.25 : 0) - (conserve ? 0.2 : 0) + (answersDown ? 0.15 : 0));
+    const wantsPush = leaking || (p.elixir >= (foeLow ? 5 : 7) * scale && (!incoming || p.elixir >= 8.5 * scale) && brain.rand() < aggression);
     const calm = lanes[0].threatValue + lanes[1].threatValue < 0.5;
 
     // An elixir pump when things are quiet (and only one at a time)
@@ -4171,9 +4641,19 @@
     if (brain.thinkT > 0) return null;
     const pr = brain.profile;
     brain.thinkT = pr.thinkMin + brain.rand() * (pr.thinkMax - pr.thinkMin);
+    const t0 = clockMs();
     const plan = aiDecide(state, brain);
+    // Decision time is recorded for profiling only; it never feeds back into a decision
+    const ms = clockMs() - t0;
+    const st = brain.stats;
+    st.decisions++;
+    st.ms += ms;
+    if (ms > st.maxMs) st.maxMs = ms;
     if (!plan) return null;
-    return deploy(state, brain.side, plan.cardId, plan.x, plan.y);
+    const res = deploy(state, brain.side, plan.cardId, plan.x, plan.y);
+    if (plan.why) plan.why.ok = res.ok;
+    if (!res.ok) brain.refused = { cardId: plan.cardId, x: plan.x, y: plan.y, until: state.time + 2, reason: res.reason };
+    return res;
   }
 
   // Place a unit directly, skipping elixir/hand/zone rules (used by tests and sandboxes)
@@ -4198,10 +4678,10 @@
     castDirect,
     ARCHETYPES, VARIANTS, CARD_LIBRARY, CARD_MAP, STARTER_DECK, MAX_DECK, RARITY_ORDER,
     getCardStatsAtLevel, towerStats, normalizeDeck,
-    createMatch, step, deploy, canDeploy, canDeployOnSnapshot, inDeployZone, snapshot, takeFx, timeLeft,
+    createMatch, step, deploy, canDeploy, explainTargeting, canDeployOnSnapshot, inDeployZone, snapshot, takeFx, timeLeft,
     isRiverPoint, walkablePoint: (state, x, y, jump) => walkablePoint(state.nav, x, y, jump),
     findPath, enemyOf,
-    createAi, aiUpdate, aiDecide, buildAiDeck, aiEvoPicks,
+    createAi, aiUpdate, aiDecide, buildAiDeck, aiEvoPicks, assessThreats, foeCycle, AI_EVAL,
     TOKEN_CARDS, MAX_ARENA,
     EVOLUTIONS, EVO_RULES, evolutionOf, evoReady, evolvedStats,
     DEFAULT_RULES, normalizeRules, MODIFIERS, MOD_STACK, MOD_CAPS, combineModFx, playCost, SIZE_FORMS, cardMatches, applyCardMods,

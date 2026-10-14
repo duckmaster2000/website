@@ -79,6 +79,7 @@ const AI_PRESETS = {
     strategicChance: 0.42,
     aggression: 0.15,
     leakAt: 9.9,
+    lookahead: 0,
     description: 'Easy: slow reactions, rarely attacks, weaker towers.'
   },
   normal: {
@@ -89,6 +90,7 @@ const AI_PRESETS = {
     strategicChance: 0.7,
     aggression: 0.35,
     leakAt: 9.3,
+    lookahead: 2,
     description: 'Normal: defends threats, builds tank-and-support pushes.'
   },
   hard: {
@@ -99,6 +101,7 @@ const AI_PRESETS = {
     strategicChance: 0.84,
     aggression: 0.5,
     leakAt: 9.0,
+    lookahead: 3,
     description: 'Hard: quick reactions, smarter counters, tougher towers.'
   },
   insane: {
@@ -109,6 +112,7 @@ const AI_PRESETS = {
     strategicChance: 0.92,
     aggression: 0.65,
     leakAt: 8.6,
+    lookahead: 3,
     description: 'Insane: near-instant counters, constant pressure, high tower HP.'
   },
   custom: {
@@ -119,6 +123,7 @@ const AI_PRESETS = {
     strategicChance: 0.72,
     aggression: 0.35,
     leakAt: 9.3,
+    lookahead: 2,
     description: 'Custom: uses your manual HP multipliers.'
   }
 };
@@ -465,12 +470,12 @@ function aiEvoSlots() {
 
 function aiProfile() {
   const p = getAiProfile();
-  return { thinkMin: p.thinkMin, thinkMax: p.thinkMax, strategicChance: p.strategicChance, aggression: p.aggression, leakAt: p.leakAt };
+  return { thinkMin: p.thinkMin, thinkMax: p.thinkMax, strategicChance: p.strategicChance, aggression: p.aggression, leakAt: p.leakAt, lookahead: p.lookahead };
 }
 
 function presetProfile(key) {
   const p = AI_PRESETS[key] || AI_PRESETS.normal;
-  return { thinkMin: p.thinkMin, thinkMax: p.thinkMax, strategicChance: p.strategicChance, aggression: p.aggression, leakAt: p.leakAt };
+  return { thinkMin: p.thinkMin, thinkMax: p.thinkMax, strategicChance: p.strategicChance, aggression: p.aggression, leakAt: p.leakAt, lookahead: p.lookahead };
 }
 
 function playerName(side) {

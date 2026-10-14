@@ -19,7 +19,7 @@ Notes on the prototype tank game at `caleb-liu.com/prototype.html`: what was cha
 | Emote artwork (animated faces drawn with canvas paths) | `prototype_emotes.js` | Browser |
 | Page logic (menus, progression, chests, decks, lobby, input, sound) | `prototype_v4.js`, `prototype.html`, `prototype.css` | Browser |
 | Online server (matchmaking, rooms, runs the engine) | `clash-tanks-server/clash-tanks-server/server.js` | Render |
-| Tests | `clash-tanks-server/clash-tanks-server/test/*.test.js` (sim, trophy, evolution, evo-progress, events) | `npm test` |
+| Tests | `clash-tanks-server/clash-tanks-server/test/*.test.js` (sim, trophy, evolution, evo-progress, events, combat-ai) | `npm test` |
 
 **One engine for every mode.** Local PvP, vs AI and Online all use the same `clash-sim.js`, so they always play by identical rules. Change gameplay **only** in that file. Don't put a second copy of the rules in the server.
 
@@ -371,7 +371,50 @@ Boss and survival levels follow your average card level (boss Hard +3, Nightmare
 - **No leaderboards:** scores and records are personal bests.
 - Balance comes from AI-vs-AI runs, which don't play like people (they don't really dodge telegraphs or plan around announced modifiers beyond simple rules). Expect retuning from real play.
 - The AI plays only the visible information (active and announced modifiers, telegraphs); it does not plan ahead for Deck Roulette swaps or Size Roulette forms.
-- The AI has a pre-existing habit of idling at full elixir when its whole hand is spells; it's fixed for event matches only, so normal battles stay byte-for-byte as before.
+- The AI has a pre-existing habit of idling at full elixir when its whole hand is spells; it's fixed for event matches only.
+
+### 13. Combat precision, targeting diagnostics and a planning AI (2026-10-13)
+
+Everything is in `shared/clash-sim.js`, so local PvP, vs AI and online all get it. Tests: `test/combat-ai.test.js` (21 new). No cards, stats, costs, arenas or victory rules changed.
+
+#### Combat resolution fixes
+| Problem found | Fix |
+|---|---|
+| Two units hitting each other on the same tick: only the one that happened to update first landed its hit (update order flips every tick, so results depended on tick parity) | Anything alive when the tick began still lands an attack that releases that tick (`releaseOnDeathTick`, `u.live`/`t.live`). Towers too: a tower destroyed on the tick its shot was due still fires it. Nothing else happens for them that tick. |
+| A wind-up whose target died could land on a *different* unit (up to 0.5 tiles out of range), and a cancelled wind-up still used up the whole cooldown | A wind-up is bound to its target (`windupTarget`). If that target dies, changes, or gets away, the swing is called off and the attack timer is handed back. Stuns still cost the attack, as before. |
+| Attack timers were compared with `<= 0` after float steps (0.3 − 6×0.05 ≈ 1e-17), so every wind-up and cooldown fired one tick (50 ms) late | `TIME_EPS` threshold, same idea zone ticks already used. Wind-up is cleared on release (an existing Cluster Pod test caught a double-fire while fixing this). |
+| Both kings destroyed on the same tick: the winner was whichever tower comes first in the list (always B) | It's a draw (reason `king`), decided once. |
+| A troop deployed between steps was invisible to a spell cast on the same tick (spatial hash only rebuilt each step) | New units join the hash immediately (`hashInsert`). |
+| Knockback only checked where a troop lands, not the path | The whole shove must be on open ground (no hopping the river or a tower). Not reachable with today's knockback sizes; it's a guard. |
+
+The damage pipeline order was audited and left as is (it's already one path: structure/crown multipliers → aura → modifiers → boss guard → shield → health). Shields that break lose the excess, by design.
+
+#### Targeting
+The existing rules were already sound (eligibility in `canTarget`, hysteresis, locks after attacking, taunt, tower retention) and are unchanged. Added:
+- Each unit records **why** it picked its target and since when (`targetWhy`, `targetSince`).
+- `Sim.explainTargeting(state, id)`: read-only report (target, why, ranges, lock, attack state, every enemy with its rejection reason). It makes no random draws, so it's safe for a debug overlay.
+
+#### AI
+The existing AI is kept (spells, events, offence, emotes). Defence now goes through a planner:
+1. **Threats** (`Sim.assessThreats`): every visible enemy, its goal (what it's hitting, or the tower it's walking to), an ETA that includes the bridge detour, and a danger score (value + tower damage it would do, weighted by how soon).
+2. **Placements** (`defenseSpots`, `spotScore`): several legal spots per card, scored with the real targeting rules. Does it cover the threat's route? Will the threat see it and turn before it reaches the tower (lure), and is that a pull toward the middle? Does it land in time? Swarm spots next to enemy splash, or under a splash spell the opponent may have back, are marked down.
+3. **Look-ahead** (`rollout`): the top candidates and "play nothing" are played out in a private copy of the match (`structuredClone`, its own random stream) for 3–6 s, scored by elixir-equivalent material (units by health left, towers by health). It holds if nothing beats holding by 0.75 elixir. The work is capped by a deterministic budget of unit-steps, not by a timer.
+4. **Card cycle** (`Sim.foeCycle`): built from the public play log (`state.playLog`). A card is known to be out of the opponent's hand only when the rules prove it (fewer plays since than the queue length implied by the cards seen). Unseen cards are never assumed absent. It's used to avoid swarms when a splash spell may be back, and to push harder when every answer they've shown is cycling.
+5. **Elixir**: no push while a dangerous threat is less than 6 s out, unless the bar is nearly full.
+6. Every planned play keeps its reasoning in `brain.lastPlan.why` (threat, eta, hold value, candidates tried and their scores). A refused spot is not retried for 2 s.
+
+Difficulty presets (`AI_PRESETS` in `prototype_v4.js`) now set `lookahead`: easy 0, normal 2, hard/insane 3. The existing tower/HP multipliers of the presets are unchanged; the AI gets no hidden information. It never reads the opponent's hand or elixir (there's a test).
+
+**Measured (AI vs AI, 100 random-deck pairs × both seats, level 5):** planner vs the old decision path: 95–80 (25 draws), crowns 290–235. Hard settings: 101–80, crowns 300–242. Decisions average ~0.12 ms; 99.97% under 8 ms; rare 20–50 ms spikes are garbage collection, not rollouts (a rollout step is ~0.05 ms).
+
+#### Status
+- **Implemented and tested:** everything in the two tables above; explainTargeting; threat ranking; card-cycle inference; look-ahead isolation (real match untouched, deep-compared); blind to the opponent's hidden hand and elixir; a Ram Hog answered with a legal play that pulls it off the tower (tower damage less than half of not answering); no retry of refused spots; bounded decision cost; building re-routing; knockback never leaves troops in the river or a tower.
+- **Verified in Chrome:** vs AI (planner and rollouts running, max decision 20 ms), local PvP, and two-window online against this server (both deploys accepted). No console errors.
+- **Implemented, lightly tested:** the "push harder when their answers are cycling" and "don't push into an incoming threat" rules (covered only by the AI-vs-AI benchmark).
+- **Not implemented:** look-ahead for offence and spells (spells keep their value-based planner); modelling the opponent's replies inside rollouts (a rollout assumes they play nothing); bridge-choice hysteresis for troops chasing across the river (no oscillation was found in tests); tower-vs-troop collision uses a circle for the square tower (nav already blocks tower cells, so it's invisible in play); a visual overlay for `explainTargeting`.
+- **Golden test re-recorded:** `normal battles play out exactly as recorded` pinned AI-vs-AI results from before the events system. These deliberate changes alter normal battles, so it was re-recorded once. It still catches any event change leaking into normal battles.
+
+**Next step:** give the rollouts a simple opponent reply (e.g. the cheapest seen card that could still be in hand, placed by the same planner) so the AI stops over-trusting a defence that only works if the opponent does nothing. Then extend look-ahead to the offence choice.
 
 ### 10. Fix: placing a swarm froze the game
 Swarm members land a moment apart, which made the drop-in animation compute a negative shadow size; the canvas threw and the frame loop stopped. The renderer now clamps it, and the frame loop keeps running even if a frame throws (the error is logged).
