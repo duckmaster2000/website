@@ -59,7 +59,7 @@ test('every Evolution is complete: name, cycles, ability text, counterplay, and 
   }
   ['melee', 'tank', 'ranged', 'swarm', 'air', 'building', 'spell', 'support'].forEach((r) => assert.ok(roles.has(r), `has a ${r} evolution`));
   // Variants share their family's Evolution
-  assert.equal(Sim.evolutionOf('brawler-twin'), Sim.EVOLUTIONS.brawler);
+  assert.equal(Sim.evolutionOf('brawler-mk-ii'), Sim.EVOLUTIONS.brawler);
   assert.equal(Sim.evolutionOf('scout'), null);
 });
 

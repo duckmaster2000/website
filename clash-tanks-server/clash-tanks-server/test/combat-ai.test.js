@@ -366,3 +366,80 @@ test('AI decisions stay cheap', () => {
   assert.ok(maxSteps <= 500, `at most ${maxSteps} simulated steps in one decision`);
   assert.ok(ms < 2, `${ms.toFixed(3)} ms per decision on average`);
 });
+
+// ── Opponent model, spell / attack look-ahead, route stickiness, square towers ─
+
+test('the opponent model only uses cards the AI has seen played, never the real hand or elixir', () => {
+  const s = Sim.createMatch({ seed: 4 });
+  const brain = Sim.createAi('A', null, 5);
+  brain.foeElixir = 6.5;
+  s.players.B.hand = ['siege', 'guardian', 'drillcat', 'ramhog'];
+  s.players.B.elixir = 10;
+  s.playLog.push({ n: ++s.playSeq, owner: 'B', cardId: 'scout', at: 0, swap: 0 });
+  s.playLog.push({ n: ++s.playSeq, owner: 'B', cardId: 'flarepod', at: 1, swap: 0 });
+  const m = Sim.foeModel(s, brain);
+  assert.deepEqual(m.ids.sort(), ['flarepod', 'scout']);
+  assert.equal(m.elixir, 6.5, 'its own estimate, not their bar');
+  assert.equal(Sim.foeModel(s, Sim.createAi('A', { replies: false }, 5)), null, 'switchable');
+});
+
+test('with look-ahead, a spell is played out before it is cast, and the reason is kept', () => {
+  const s = aiMatch(['firebomb', 'mechmice', 'brawler', 'antmarch']);
+  for (let i = 0; i < 4; i++) {
+    const u = Sim.spawnDirect(s, 'B', 'junkpack', 3 + (i % 2) * 0.6, 21 + Math.floor(i / 2) * 0.6);
+    u.costShare = 1.5;
+    u.hp = 150; // already hurt, so one Fire Bomb (165) kills the whole group
+  }
+  const brain = Sim.createAi('A', { strategicChance: 1, lookahead: 2 }, 5);
+  const before = structuredClone({ ...s, fx: [] });
+  const plan = Sim.aiDecide(s, brain);
+  assert.deepEqual(structuredClone({ ...s, fx: [] }), before, 'the real match is untouched');
+  assert.equal(brain.lastPlan.why.kind, 'spell');
+  assert.ok(Array.isArray(brain.lastPlan.why.tried) && typeof brain.lastPlan.why.hold === 'number');
+  if (plan) assert.equal(plan.cardId, 'firebomb', 'and casts it when it beats holding');
+});
+
+test('with look-ahead, an attack compares both lanes for a fast win condition', () => {
+  const s = aiMatch(['ramhog', 'mechmice', 'brawler', 'antmarch']);
+  s.players.A.elixir = 10;
+  const brain = Sim.createAi('A', { strategicChance: 1, lookahead: 2, aggression: 1, leakAt: 9.5 }, 5);
+  const plan = Sim.aiDecide(s, brain);
+  assert.ok(plan && plan.why && plan.why.kind === 'push', JSON.stringify(plan && plan.why));
+  assert.ok(plan.why.tried.length >= 2 && new Set(plan.why.tried.map((t) => t.lane)).size === 2, 'both lanes tried');
+  assert.ok(Sim.deploy(s, 'A', plan.cardId, plan.x, plan.y).ok, 'and the play is legal');
+});
+
+test('a troop chasing a target that swings across the middle commits to a bridge and crosses', () => {
+  // Without route stickiness this unit flipped bridges ~10 times and never crossed
+  const s = sandbox();
+  const u = Sim.spawnDirect(s, 'B', 'brawler', 9, 9);
+  u.sight = 40; // keep it on the moving target, not the towers
+  const t = Sim.spawnDirect(s, 'A', 'brawler', 9, 23);
+  t.speed = 0; t.targets = 'none';
+  let flips = 0;
+  let last = -1;
+  let crossedAt = null;
+  let tick = 0;
+  run(s, 12, () => {
+    tick++;
+    t.x = 9 + (Math.floor(tick / 10) % 2 ? 2.5 : -2.5); // swings from one side of the middle to the other
+    if (u.y < Sim.RIVER.y0 && u.path && u.path.bridge >= 0) {
+      if (last >= 0 && u.path.bridge !== last) flips++;
+      last = u.path.bridge;
+    }
+    if (crossedAt == null && u.y > Sim.RIVER.y1) crossedAt = s.time;
+  });
+  assert.equal(flips, 0, `bridge flips: ${flips}`);
+  assert.ok(crossedAt != null && crossedAt < 11, `crossed the river (at ${crossedAt})`);
+});
+
+test('troops are pushed out of a tower\'s square corner, not just its circle', () => {
+  const s = sandbox();
+  const t = tower(s, 'T-B-L'); // centre 3.5, 6.5, half 1.5: corner at (5, 8)
+  const u = Sim.spawnDirect(s, 'A', 'brawler', 5.3, 8.3);
+  u.speed = 0; u.targets = 'none';
+  const gap = () => Math.hypot(Math.max(Math.abs(u.x - t.x) - t.half, 0), Math.max(Math.abs(u.y - t.y) - t.half, 0));
+  assert.ok(gap() < u.radius, 'starts overlapping the corner');
+  run(s, 0.5);
+  assert.ok(gap() >= u.radius - 1e-6, `pushed clear (gap ${gap().toFixed(3)})`);
+});

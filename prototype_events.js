@@ -11,7 +11,7 @@
 const Events = window.ClashEvents;
 
 const evUi = { btn: null, overlay: null, modal: null, bar: null, draft: null, winEvent: null, winHub: null, lobbyEvent: null };
-const hub = { screen: 'hub', id: null, tier: null, ai: 'normal', timer: null };
+const hub = { screen: 'hub', id: null, tier: null, ai: 'normal', timer: null, reroll: 0 }; // reroll: admin line-up salt (this session only)
 let onlineEvent = null;   // { eventId, tier } the online lobby queues / creates rooms for
 let lastEventSpec = null; // what "Play again" replays
 let draftSession = null;  // { spec, rounds, picks }
@@ -25,7 +25,7 @@ function evProgress() { return state.progress.events; }
 function evNow() { return Date.now(); }
 // Admin mode and ?events=all open every event for testing (and pay no rewards)
 function evDevAll() { return state.admin.active || /[?&]events=all\b/.test(location.search); }
-function evRotation() { return Events.rotation(evNow(), { forceAll: evDevAll() }); }
+function evRotation() { return Events.rotation(evNow(), { forceAll: evDevAll(), reroll: state.admin.active ? hub.reroll : 0 }); }
 function evName(ev, tier) {
   const t = ev.tiers && tier ? ev.tiers.find((x) => x.id === tier) : null;
   return t && ev.id !== 'chaos' ? `${ev.name} · ${t.name}` : t ? t.name : ev.name;
@@ -155,7 +155,8 @@ function hubHtml() {
   <header class="ev-head">
     <div class="ev-head-badge" aria-hidden="true">🎪</div>
     <div><p class="road-kicker">SPECIAL EVENTS</p><h3>Event Hub</h3>
-    <p class="ev-sub">New line-up in <b data-ends="${rot.dayEndsAt}">${fmtLeft(rot.dayEndsAt - rot.now)}</b>${rot.forceAll ? ' · <span class="ev-dev">dev: all events open, no rewards</span>' : ''}</p></div>
+    <p class="ev-sub">New line-up in <b data-ends="${rot.dayEndsAt}">${fmtLeft(rot.dayEndsAt - rot.now)}</b>${rot.forceAll ? ' · <span class="ev-dev">dev: all events open, no rewards</span>' : ''}${rot.reroll ? ' · <span class="ev-dev">rerolled line-up</span>' : ''}</p>
+    ${state.admin.active ? `<div class="ev-admin"><button type="button" data-ev-reroll>🎲 Reroll events</button>${rot.reroll ? '<button type="button" data-ev-reroll-reset>Back to today\'s</button>' : ''}</div>` : ''}</div>
   </header>
   <div class="ev-scroll">
     <section class="ev-featured art-${featured.art}">
@@ -819,6 +820,8 @@ function bindEvents() {
     if (!t || t.disabled) return;
     if (t.matches('[data-ev-close]')) { closeEvents(); return; }
     if (t.matches('[data-ev-back]')) { hub.screen = 'hub'; hub.id = null; renderEventsOverlay(); return; }
+    if (t.matches('[data-ev-reroll]')) { hub.reroll = 1 + Math.floor(Math.random() * 0x7ffffffe); Sound.play('select'); renderEventsOverlay(); return; }
+    if (t.matches('[data-ev-reroll-reset]')) { hub.reroll = 0; Sound.play('select'); renderEventsOverlay(); return; }
     if (t.dataset.evOpen) {
       if (t.dataset.tier) hub.tier = t.dataset.tier;
       else if (hub.id !== t.dataset.evOpen) hub.tier = null;

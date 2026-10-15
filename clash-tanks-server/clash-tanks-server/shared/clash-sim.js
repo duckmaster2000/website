@@ -62,89 +62,89 @@
   const ab = (name, minLevel, minMastery, dmgBoost, hpBoost) => ({ name, minLevel, minMastery, dmgBoost, hpBoost });
 
   const ARCHETYPES = [
-    { slug: 'scout', name: 'Scout', icon: '🏎️', rarity: 'common', cost: 2, role: 'raider', hp: 230, dmg: 45, cd: 1.0, range: 2.5, speed: 2.0, targets: 'buildings', proj: 'slug', radius: 0.45, deployCd: 1.0,
+    { slug: 'scout', name: 'Scout', icon: '🏎️', rarity: 'common', cost: 2, role: 'raider', hp: 248, dmg: 47, cd: 1.0, range: 2.5, speed: 2.0, targets: 'buildings', proj: 'slug', radius: 0.45, deployCd: 1.0,
       ability: ab('Turbo Drive', 5, 10, 1.08, 1.07) },
     { slug: 'brawler', name: 'Brawler', icon: '🚛', rarity: 'common', cost: 4, role: 'tank', hp: 650, dmg: 75, cd: 1.2, range: 0.6, speed: 1.0, targets: 'ground', proj: 'melee', radius: 0.6, deployCd: 1.15,
       ability: ab('Iron Shell', 6, 12, 1.05, 1.12) },
-    { slug: 'siege', name: 'Siege', icon: '🛞', rarity: 'rare', cost: 6, role: 'siege tank', hp: 1050, dmg: 105, cd: 1.7, range: 5.0, speed: 0.75, targets: 'buildings', proj: 'shell', radius: 0.7, deployCd: 1.45,
+    { slug: 'siege', name: 'Siege', icon: '🛞', rarity: 'rare', cost: 6, role: 'siege tank', hp: 1300, dmg: 105, cd: 1.7, range: 5.0, speed: 0.75, targets: 'buildings', proj: 'shell', radius: 0.7, deployCd: 1.45,
       ability: ab('Heavy Payload', 6, 12, 1.14, 1.05) },
-    { slug: 'guardian', name: 'Guardian', icon: '🛡️', rarity: 'rare', cost: 5, role: 'shield support', hp: 800, dmg: 45, cd: 1.2, range: 0.8, speed: 0.9, targets: 'ground', proj: 'melee', radius: 0.65, special: 'aura', deployCd: 1.25,
+    { slug: 'guardian', name: 'Guardian', icon: '🛡️', rarity: 'rare', cost: 5, role: 'shield support', hp: 875, dmg: 48, cd: 1.2, range: 0.8, speed: 0.9, targets: 'ground', proj: 'melee', radius: 0.65, special: 'aura', deployCd: 1.25,
       ability: ab('Forcefield', 5, 10, 1.07, 1.14) },
     { slug: 'voltbug', name: 'Volt Bug', icon: '⚡', rarity: 'common', cost: 3, role: 'chain zapper', hp: 240, dmg: 35, cd: 1.2, range: 4.5, speed: 1.25, targets: 'any', proj: 'spark', radius: 0.45, special: 'chain', deployCd: 1.0,
       ability: ab('Static Burst', 5, 10, 1.12, 1.05) },
-    { slug: 'flarepod', name: 'Flare Pod', icon: '🔥', rarity: 'epic', cost: 4, role: 'splash caster', hp: 250, dmg: 90, cd: 1.4, range: 5.0, speed: 1.0, targets: 'any', proj: 'flare', splash: 1.3, radius: 0.45, deployCd: 1.2,
+    { slug: 'flarepod', name: 'Flare Pod', icon: '🔥', rarity: 'epic', cost: 4, role: 'splash caster', hp: 215, dmg: 55, cd: 1.4, range: 5.0, speed: 1.0, targets: 'any', proj: 'flare', splash: 1.3, radius: 0.45, deployCd: 1.2,
       ability: ab('Inferno Surge', 6, 12, 1.12, 1.07) },
-    { slug: 'drillcat', name: 'Drill Cat', icon: '🚜', rarity: 'rare', cost: 4, role: 'tank killer', hp: 450, dmg: 240, cd: 1.6, range: 0.5, speed: 1.5, targets: 'ground', proj: 'melee', radius: 0.5, structureMult: 1.25, deployCd: 1.15,
+    { slug: 'drillcat', name: 'Drill Cat', icon: '🚜', rarity: 'rare', cost: 4, role: 'tank killer', hp: 401, dmg: 189, cd: 1.6, range: 0.5, speed: 1.5, targets: 'ground', proj: 'melee', radius: 0.5, structureMult: 1.25, deployCd: 1.15,
       ability: ab('Diamond Drill', 6, 12, 1.14, 1.06) },
-    { slug: 'raylance', name: 'Ray Lance', icon: '💠', rarity: 'legendary', cost: 5, role: 'sniper', hp: 270, dmg: 85, cd: 1.0, range: 6.5, speed: 1.0, targets: 'any', proj: 'beam', radius: 0.45, deployCd: 1.35,
+    { slug: 'raylance', name: 'Ray Lance', icon: '💠', rarity: 'legendary', cost: 5, role: 'sniper', hp: 228, dmg: 60, cd: 1.0, range: 6.5, speed: 1.0, targets: 'any', proj: 'beam', radius: 0.45, deployCd: 1.35,
       ability: ab('Overcharge', 7, 15, 1.16, 1.05) },
     { slug: 'mortarfox', name: 'Mortar Fox', icon: '🧨', rarity: 'epic', cost: 6, role: 'artillery', hp: 330, dmg: 110, cd: 2.6, range: 6.5, minRange: 2.5, speed: 0.75, targets: 'ground', proj: 'mortar', splash: 1.5, radius: 0.55, deployCd: 1.65,
       ability: ab('Barrage Mode', 7, 15, 1.14, 1.07) },
     { slug: 'ramhog', name: 'Ram Hog', icon: '🐗', rarity: 'rare', cost: 5, role: 'river-jumping charger', hp: 560, dmg: 105, cd: 1.6, range: 0.5, speed: 2.0, targets: 'buildings', proj: 'melee', radius: 0.55, special: 'jump charge', deployCd: 1.18,
       ability: ab('Rampage', 7, 15, 1.16, 1.08) },
     // ── Swarms ──
-    { slug: 'junkpack', name: 'Junk Pack', icon: '🔧', rarity: 'common', cost: 3, role: 'melee swarm', count: 3, hp: 170, dmg: 45, cd: 1.3, range: 0.5, speed: 1.0, targets: 'ground', proj: 'melee', radius: 0.42, deployCd: 1.1,
+    { slug: 'junkpack', name: 'Junk Pack', icon: '🔧', rarity: 'common', cost: 3, role: 'melee swarm', count: 3, hp: 184, dmg: 48, cd: 1.3, range: 0.5, speed: 1.0, targets: 'ground', proj: 'melee', radius: 0.42, deployCd: 1.1,
       ability: ab('Mob Rush', 5, 10, 1.1, 1.08) },
-    { slug: 'bugsquad', name: 'Bug Squad', icon: '🐛', rarity: 'rare', cost: 4, role: 'ranged swarm', count: 4, hp: 70, dmg: 30, cd: 1.2, range: 4.0, speed: 1.5, targets: 'any', proj: 'spark', radius: 0.35, deployCd: 1.2,
+    { slug: 'bugsquad', name: 'Bug Squad', icon: '🐛', rarity: 'rare', cost: 4, role: 'ranged swarm', count: 4, hp: 85, dmg: 30, cd: 1.2, range: 4.0, speed: 1.5, targets: 'any', proj: 'spark', radius: 0.35, deployCd: 1.2,
       ability: ab('Hive Mind', 6, 12, 1.12, 1.1) },
     { slug: 'mechmice', name: 'Mech Mice', icon: '🐭', rarity: 'common', cost: 2, role: 'cycle swarm', count: 2, hp: 110, dmg: 45, cd: 1.0, range: 0.4, speed: 2.0, targets: 'ground', proj: 'melee', radius: 0.35, deployCd: 0.95,
       ability: ab('Scuttle', 5, 10, 1.08, 1.1) },
-    { slug: 'goblinbikers', name: 'Goblin Bikers', icon: '🏍️', rarity: 'epic', cost: 5, role: 'tower rushers', count: 5, hp: 90, dmg: 30, cd: 1.1, range: 0.5, speed: 2.0, targets: 'buildings', proj: 'melee', radius: 0.38, deployCd: 1.3,
+    { slug: 'goblinbikers', name: 'Goblin Bikers', icon: '🏍️', rarity: 'epic', cost: 5, role: 'tower rushers', count: 5, hp: 152, dmg: 46, cd: 1.1, range: 0.5, speed: 2.0, targets: 'buildings', proj: 'melee', radius: 0.38, deployCd: 1.3,
       ability: ab('Turbo Gang', 7, 15, 1.12, 1.1) },
-    { slug: 'nanodrones', name: 'Nano Drones', icon: '🤖', rarity: 'rare', cost: 4, role: 'air swarm', count: 3, air: true, hp: 95, dmg: 32, cd: 1.0, range: 2.0, speed: 1.5, targets: 'any', proj: 'spark', radius: 0.4, deployCd: 1.2,
+    { slug: 'nanodrones', name: 'Nano Drones', icon: '🤖', rarity: 'rare', cost: 4, role: 'air swarm', count: 3, air: true, hp: 110, dmg: 32, cd: 1.0, range: 2.0, speed: 1.5, targets: 'any', proj: 'spark', radius: 0.4, deployCd: 1.2,
       ability: ab('Network Link', 6, 12, 1.1, 1.08) },
-    { slug: 'bombbeetles', name: 'Bomb Beetles', icon: '💣', rarity: 'legendary', cost: 6, role: 'kamikaze splash', count: 6, hp: 70, dmg: 60, cd: 1.0, range: 1.6, speed: 2.0, targets: 'any', proj: 'melee', splash: 1.5, radius: 0.35, special: 'kamikaze', deployCd: 1.5,
+    { slug: 'bombbeetles', name: 'Bomb Beetles', icon: '💣', rarity: 'legendary', cost: 5, role: 'kamikaze splash', count: 6, hp: 145, dmg: 81, cd: 1.0, range: 1.6, speed: 2.0, targets: 'any', proj: 'melee', splash: 1.5, radius: 0.35, special: 'kamikaze', deployCd: 1.5,
       ability: ab('Chain Detonation', 7, 15, 1.16, 1.08) },
-    { slug: 'antmarch', name: 'Ant March', icon: '🐜', rarity: 'common', cost: 2, role: 'cheap swarm', count: 3, hp: 50, dmg: 40, cd: 1.0, range: 0.4, speed: 1.5, targets: 'ground', proj: 'melee', radius: 0.3, deployCd: 0.9,
+    { slug: 'antmarch', name: 'Ant March', icon: '🐜', rarity: 'common', cost: 2, role: 'cheap swarm', count: 3, hp: 65, dmg: 42, cd: 1.0, range: 0.4, speed: 1.5, targets: 'ground', proj: 'melee', radius: 0.3, deployCd: 0.9,
       ability: ab('Column Charge', 5, 10, 1.08, 1.1) },
     { slug: 'crickethop', name: 'Cricket Hop', icon: '🦗', rarity: 'common', cost: 2, role: 'river jumpers', count: 2, hp: 130, dmg: 50, cd: 1.0, range: 0.5, speed: 2.0, targets: 'ground', proj: 'melee', radius: 0.38, special: 'jump', deployCd: 0.95,
       ability: ab('Leap Spring', 5, 10, 1.09, 1.09) },
-    { slug: 'beeblitz', name: 'Bee Blitz', icon: '🐝', rarity: 'common', cost: 3, role: 'air swarm', count: 4, air: true, hp: 40, dmg: 30, cd: 1.1, range: 0.6, speed: 2.0, targets: 'any', proj: 'melee', radius: 0.32, deployCd: 1.0,
+    { slug: 'beeblitz', name: 'Bee Blitz', icon: '🐝', rarity: 'common', cost: 3, role: 'air swarm', count: 4, air: true, hp: 65, dmg: 30, cd: 1.1, range: 0.6, speed: 2.0, targets: 'any', proj: 'melee', radius: 0.32, deployCd: 1.0,
       ability: ab('Sting Flurry', 5, 10, 1.1, 1.07) },
-    { slug: 'scrapbots', name: 'Scrap Bots', icon: '🪲', rarity: 'common', cost: 3, role: 'sturdy swarm', count: 3, hp: 180, dmg: 40, cd: 1.3, range: 0.5, speed: 0.9, targets: 'ground', proj: 'melee', radius: 0.42, deployCd: 1.1,
+    { slug: 'scrapbots', name: 'Scrap Bots', icon: '🪲', rarity: 'common', cost: 3, role: 'sturdy swarm', count: 3, hp: 199, dmg: 43, cd: 1.3, range: 0.5, speed: 0.9, targets: 'ground', proj: 'melee', radius: 0.42, deployCd: 1.1,
       ability: ab('Salvage Mode', 5, 10, 1.08, 1.12) },
-    { slug: 'lizarddash', name: 'Lizard Dash', icon: '🦎', rarity: 'rare', cost: 3, role: 'fast swarm', count: 3, hp: 110, dmg: 40, cd: 1.0, range: 0.4, speed: 2.0, targets: 'ground', proj: 'melee', radius: 0.36, deployCd: 1.05,
+    { slug: 'lizarddash', name: 'Lizard Dash', icon: '🦎', rarity: 'rare', cost: 3, role: 'fast swarm', count: 3, hp: 125, dmg: 40, cd: 1.0, range: 0.4, speed: 2.0, targets: 'ground', proj: 'melee', radius: 0.36, deployCd: 1.05,
       ability: ab('Cold Blooded', 6, 12, 1.12, 1.06) },
-    { slug: 'toadtroop', name: 'Toad Troop', icon: '🐸', rarity: 'rare', cost: 4, role: 'splash swarm', count: 3, hp: 170, dmg: 45, cd: 1.4, range: 4.0, speed: 1.0, targets: 'ground', proj: 'shell', splash: 1.0, radius: 0.4, deployCd: 1.2,
+    { slug: 'toadtroop', name: 'Toad Troop', icon: '🐸', rarity: 'rare', cost: 4, role: 'splash swarm', count: 3, hp: 155, dmg: 37, cd: 1.4, range: 4.0, speed: 1.0, targets: 'ground', proj: 'shell', splash: 1.0, radius: 0.4, deployCd: 1.2,
       ability: ab('Leapfrog Volley', 6, 12, 1.1, 1.1) },
-    { slug: 'wolfpack', name: 'Wolf Pack', icon: '🐺', rarity: 'rare', cost: 5, role: 'fast melee pack', count: 3, hp: 300, dmg: 80, cd: 1.2, range: 0.5, speed: 1.5, targets: 'ground', proj: 'melee', radius: 0.45, deployCd: 1.3,
+    { slug: 'wolfpack', name: 'Wolf Pack', icon: '🐺', rarity: 'rare', cost: 5, role: 'fast melee pack', count: 3, hp: 279, dmg: 69, cd: 1.2, range: 0.5, speed: 1.5, targets: 'ground', proj: 'melee', radius: 0.45, deployCd: 1.3,
       ability: ab('Pack Fury', 6, 12, 1.14, 1.08) },
-    { slug: 'zombiemob', name: 'Zombie Mob', icon: '🧟', rarity: 'rare', cost: 4, role: 'slow horde', count: 5, hp: 140, dmg: 32, cd: 1.4, range: 0.5, speed: 0.75, targets: 'ground', proj: 'melee', radius: 0.4, deployCd: 1.2,
+    { slug: 'zombiemob', name: 'Zombie Mob', icon: '🧟', rarity: 'rare', cost: 4, role: 'slow horde', count: 5, hp: 218, dmg: 38, cd: 1.4, range: 0.5, speed: 0.9, targets: 'ground', proj: 'melee', radius: 0.4, deployCd: 1.2,
       ability: ab('Reanimate', 6, 12, 1.07, 1.16) },
     { slug: 'hawkstrike', name: 'Hawk Strike', icon: '🦅', rarity: 'epic', cost: 4, role: 'air hunters', count: 3, air: true, hp: 140, dmg: 45, cd: 1.1, range: 0.7, speed: 2.0, targets: 'any', proj: 'melee', radius: 0.42, deployCd: 1.2,
       ability: ab('Talon Dive', 7, 15, 1.14, 1.08) },
     { slug: 'crackergang', name: 'Cracker Gang', icon: '🎆', rarity: 'epic', cost: 5, role: 'ranged gang', count: 4, hp: 120, dmg: 45, cd: 1.4, range: 4.5, speed: 1.25, targets: 'any', proj: 'slug', radius: 0.38, deployCd: 1.3,
       ability: ab('Flashbang', 7, 15, 1.12, 1.1) },
-    { slug: 'flybombers', name: 'Fly Bombers', icon: '🪰', rarity: 'epic', cost: 5, role: 'air tower bombers', count: 5, air: true, hp: 110, dmg: 45, cd: 2.0, range: 0.4, speed: 1.25, targets: 'buildings', proj: 'melee', splash: 1.0, radius: 0.42, special: 'deathBomb', deployCd: 1.3,
+    { slug: 'flybombers', name: 'Fly Bombers', icon: '🪰', rarity: 'epic', cost: 5, role: 'air tower bombers', count: 5, air: true, hp: 165, dmg: 59, cd: 1.7, range: 0.4, speed: 1.25, targets: 'buildings', proj: 'melee', splash: 1.0, radius: 0.42, special: 'deathBomb', deployCd: 1.3,
       ability: ab('Kamikaze Drop', 7, 15, 1.14, 1.06) },
-    { slug: 'rabbitrush', name: 'Rabbit Rush', icon: '🐇', rarity: 'epic', cost: 5, role: 'burrowing rushers', count: 5, hp: 90, dmg: 28, cd: 1.0, range: 0.5, speed: 2.0, targets: 'buildings', proj: 'melee', radius: 0.36, special: 'jump', deployCd: 1.25,
+    { slug: 'rabbitrush', name: 'Rabbit Rush', icon: '🐇', rarity: 'epic', cost: 5, role: 'burrowing rushers', count: 5, hp: 156, dmg: 44, cd: 1.0, range: 0.5, speed: 2.0, targets: 'buildings', proj: 'melee', radius: 0.36, special: 'jump', deployCd: 1.25,
       ability: ab('Burrow Blitz', 7, 15, 1.12, 1.1) },
-    { slug: 'ufofleet', name: 'UFO Fleet', icon: '🛸', rarity: 'legendary', cost: 6, role: 'air siege', count: 4, air: true, hp: 170, dmg: 45, cd: 1.5, range: 4.0, speed: 1.0, targets: 'buildings', proj: 'beam', radius: 0.45, deployCd: 1.5,
+    { slug: 'ufofleet', name: 'UFO Fleet', icon: '🛸', rarity: 'legendary', cost: 6, role: 'air siege', count: 4, air: true, hp: 240, dmg: 45, cd: 1.5, range: 4.0, speed: 1.0, targets: 'buildings', proj: 'beam', radius: 0.45, deployCd: 1.5,
       ability: ab('Abduction Ray', 7, 15, 1.16, 1.06) },
     { slug: 'dustdevils', name: 'Dust Devils', icon: '🌪️', rarity: 'legendary', cost: 6, role: 'spinning splash', count: 3, hp: 330, dmg: 75, cd: 1.5, range: 0.6, speed: 1.0, targets: 'ground', proj: 'melee', splash: 1.4, radius: 0.45, special: 'spin', deployCd: 1.45,
       ability: ab('Vortex Spin', 7, 15, 1.14, 1.1) },
     { slug: 'makoswarm', name: 'Mako Swarm', icon: '🦈', rarity: 'legendary', cost: 7, role: 'heavy horde', count: 6, hp: 220, dmg: 60, cd: 1.4, range: 0.5, speed: 1.0, targets: 'ground', proj: 'melee', radius: 0.45, deployCd: 1.6,
       ability: ab('Feeding Frenzy', 7, 15, 1.18, 1.1) },
     // ── Buildings ──
-    { slug: 'boltturret', name: 'Bolt Turret', icon: '🏯', rarity: 'common', cost: 4, role: 'defensive building', building: true, lifetime: 30, hp: 1000, dmg: 70, cd: 0.9, range: 5.5, speed: 0, targets: 'ground', proj: 'bolt', radius: 0.95, deployCd: 1.2,
+    { slug: 'boltturret', name: 'Bolt Turret', icon: '🏯', rarity: 'common', cost: 4, role: 'defensive building', building: true, lifetime: 30, hp: 964, dmg: 65, cd: 0.9, range: 5.5, speed: 0, targets: 'ground', proj: 'bolt', radius: 0.95, deployCd: 1.2,
       ability: ab('Overclock', 5, 10, 1.1, 1.1) },
     // ── Spells: cast anywhere on the arena. Projectile spells fly from your king tower. ──
     // `splash` is the spell radius; crown towers take `towerMult` of the damage.
-    { slug: 'firebomb', name: 'Fire Bomb', icon: '☄️', rarity: 'rare', cost: 4, role: 'area damage spell', spell: true, hp: 0, dmg: 200, cd: 1, range: 0, speed: 0, targets: 'any', proj: 'firebomb', splash: 2.5, radius: 0, towerMult: 0.3, knockback: 0.9, deployCd: 1.0,
+    { slug: 'firebomb', name: 'Fire Bomb', icon: '☄️', rarity: 'rare', cost: 4, role: 'area damage spell', spell: true, hp: 0, dmg: 165, cd: 1, range: 0, speed: 0, targets: 'any', proj: 'firebomb', splash: 2.5, radius: 0, towerMult: 0.3, knockback: 0.9, deployCd: 1.0,
       ability: ab('Inferno Core', 6, 12, 1.1, 1) },
-    { slug: 'shock', name: 'Shock', icon: '🌩️', rarity: 'common', cost: 2, role: 'instant stun spell', spell: true, hp: 0, dmg: 75, cd: 1, range: 0, speed: 0, targets: 'any', proj: 'shock', splash: 2.5, radius: 0, towerMult: 0.3, stun: 0.6, deployCd: 0.9,
+    { slug: 'shock', name: 'Shock', icon: '🌩️', rarity: 'common', cost: 2, role: 'instant stun spell', spell: true, hp: 0, dmg: 62, cd: 1, range: 0, speed: 0, targets: 'any', proj: 'shock', splash: 2.5, radius: 0, towerMult: 0.3, stun: 0.6, deployCd: 0.9,
       ability: ab('Overvolt', 5, 10, 1.1, 1) },
-    { slug: 'rocketrain', name: 'Rocket Rain', icon: '🚀', rarity: 'common', cost: 3, role: 'swarm-clearing spell', spell: true, hp: 0, dmg: 120, cd: 1, range: 0, speed: 0, targets: 'any', proj: 'rocket', splash: 3.8, radius: 0, towerMult: 0.3, waves: 3, deployCd: 1.0,
+    { slug: 'rocketrain', name: 'Rocket Rain', icon: '🚀', rarity: 'common', cost: 3, role: 'swarm-clearing spell', spell: true, hp: 0, dmg: 100, cd: 1, range: 0, speed: 0, targets: 'any', proj: 'rocket', splash: 3.8, radius: 0, towerMult: 0.3, waves: 3, deployCd: 1.0,
       ability: ab('Cluster Payload', 5, 10, 1.1, 1) },
 
-    // ── Trophy Road cards: one version each (no Mk-II/Twin/Burst/Core variants) ──
+    // ── Trophy Road cards: one version each (no Mk-II variant) ──
     // `mech` holds the card's special mechanic; see the Mechanics section below.
 
     // Spells. `zone` spells leave a lingering area; `instant` ones land immediately.
-    { slug: 'frostnova', name: 'Frost Nova', icon: '❄️', rarity: 'epic', cost: 4, role: 'freeze spell', spell: true, instant: true, hp: 0, dmg: 80, cd: 1, range: 0, speed: 0, targets: 'any', proj: 'frost', splash: 3.0, radius: 0, towerMult: 0.3, freeze: 3.0, deployCd: 1.1, arena: 2,
+    { slug: 'frostnova', name: 'Frost Nova', icon: '❄️', rarity: 'epic', cost: 4, role: 'freeze spell', spell: true, instant: true, hp: 0, dmg: 65, cd: 1, range: 0, speed: 0, targets: 'any', proj: 'frost', splash: 3.0, radius: 0, towerMult: 0.3, freeze: 3.0, deployCd: 1.1, arena: 2,
       desc: 'Freezes every enemy in the area (troops, buildings and towers) for 3 seconds.',
       ability: ab('Deep Freeze', 6, 12, 1.1, 1) },
-    { slug: 'acidpool', name: 'Acid Pool', icon: '🧪', rarity: 'epic', cost: 4, role: 'damage-over-time spell', spell: true, instant: true, hp: 0, dmg: 300, cd: 1, range: 0, speed: 0, targets: 'any', proj: 'acid', splash: 3.0, radius: 0, towerMult: 0.3, deployCd: 1.1, arena: 3,
+    { slug: 'acidpool', name: 'Acid Pool', icon: '🧪', rarity: 'epic', cost: 4, role: 'damage-over-time spell', spell: true, instant: true, hp: 0, dmg: 250, cd: 1, range: 0, speed: 0, targets: 'any', proj: 'acid', splash: 3.0, radius: 0, towerMult: 0.3, deployCd: 1.1, arena: 3,
       zone: { kind: 'dot', dur: 6, tick: 1, slow: 0.8 },
       desc: 'A bubbling pool that burns enemies for 6 seconds and slows them while they stand in it.',
       ability: ab('Corrosion', 6, 12, 1.1, 1) },
@@ -156,19 +156,19 @@
       zone: { kind: 'haste', dur: 6, haste: 1.4 },
       desc: 'Your troops and buildings inside move and attack 40% faster for 6 seconds.',
       ability: ab('Redline', 6, 12, 1, 1) },
-    { slug: 'repairwave', name: 'Repair Wave', icon: '💚', rarity: 'rare', cost: 3, role: 'friendly healing spell', spell: true, instant: true, friendly: true, hp: 0, dmg: 300, cd: 1, range: 0, speed: 0, targets: 'any', proj: 'repair', splash: 3.0, radius: 0, towerMult: 0, deployCd: 1.0, arena: 4,
+    { slug: 'repairwave', name: 'Repair Wave', icon: '💚', rarity: 'rare', cost: 3, role: 'friendly healing spell', spell: true, instant: true, friendly: true, hp: 0, dmg: 324, cd: 1, range: 0, speed: 0, targets: 'any', proj: 'repair', splash: 3.0, radius: 0, towerMult: 0, deployCd: 1.0, arena: 4,
       zone: { kind: 'heal', dur: 3, tick: 0.5 },
-      desc: 'Heals your troops and buildings in the area by 300 over 3 seconds. Does not heal crown towers.',
+      desc: 'Heals your troops and buildings in the area by 324 over 3 seconds. Does not heal crown towers.',
       ability: ab('Nanite Swarm', 5, 10, 1.1, 1) },
-    { slug: 'gravitywell', name: 'Gravity Well', icon: '🌀', rarity: 'epic', cost: 3, role: 'pulling spell', spell: true, instant: true, hp: 0, dmg: 120, cd: 1, range: 0, speed: 0, targets: 'any', proj: 'gravity', splash: 3.5, radius: 0, towerMult: 0.3, deployCd: 1.0, arena: 6,
+    { slug: 'gravitywell', name: 'Gravity Well', icon: '🌀', rarity: 'epic', cost: 3, role: 'pulling spell', spell: true, instant: true, hp: 0, dmg: 100, cd: 1, range: 0, speed: 0, targets: 'any', proj: 'gravity', splash: 3.5, radius: 0, towerMult: 0.3, deployCd: 1.0, arena: 6,
       zone: { kind: 'pull', dur: 2.2, tick: 0.5, pull: 2.4 },
       desc: 'Drags enemy troops toward its centre for 2 seconds while damaging them. Great for grouping troops or pulling them into tower range.',
       ability: ab('Event Horizon', 6, 12, 1.1, 1) },
-    { slug: 'orbitallaser', name: 'Orbital Laser', icon: '🛰️', rarity: 'legendary', cost: 6, role: 'heavy precision strike', spell: true, instant: true, hp: 0, dmg: 480, cd: 1, range: 0, speed: 0, targets: 'any', proj: 'laser', splash: 3.5, radius: 0, towerMult: 0.3, stun: 0.4, deployCd: 1.4, arena: 8,
+    { slug: 'orbitallaser', name: 'Orbital Laser', icon: '🛰️', rarity: 'legendary', cost: 6, role: 'heavy precision strike', spell: true, instant: true, hp: 0, dmg: 432, cd: 1, range: 0, speed: 0, targets: 'any', proj: 'laser', splash: 3.5, radius: 0, towerMult: 0.3, stun: 0.4, deployCd: 1.4, arena: 8,
       zone: { kind: 'laser', delay: 0.9, targets: 3 },
       desc: 'After a short lock-on, beams hit the 3 toughest enemies in the area for heavy damage.',
       ability: ab('Focused Lens', 7, 15, 1.1, 1) },
-    { slug: 'boulder', name: 'Boulder Roll', icon: '🪨', rarity: 'rare', cost: 2, role: 'rolling knockback spell', spell: true, instant: true, hp: 0, dmg: 150, cd: 1, range: 0, speed: 0, targets: 'ground', proj: 'boulder', splash: 1.0, radius: 0, towerMult: 0.3, knockback: 1.2, deployCd: 0.9, arena: 3,
+    { slug: 'boulder', name: 'Boulder Roll', icon: '🪨', rarity: 'rare', cost: 2, role: 'rolling knockback spell', spell: true, instant: true, hp: 0, dmg: 97, cd: 1, range: 0, speed: 0, targets: 'ground', proj: 'boulder', splash: 1.0, radius: 0, towerMult: 0.3, knockback: 1.2, deployCd: 0.9, arena: 3,
       zone: { kind: 'roll', length: 10, speed: 6 },
       desc: 'Rolls 10 tiles toward the enemy, hitting every ground troop in its path once and knocking it back.',
       ability: ab('Avalanche', 5, 10, 1.1, 1) },
@@ -181,22 +181,22 @@
     { slug: 'flaktower', name: 'Flak Tower', icon: '🎯', rarity: 'rare', cost: 4, role: 'anti-air building', building: true, lifetime: 35, hp: 950, dmg: 115, cd: 0.9, range: 6.5, speed: 0, targets: 'air', proj: 'flak', splash: 1.0, radius: 0.9, deployCd: 1.2, arena: 2,
       desc: 'Shreds flying troops with splash flak. Cannot hit ground troops at all.',
       ability: ab('Proximity Fuse', 5, 10, 1.1, 1.1) },
-    { slug: 'infernospire', name: 'Inferno Spire', icon: '🌋', rarity: 'epic', cost: 5, role: 'tank-melting building', building: true, lifetime: 35, hp: 1000, dmg: 22, cd: 0.4, range: 6.0, speed: 0, targets: 'any', proj: 'beam', radius: 0.9, deployCd: 1.3, arena: 5,
+    { slug: 'infernospire', name: 'Inferno Spire', icon: '🌋', rarity: 'epic', cost: 5, role: 'tank-melting building', building: true, lifetime: 35, hp: 804, dmg: 14, cd: 0.4, range: 6.0, speed: 0, targets: 'any', proj: 'beam', radius: 0.9, deployCd: 1.3, arena: 5,
       mech: { ramp: 4 },
       desc: 'Its beam heats up the longer it stays on one target, reaching 10× damage after 4 seconds. Stuns and target swaps reset it.',
       ability: ab('Superheat', 6, 12, 1.1, 1.1) },
-    { slug: 'mortarbunker', name: 'Mortar Bunker', icon: '💥', rarity: 'rare', cost: 4, role: 'long-range siege building', building: true, lifetime: 30, hp: 800, dmg: 110, cd: 4.5, range: 11.5, minRange: 3.5, speed: 0, targets: 'ground', proj: 'mortar', splash: 1.4, radius: 0.9, deployCd: 1.2, arena: 3,
+    { slug: 'mortarbunker', name: 'Mortar Bunker', icon: '💥', rarity: 'rare', cost: 4, role: 'long-range siege building', building: true, lifetime: 30, hp: 873, dmg: 117, cd: 4.5, range: 11.5, minRange: 3.5, speed: 0, targets: 'ground', proj: 'mortar', splash: 1.4, radius: 0.9, deployCd: 1.2, arena: 3,
       desc: 'Lobs slow splash shells 11.5 tiles. Placed near the river it can bombard an enemy tower, but it cannot hit anything close.',
       ability: ab('Heavy Shells', 6, 12, 1.1, 1.1) },
     { slug: 'teslapit', name: 'Tesla Pit', icon: '🗼', rarity: 'epic', cost: 4, role: 'hidden defense', building: true, lifetime: 35, hp: 750, dmg: 85, cd: 1.1, range: 5.5, speed: 0, targets: 'any', proj: 'zap', radius: 0.85, deployCd: 1.2, arena: 6,
       mech: { hide: true },
       desc: 'Hides underground (untargetable except by spells) until an enemy comes in range, then pops up and zaps air and ground.',
       ability: ab('Overcharge Coil', 6, 12, 1.1, 1.1) },
-    { slug: 'dronehangar', name: 'Drone Hangar', icon: '🛩️', rarity: 'rare', cost: 5, role: 'air-spawning building', building: true, lifetime: 40, hp: 850, dmg: 0, cd: 1, range: 0, speed: 0, targets: 'none', proj: 'none', radius: 0.95, deployCd: 1.3, arena: 4,
+    { slug: 'dronehangar', name: 'Drone Hangar', icon: '🛩️', rarity: 'rare', cost: 5, role: 'air-spawning building', building: true, lifetime: 40, hp: 819, dmg: 0, cd: 1, range: 0, speed: 0, targets: 'none', proj: 'none', radius: 0.95, deployCd: 1.3, arena: 4,
       mech: { spawner: { card: 'hangardrone', every: 4.5, count: 1, onDeath: 1 } },
       desc: 'Launches a flying drone every 4.5 seconds, plus one more when destroyed.',
       ability: ab('Fast Assembly', 6, 12, 1.08, 1.1) },
-    { slug: 'bonecrypt', name: 'Bone Crypt', icon: '⚰️', rarity: 'common', cost: 3, role: 'distraction spawner', building: true, lifetime: 35, hp: 450, dmg: 0, cd: 1, range: 0, speed: 0, targets: 'none', proj: 'none', radius: 0.85, deployCd: 1.1, arena: 1,
+    { slug: 'bonecrypt', name: 'Bone Crypt', icon: '⚰️', rarity: 'common', cost: 3, role: 'distraction spawner', building: true, lifetime: 35, hp: 415, dmg: 0, cd: 1, range: 0, speed: 0, targets: 'none', proj: 'none', radius: 0.85, deployCd: 1.1, arena: 1,
       mech: { spawner: { card: 'cryptskel', every: 2.9, count: 1, onDeath: 3 } },
       desc: 'Raises a skeleton every 2.9 seconds and 3 more when destroyed. Cheap bait for tanks and win conditions.',
       ability: ab('Restless Dead', 5, 10, 1.08, 1.1) },
@@ -214,15 +214,15 @@
       mech: { heal: { radius: 3.0, perSec: 26 } },
       desc: 'Heals nearby friendly troops by 26 HP per second while plinking at enemies.',
       ability: ab('Triage', 6, 12, 1.05, 1.1) },
-    { slug: 'rocktitan', name: 'Rock Titan', icon: '🗿', rarity: 'legendary', cost: 8, role: 'giant building-buster', hp: 2000, dmg: 110, cd: 1.5, range: 0.6, speed: 0.6, targets: 'buildings', proj: 'melee', radius: 0.9, deployCd: 1.8, arena: 8,
+    { slug: 'rocktitan', name: 'Rock Titan', icon: '🗿', rarity: 'legendary', cost: 8, role: 'giant building-buster', hp: 1672, dmg: 76, cd: 1.5, range: 0.6, speed: 0.6, targets: 'buildings', proj: 'melee', radius: 0.9, deployCd: 1.8, arena: 8,
       mech: { deathSpawn: { card: 'rockshard', count: 2 }, deathSplash: { radius: 2, dmg: 140 } },
       desc: 'Enormous and slow. Only attacks buildings. When it falls it shatters, damaging nearby enemies and splitting into 2 Rock Shards.',
       ability: ab('Bedrock', 7, 15, 1.06, 1.12) },
-    { slug: 'teslatank', name: 'Tesla Tank', icon: '🔋', rarity: 'legendary', cost: 6, role: 'charged splash cannon', hp: 850, dmg: 260, cd: 5.0, range: 4.5, speed: 0.75, targets: 'ground', proj: 'pulse', splash: 1.5, radius: 0.7, deployCd: 1.5, arena: 5,
+    { slug: 'teslatank', name: 'Tesla Tank', icon: '🔋', rarity: 'legendary', cost: 6, role: 'charged splash cannon', hp: 816, dmg: 239, cd: 5.0, range: 4.5, speed: 0.75, targets: 'ground', proj: 'pulse', splash: 1.5, radius: 0.7, deployCd: 1.5, arena: 5,
       mech: { chargeShot: true },
       desc: 'Charges a devastating splash blast every 5 seconds. Stuns and freezes reset its charge.',
       ability: ab('Capacitor Bank', 7, 15, 1.12, 1.06) },
-    { slug: 'shieldknight', name: 'Shield Knight', icon: '🤺', rarity: 'rare', cost: 4, role: 'shielded melee', hp: 560, dmg: 90, cd: 1.2, range: 0.6, speed: 1.0, targets: 'ground', proj: 'melee', radius: 0.55, deployCd: 1.2, arena: 2,
+    { slug: 'shieldknight', name: 'Shield Knight', icon: '🤺', rarity: 'rare', cost: 4, role: 'shielded melee', hp: 533, dmg: 81, cd: 1.2, range: 0.6, speed: 1.0, targets: 'ground', proj: 'melee', radius: 0.55, deployCd: 1.2, arena: 2,
       mech: { shield: 280 },
       desc: 'Carries a 280 HP shield that soaks damage first. Once the shield breaks, extra damage from that hit is lost.',
       ability: ab('Tower Shield', 6, 12, 1.05, 1.12) },
@@ -230,18 +230,18 @@
       mech: { deathSpawn: { card: 'stormsprite', count: 4 } },
       desc: 'A huge flying tank that heads for buildings. When it pops, 4 Storm Sprites burst out and attack everything.',
       ability: ab('Thunderhead', 7, 15, 1.06, 1.12) },
-    { slug: 'cryocaster', name: 'Cryo Caster', icon: '🧊', rarity: 'epic', cost: 4, role: 'slowing splash caster', hp: 370, dmg: 60, cd: 1.4, range: 5.0, speed: 1.0, targets: 'any', proj: 'ice', splash: 1.0, radius: 0.45, deployCd: 1.2, arena: 2,
-      mech: { slowOnHit: { mult: 0.7, dur: 2.5 } },
-      desc: 'Ice shards splash air and ground and slow whatever they hit by 30% for 2.5 seconds.',
+    { slug: 'cryocaster', name: 'Cryo Caster', icon: '🧊', rarity: 'epic', cost: 4, role: 'slowing splash caster', hp: 352, dmg: 45, cd: 1.4, range: 5.0, speed: 1.0, targets: 'any', proj: 'ice', splash: 1.0, radius: 0.45, deployCd: 1.2, arena: 2,
+      mech: { slowOnHit: { mult: 0.7, dur: 1.5 } },
+      desc: 'Ice shards splash air and ground and slow whatever they hit by 30% for 1.5 seconds.',
       ability: ab('Permafrost', 6, 12, 1.1, 1.06) },
-    { slug: 'phantomrider', name: 'Phantom Rider', icon: '👻', rarity: 'legendary', cost: 3, role: 'dashing assassin', hp: 380, dmg: 75, cd: 1.0, range: 0.5, speed: 1.5, targets: 'ground', proj: 'melee', radius: 0.45, deployCd: 1.0, arena: 6,
+    { slug: 'phantomrider', name: 'Phantom Rider', icon: '👻', rarity: 'legendary', cost: 3, role: 'dashing assassin', hp: 340, dmg: 60, cd: 1.0, range: 0.5, speed: 1.5, targets: 'ground', proj: 'melee', radius: 0.45, deployCd: 1.0, arena: 6,
       mech: { dash: { min: 2.5, max: 6, speed: 10, cd: 3.5 } },
       desc: 'Dashes at targets 2.5 to 6 tiles away, untouchable during the dash, and hits for double damage when it lands.',
       ability: ab('Shadow Step', 7, 15, 1.1, 1.08) },
     { slug: 'flakgunner', name: 'Flak Gunner', icon: '🔭', rarity: 'common', cost: 3, role: 'anti-air troop', hp: 430, dmg: 105, cd: 0.9, range: 5.5, speed: 1.0, targets: 'air', proj: 'flak', splash: 0.8, radius: 0.45, deployCd: 1.0, arena: 1,
       desc: 'Shoots only flying troops, with splash. Holds its ground when no air target is in sight.',
       ability: ab('Tracer Rounds', 5, 10, 1.1, 1.08) },
-    { slug: 'boomerang', name: 'Boomerang Bot', icon: '🪃', rarity: 'epic', cost: 5, role: 'piercing thrower', hp: 650, dmg: 70, cd: 2.4, range: 4.0, speed: 1.0, targets: 'ground', proj: 'blade', radius: 0.55, deployCd: 1.3, arena: 6,
+    { slug: 'boomerang', name: 'Boomerang Bot', icon: '🪃', rarity: 'epic', cost: 5, role: 'piercing thrower', hp: 585, dmg: 56, cd: 2.4, range: 4.0, speed: 1.0, targets: 'ground', proj: 'blade', radius: 0.55, deployCd: 1.3, arena: 6,
       mech: { pierce: 1.5 },
       desc: 'Throws a blade that flies through every ground enemy in a line and back again, hitting each one twice.',
       ability: ab('Razor Edge', 6, 12, 1.1, 1.08) },
@@ -257,7 +257,7 @@
 
   // Token units: spawned by other cards, never in a deck or the collection
   const TOKENS = [
-    { slug: 'paratrooper', name: 'Paratrooper', icon: '🪖', rarity: 'common', cost: 0, role: 'dropped trooper', hp: 75, dmg: 55, cd: 1.0, range: 0.5, speed: 1.5, targets: 'ground', proj: 'melee', radius: 0.35 },
+    { slug: 'paratrooper', name: 'Paratrooper', icon: '🪖', rarity: 'common', cost: 0, role: 'dropped trooper', hp: 75, dmg: 38, cd: 1.0, range: 0.5, speed: 1.5, targets: 'ground', proj: 'melee', radius: 0.35 },
     { slug: 'hangardrone', name: 'Hangar Drone', icon: '🚁', rarity: 'common', cost: 0, role: 'spawned drone', air: true, hp: 110, dmg: 38, cd: 1.0, range: 2.5, speed: 1.6, targets: 'any', proj: 'spark', radius: 0.35 },
     { slug: 'cryptskel', name: 'Skeleton', icon: '💀', rarity: 'common', cost: 0, role: 'spawned skeleton', hp: 55, dmg: 50, cd: 1.0, range: 0.5, speed: 1.5, targets: 'ground', proj: 'melee', radius: 0.32 },
     { slug: 'rockshard', name: 'Rock Shard', icon: '🧱', rarity: 'common', cost: 0, role: 'titan fragment', hp: 650, dmg: 65, cd: 1.5, range: 0.6, speed: 0.75, targets: 'buildings', proj: 'melee', radius: 0.6 },
@@ -271,7 +271,7 @@
   ];
 
   // Which Trophy Road arena (0-9) unlocks each original card into chests and rewards.
-  // Variants unlock with their base card (Mk-II), one arena later (Twin, Burst) or two (Core).
+  // The Mk-II variant unlocks with its base card.
   const BASE_ARENA = {
     scout: 0, brawler: 0, siege: 0, guardian: 0, voltbug: 0, drillcat: 0, ramhog: 0, flarepod: 0,
     boltturret: 0, firebomb: 0, shock: 0, rocketrain: 0, junkpack: 0, mechmice: 0, antmarch: 0,
@@ -284,12 +284,12 @@
     ufofleet: 7, dustdevils: 7,
     bombbeetles: 8, makoswarm: 8,
   };
-  const VARIANT_ARENA_SHIFT = [0, 0, 1, 1, 2];
+  const VARIANT_ARENA_SHIFT = [0, 0];
 
   // ─── Card Evolutions ─────────────────────────────────────────────────────
   //
   // An Evolution is an upgraded form of a card family (keyed by slug, so it covers that card's
-  // Mk-II/Twin/Burst/Core variants too). It changes how the card behaves, not just its numbers.
+  // Mk-II variant too). It changes how the card behaves, not just its numbers.
   //
   //   cycles   normal plays needed before the next play comes out evolved (then it resets)
   //   hp/dmg   small stat multipliers for the evolved form (most stay at 1)
@@ -453,14 +453,13 @@
     rocketrain: 'Three waves of rockets over a wide area. Clears swarms.',
   };
 
-  // Variants scale the base unit; the pricier ones change how the unit attacks.
+  // Variants scale the base unit. Twin, Burst and Core were removed on 2026-10-14; saves that
+  // still hold them are folded into the base card (REMOVED_VARIANTS / migrateCardId).
   const VARIANTS = [
     { suffix: 'Mk-I', hp: 1, dmg: 1, range: 0, speed: 0, cost: 0, cd: 1, deployCd: 0, rarityShift: 0, style: null },
     { suffix: 'Mk-II', hp: 1.06, dmg: 1.06, range: 0.3, speed: 0.05, cost: 0, cd: 0.97, deployCd: -0.05, rarityShift: 0, style: null },
-    { suffix: 'Twin', hp: 0.94, dmg: 1.04, range: 0.5, speed: -0.05, cost: 1, cd: 1.02, deployCd: 0.03, rarityShift: 1, style: 'double' },
-    { suffix: 'Burst', hp: 0.92, dmg: 1.08, range: 0, speed: 0, cost: 1, cd: 0.9, deployCd: -0.08, rarityShift: 1, style: 'burst' },
-    { suffix: 'Core', hp: 1.12, dmg: 1.1, range: 0.3, speed: -0.1, cost: 1, cd: 1.08, deployCd: 0.08, rarityShift: 2, style: 'splash' },
   ];
+  const REMOVED_VARIANTS = ['twin', 'burst', 'core'];
 
   const RARITY_ORDER = ['common', 'rare', 'epic', 'legendary', 'champion'];
 
@@ -494,7 +493,7 @@
       air: !!a.air,
       building: !!a.building,
       lifetime: a.lifetime || 0,
-      splash: Math.max(a.splash || 0, style === 'splash' ? 1.0 : 0),
+      splash: a.splash || 0,
       style,
       proj: a.proj,
       role: a.role,
@@ -542,6 +541,13 @@
   const TOKEN_CARDS = TOKENS.map((t) => makeCard(t, VARIANTS[0], 0, true));
   // CARD_MAP includes tokens (the renderer needs their icons); CARD_LIBRARY does not
   const CARD_MAP = Object.fromEntries(CARD_LIBRARY.concat(TOKEN_CARDS).map((c) => [c.id, c]));
+  /** A card id from an older save: removed Twin/Burst/Core versions become the base card; unknown ids give null. */
+  function migrateCardId(id) {
+    if (typeof id !== 'string') return null;
+    if (CARD_MAP[id]) return id;
+    const m = id.match(/^(.+)-([a-z]+)$/);
+    return m && REMOVED_VARIANTS.includes(m[2]) && CARD_MAP[m[1]] ? m[1] : null;
+  }
   const STARTER_DECK = ['scout', 'brawler', 'siege', 'guardian', 'voltbug', 'drillcat', 'ramhog', 'flarepod'];
   const MAX_DECK = 8;
 
@@ -793,9 +799,23 @@
 
   const NEIGHBORS = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, Math.SQRT2], [1, -1, Math.SQRT2], [-1, 1, Math.SQRT2], [-1, -1, Math.SQRT2]];
 
+  // Which bridge a nav cell belongs to (-1: not on a bridge)
+  const BRIDGE_STICK = 2;   // extra tiles a route must save before a unit switches to the other bridge
+  const BRIDGE_COMMIT = 8;  // ...and much more once it is close to its bridge (within BRIDGE_NEAR tiles):
+  const BRIDGE_NEAR = 5;    // turning back from there costs more than it could ever save
+  const BRIDGE_HOLD = 4;    // seconds a newly chosen bridge is held with the same commitment
+  function bridgeOfCell(idx) {
+    const y = (Math.floor(idx / COLS) + 0.5) * NAV_CELL;
+    if (y < RIVER.y0 || y >= RIVER.y1) return -1;
+    const x = ((idx % COLS) + 0.5) * NAV_CELL;
+    return BRIDGES.findIndex((b) => x > b.x0 && x < b.x1);
+  }
+
   // A* from (sx,sy) to any cell where a body of `radius` would be within `range` of `target`.
-  // Returns smoothed waypoints or null.
-  function findPath(state, sx, sy, target, range, radius, jump) {
+  // Returns smoothed waypoints or null; `.bridge` on the result is the bridge it crosses (-1: none).
+  // `stick` (a bridge index) makes stepping onto the OTHER bridge cost BRIDGE_STICK tiles more, so a
+  // unit chasing something near the middle doesn't flip between two nearly equal routes.
+  function findPath(state, sx, sy, target, range, radius, jump, stick, commit) {
     const tx = target.x;
     const ty = target.y;
     const far = range + radius + targetExtent(target) * Math.SQRT2;
@@ -804,6 +824,11 @@
     if (!walkableCell(nav, start, jump)) start = nearestWalkableCell(nav, sx, sy, jump);
     if (start < 0) return null;
 
+    let stickCost = 0;
+    if (stick != null && stick >= 0) {
+      const near = dist(sx, sy, BRIDGES[stick].cx, (RIVER.y0 + RIVER.y1) / 2) < BRIDGE_NEAR;
+      stickCost = BRIDGE_STICK + (near || commit ? BRIDGE_COMMIT : 0);
+    }
     nav.search++;
     const s = nav.search;
     const heap = makeHeap();
@@ -833,7 +858,11 @@
         if (!walkableCell(nav, ni, jump)) continue;
         // No cutting corners past blocked cells
         if (dc && dr && (!walkableCell(nav, cr * COLS + nc, jump) || !walkableCell(nav, nr * COLS + cc, jump))) continue;
-        const g = nav.g[cur] + cost * NAV_CELL;
+        let g = nav.g[cur] + cost * NAV_CELL;
+        if (stick != null && stick >= 0) {
+          const nb = bridgeOfCell(ni);
+          if (nb >= 0 && nb !== stick && bridgeOfCell(cur) !== nb) g += stickCost;
+        }
         if (nav.seen[ni] === s && g >= nav.g[ni]) continue;
         nav.seen[ni] = s;
         nav.g[ni] = g;
@@ -844,7 +873,8 @@
     if (goal < 0) return null;
 
     const cells = [];
-    for (let i = goal; i >= 0; i = nav.from[i]) cells.push(i);
+    let crossed = -1;
+    for (let i = goal; i >= 0; i = nav.from[i]) { cells.push(i); if (crossed < 0) crossed = bridgeOfCell(i); }
     cells.reverse();
     const pts = cells.map((i) => ({ x: ((i % COLS) + 0.5) * NAV_CELL, y: (Math.floor(i / COLS) + 0.5) * NAV_CELL }));
     // String-pull: keep only the waypoints needed to stay on walkable ground
@@ -860,6 +890,7 @@
       ay = pts[j].y;
       i = j + 1;
     }
+    out.bridge = crossed;
     return out;
   }
 
@@ -1482,6 +1513,7 @@
       pathTargetId: null,
       pathNav: -1,
       stuckT: 0,
+      bridge: -1,          // bridge its current route crosses (route stickiness, see findPath)
       runDist: 0,
       charging: false,
       jumping: false,
@@ -2404,11 +2436,6 @@
       }
       // Melee shockwave every Nth hit, centred on the target
       if (em && em.shockwave && u.evoHits % em.shockwave.every === 0) shockwave(state, u, t.x, t.y, em.shockwave, 'shockwave');
-      if (u.style === 'double') {
-        const second = secondTarget(state, u, t);
-        if (second) applyDamage(state, src, second, dmg);
-      }
-      if (u.style === 'burst') applyDamage(state, src, t, dmg * 0.45);
       return;
     }
 
@@ -2420,22 +2447,6 @@
       impactZone: em && em.impactZone,
       cluster: em && em.cluster,
     });
-    if (u.style === 'double') {
-      const second = secondTarget(state, u, t);
-      if (second) launchProjectile(state, u, second, dmg);
-    }
-    if (u.style === 'burst') launchProjectile(state, u, t, dmg * 0.45, { delay: 0.15 });
-  }
-
-  function secondTarget(state, u, primary) {
-    let best = null;
-    let bestD = Infinity;
-    queryHash(state, u.x, u.y, u.range + u.radius + 1, (e) => {
-      if (e === primary || !canTarget(u, e) || !inAttackRange(u, e)) return;
-      const d = edgeDist(u, e);
-      if (d < bestD) { bestD = d; best = e; }
-    });
-    return best;
   }
 
   function windupOf(u) {
@@ -2854,7 +2865,11 @@
       } else {
         const stale = !u.path || u.pathTargetId !== t.id || state.time >= u.pathT || u.pathNav !== state.nav.version;
         if (stale) {
-          u.path = findPath(state, u.x, u.y, t, u.range, u.radius, jump);
+          const fresh = u.bridge >= 0 && state.time - (u.bridgeSince || 0) < BRIDGE_HOLD;
+          u.path = findPath(state, u.x, u.y, t, u.range, u.radius, jump, u.bridge, fresh);
+          // Remember the bridge while still on the far side of it; once across, forget it
+          const nb = u.path ? u.path.bridge : u.bridge;
+          if (u.path && nb !== u.bridge) { u.bridge = nb; u.bridgeSince = state.time; }
           u.pathTargetId = t.id;
           u.pathNav = state.nav.version;
           // Refresh paths to moving troops often; static objectives rarely. Failed searches wait too.
@@ -2952,15 +2967,39 @@
         if (o === u || o.hp <= 0 || o.air !== u.air) return;
         const isStatic = o.kind !== 'troop';
         if (!isStatic && o.id < u.id) return; // each troop pair once
-        let dx = u.x - o.x;
-        let dy = u.y - o.y;
-        let d = Math.hypot(dx, dy);
-        const min = u.radius + o.radius;
-        if (d >= min) return;
-        if (d < 1e-4) { const a = nextRandom(state) * Math.PI * 2; dx = Math.cos(a); dy = Math.sin(a); d = 1; }
-        const nx = dx / d;
-        const ny = dy / d;
-        const overlap = min - Math.max(d, 1e-4);
+        let nx;
+        let ny;
+        let overlap;
+        if (o.kind === 'tower') {
+          // Towers are squares (the same footprint the nav grid and attack range use), not circles:
+          // push out from the nearest point of the square
+          const cx = clamp(u.x, o.x - o.half, o.x + o.half);
+          const cy = clamp(u.y, o.y - o.half, o.y + o.half);
+          let dx = u.x - cx;
+          let dy = u.y - cy;
+          const d = Math.hypot(dx, dy);
+          if (d >= u.radius) return;
+          if (d < 1e-6) {
+            // Centre inside the square: leave by the nearest edge
+            const ex = o.half - Math.abs(u.x - o.x);
+            const ey = o.half - Math.abs(u.y - o.y);
+            if (ex < ey) { dx = u.x >= o.x ? 1 : -1; dy = 0; overlap = ex + u.radius; } else { dx = 0; dy = u.y >= o.y ? 1 : -1; overlap = ey + u.radius; }
+            nx = dx; ny = dy;
+          } else {
+            nx = dx / d; ny = dy / d;
+            overlap = u.radius - d;
+          }
+        } else {
+          let dx = u.x - o.x;
+          let dy = u.y - o.y;
+          let d = Math.hypot(dx, dy);
+          const min = u.radius + o.radius;
+          if (d >= min) return;
+          if (d < 1e-4) { const a = nextRandom(state) * Math.PI * 2; dx = Math.cos(a); dy = Math.sin(a); d = 1; }
+          nx = dx / d;
+          ny = dy / d;
+          overlap = min - Math.max(d, 1e-4);
+        }
         const mu = u.radius * u.radius * (u.locked ? 3 : 1);
         const mo = isStatic ? Infinity : o.radius * o.radius * (o.locked ? 3 : 1);
         const shareU = isStatic ? 1 : mo / (mu + mo);
@@ -3730,14 +3769,17 @@
     return {
       side,
       // plan: rank threats and score placements; lookahead: how many plays to try out in a copy of the match
-      profile: Object.assign({ thinkMin: 0.5, thinkMax: 0.6, strategicChance: 0.7, aggression: 0.35, leakAt: 9.3, emoteChance: 0.55, plan: true, lookahead: 2 }, profile || {}),
+      // replies / spellLook / pushLook switch the opponent model and the spell / attack look-ahead (all on by default)
+      profile: Object.assign({ thinkMin: 0.5, thinkMax: 0.6, strategicChance: 0.7, aggression: 0.35, leakAt: 9.3, emoteChance: 0.55, plan: true, lookahead: 2, replies: true, spellLook: true, pushLook: true }, profile || {}),
       thinkT: 1.5,
       rand: rng,
       // What the AI has *seen* the opponent spend (it can't see their elixir, so it estimates)
       foeElixir: 5,
       init: false,
       seenSeq: 0,
-      lastPlan: null,     // the last play it made and why (see planDefense)
+      lastPlan: null,     // the last play it made and why (see planDefense, planPush, verifySpell)
+      spellQuietUntil: -1, // a "don't cast" verdict stands until then, unless the opponent plays
+      spellQuietSeq: -1,
       holdUntil: -1,      // a "hold" verdict stands until then, unless the opponent plays again
       holdSeq: -1,
       stats: { decisions: 0, rollouts: 0, steps: 0, ms: 0, maxMs: 0 },
@@ -4023,6 +4065,7 @@
     const smart = brain.rand() < brain.profile.strategicChance;
     const king = state.towers.find((t) => t.owner === side && t.tower === 'king');
     let best = null;
+    const cands = [];
     for (const c of spells) {
       const kind = c.zone ? c.zone.kind : c.proj;
       const flies = !c.instant && !c.zone && c.proj !== 'shock';
@@ -4050,12 +4093,42 @@
         if (ownHalf(side, pt.y) && kind !== 'spawn') value *= 1.15;
         const need = playCost(state, side, c.id) * (smart ? 1.05 : 1.5);
         const enough = kind === 'spawn' || kind === 'haste' || kind === 'heal' ? count >= 1 : (count >= 2 || value >= 20);
-        if (enough && value >= need && (!best || value - c.cost > best.score)) {
-          best = { cardId: c.id, x: clamp(pt.x, 0.6, W - 0.6), y: clamp(pt.y, 0.6, H - 0.6), score: value - c.cost };
+        if (enough && value >= need) {
+          const cand = { cardId: c.id, x: clamp(pt.x, 0.6, W - 0.6), y: clamp(pt.y, 0.6, H - 0.6), score: value - c.cost };
+          cands.push(cand);
+          if (!best || cand.score > best.score) best = cand;
         }
       }
     }
+    // The runners-up (best spot of each other spell), for the look-ahead to compare
+    if (best) {
+      cands.sort((a, b) => b.score - a.score);
+      best.alts = cands.filter((cd, i) => cands.findIndex((o) => o.cardId === cd.cardId) === i && cd !== best);
+    }
     return best;
+  }
+
+  // Look-ahead check for a spell: play the best few casts and "don't cast" in copies of the match.
+  // Returns the winning cast (with its numbers), or null when not casting is as good.
+  function verifySpell(state, brain, spell) {
+    const side = brain.side;
+    const model = foeModel(state, brain);
+    const stats = brain.stats;
+    const opts = [spell].concat((spell.alts || []).slice(0, Math.max(0, (brain.profile.lookahead | 0) - 1)));
+    const hold = rollout(state, side, null, AI_EVAL.spellSecs, stats, model);
+    let best = null;
+    const tried = [];
+    for (const o of opts) {
+      const v = rollout(state, side, o, AI_EVAL.spellSecs, stats, model);
+      if (v == null) continue;
+      tried.push({ cardId: o.cardId, x: r2(o.x), y: r2(o.y), value: r2(v) });
+      if (!best || v > best.v) best = { o, v };
+    }
+    stats.rollouts += tried.length + 1;
+    if (hold == null || !best) return spell;
+    const why = { kind: 'spell', by: 'lookahead', secs: AI_EVAL.spellSecs, hold: r2(hold), tried };
+    if (best.v < hold + AI_EVAL.spellMargin) { brain.lastPlan = { hold: true, why: { ...why, verdict: 'no cast: not worth it once played out' } }; return null; }
+    return { cardId: best.o.cardId, x: best.o.x, y: best.o.y, why: { ...why, value: r2(best.v), gain: r2(best.v - hold) } };
   }
 
   // ─── AI: threats, placements and look-ahead ──────────────────────────────
@@ -4081,6 +4154,11 @@
     workBudget: 6000,    // unit-steps one decision may spend on rollouts (steps x units on the board), so
                          // a crowded board gets fewer/shorter rollouts; counted, not timed, so it stays deterministic
     recheck: 0.8,        // after a "hold" verdict, wait this long before re-running rollouts (unless the foe plays)
+    reaction: 1.0,       // seconds before the modelled opponent answers a play inside a rollout
+    replyMin: 0.8,       // the modelled answer must be worth this fraction of its cost to be made
+    spellMargin: 0.4,    // a spell must beat not casting by this much (elixir) in its rollout
+    spellSecs: 3,        // rollout length for a spell
+    pushSecs: 8,         // rollout length for an attack (time to cross and start hitting)
   };
 
   // Where an enemy troop is heading on our side and roughly how long until it gets there.
@@ -4301,19 +4379,85 @@
     return m;
   }
 
-  // Play `action` (or nothing) in a copy of the match for `secs` and score the result
-  function rollout(state, side, action, secs, stats) {
+  /**
+   * What the AI believes the opponent could answer with: only cards it has SEEN them play that the
+   * cycle rules don't rule out, at the level their units have shown, with its estimate of their
+   * elixir. Never-seen cards can't be modelled, so they are left out (the answer is a lower bound).
+   */
+  function foeModel(state, brain) {
+    if (brain.profile && brain.profile.replies === false) return null;
+    const foe = enemyOf(brain.side);
+    const cyc = foeCycle(state, brain.side);
+    const ids = [...cyc.seen].filter((id) => CARD_MAP[id] && !CARD_MAP[id].token && cyc.mayHold(id));
+    const lv = state.units.filter((u) => u.owner === foe && u.costShare > 0).map((u) => u.level || 1);
+    const level = lv.length ? Math.round(lv.reduce((a, b) => a + b, 0) / lv.length) : 1;
+    return { ids, elixir: brain.foeElixir, level };
+  }
+
+  // Inside a rollout: the opponent answers our play at (action.x, action.y) with the best card the
+  // model allows. The copy's real hand is hidden information, so it is replaced by the believed one
+  // before anything is played. Returns the elixir the answer cost (0 if there was none).
+  function modelReply(sim, side, model, action) {
+    if (!model || !model.ids.length || !action) return 0;
+    const foe = enemyOf(side);
+    const p = sim.players[foe];
+    const near = sim.units.filter((u) => u.owner === side && u.hp > 0 && u.costShare > 0 && dist(u.x, u.y, action.x, action.y) < 4);
+    if (!near.length) return 0;
+    const laneIdx = action.x < MID_X ? 0 : 1;
+    const lane = laneSummary(sim, foe, laneIdx);
+    const cx = near.reduce((a, u) => a + u.x, 0) / near.length;
+    const cy = near.reduce((a, u) => a + u.y, 0) / near.length;
+    let best = null;
+    for (const id of model.ids) {
+      const c = getCardStatsAtLevel(id, model.level, false, 0);
+      if (!c || c.cost > model.elixir) continue;
+      let value;
+      let spot;
+      if (c.spell) {
+        if (c.friendly || !(c.dmg > 0)) continue;
+        value = 0;
+        for (const e of near) if (dist(cx, cy, e.x, e.y) - e.radius <= c.splash) value += hitValue(e, c.dmgScaled);
+        spot = { x: cx, y: cy };
+      } else {
+        const sc = defenderScore(sim, { side: foe }, c, lane);
+        if (sc == null) continue;
+        value = c.cost * (1 + sc / 10);
+        const want = legacyDefenseSpot(foe, c, near[0], laneIdx);
+        spot = findDeploySpot(sim, foe, c, want.x, want.y);
+        if (!spot) continue;
+      }
+      if (value < c.cost * AI_EVAL.replyMin) continue;
+      if (!best || value - c.cost > best.value - best.c.cost) best = { id, c, value, spot };
+    }
+    if (!best) return 0;
+    p.cards[best.id] = best.c;
+    p.hand = [best.id];
+    p.queue = [];
+    p.cooldowns[best.id] = 0;
+    p.elixir = best.c.cost; // exactly enough: the copy's real elixir is hidden information too
+    return deploy(sim, foe, best.id, best.spot.x, best.spot.y).ok ? best.c.cost : 0;
+  }
+
+  // Play `action` (or nothing) in a copy of the match for `secs` and score the result. With a foe
+  // model, the opponent answers the play after AI_EVAL.reaction seconds; the elixir they spend is
+  // added back, so only what their answer achieves on the board counts against the play.
+  function rollout(state, side, action, secs, stats, model) {
     if (typeof structuredClone !== 'function') return null;
     const sim = cloneForRollout(state);
     let cost = 0;
+    let replyCost = 0;
     if (action) {
       cost = playCost(sim, side, action.cardId);
       if (!deploy(sim, side, action.cardId, action.x, action.y).ok) return null;
     }
     const steps = Math.round(secs / MATCH.step);
-    for (let i = 0; i < steps && sim.running; i++) step(sim);
-    if (stats) stats.steps += steps;
-    return material(sim, side) - cost;
+    const replyAt = model && action ? Math.round(AI_EVAL.reaction / MATCH.step) : -1;
+    for (let i = 0; i < steps && sim.running; i++) {
+      if (i === replyAt) replyCost = modelReply(sim, side, model, action);
+      step(sim);
+    }
+    if (stats) { stats.steps += steps; if (replyCost) stats.replies = (stats.replies || 0) + 1; }
+    return material(sim, side) - cost + replyCost;
   }
 
   // Pick a defensive play for the most dangerous threat. Returns a plan, a hold verdict, or null.
@@ -4357,11 +4501,12 @@
     const secs = clamp(Math.min(th.eta + AI_EVAL.hitWindow, stepsAllowed * MATCH.step / 2), AI_EVAL.horizonMin * 0.6, AI_EVAL.horizonMax);
     const maxRuns = Math.max(2, Math.floor(stepsAllowed / Math.round(secs / MATCH.step)));
     const stats = brain.stats;
-    const hold = rollout(state, side, null, secs, stats);
+    const model = foeModel(state, brain);
+    const hold = rollout(state, side, null, secs, stats, model);
     let best = null;
     const tried = [];
     for (const cd of picks.slice(0, maxRuns - 1)) {
-      const v = rollout(state, side, cd, secs, stats);
+      const v = rollout(state, side, cd, secs, stats, model);
       if (v == null) continue;
       tried.push({ cardId: cd.cardId, x: cd.x, y: cd.y, value: r2(v) });
       if (!best || v > best.v) best = { cd, v };
@@ -4371,6 +4516,52 @@
     const detail = { ...why, by: 'lookahead', secs: r2(secs), hold: r2(hold), tried };
     if (best.v < hold + AI_EVAL.holdMargin) return { hold: true, why: { ...detail, verdict: 'hold: no play beats letting it come' } };
     return { cardId: best.cd.cardId, x: best.cd.x, y: best.cd.y, why: { ...detail, value: r2(best.v), gain: r2(best.v - hold), notes: best.cd.notes } };
+  }
+
+  // Look-ahead for an attack: the top two fast (or tunnelling) win conditions, each sent down either
+  // lane, played out with the opponent's modelled answer. Slow tanks keep the start-at-the-back
+  // heuristic: a few seconds of look-ahead can't see their pay-off, so it would only bias against them.
+  // A slow single-body win condition (Rock Titan, Storm Zeppelin, Siege) walks from the back; slow
+  // swarms like UFO Fleet go to the bridge instead, so they don't cross the whole map alone
+  function startsAtBack(c) { return c.speed <= 1.0 && (c.swarmCount || 1) <= 1; }
+
+  function planPush(state, brain, winCons, enemyPrincesses, bridgeY) {
+    const side = brain.side;
+    const foe = enemyOf(side);
+    if (brain.profile.plan === false || brain.profile.pushLook === false || (brain.profile.lookahead | 0) <= 0 || typeof structuredClone !== 'function') return null;
+    // Everything but the slow single-body cards (they start at the back instead): fast win conditions
+    // and slow swarms like UFO Fleet
+    const fast = winCons.filter((c) => c.anywhere || !startsAtBack(c)).slice(0, 2);
+    if (!fast.length) return null;
+    const cands = [];
+    for (const c of fast) {
+      for (const laneIdx of [0, 1]) {
+        const tower = enemyPrincesses[laneIdx].hp > 0 ? enemyPrincesses[laneIdx] : state.towers.find((t) => t.owner === foe && t.tower === 'king');
+        if (!tower) continue;
+        const want = c.anywhere ? { x: tower.x + (tower.x < MID_X ? 2.2 : -2.2), y: tower.y } : { x: BRIDGES[laneIdx].cx, y: bridgeY };
+        const spot = findDeploySpot(state, side, c, want.x, want.y);
+        if (spot && !refusedHere(state, brain, c.id, spot)) cands.push({ cardId: c.id, x: spot.x, y: spot.y, lane: laneIdx });
+      }
+    }
+    if (!cands.length) return null;
+    const busy = Math.max(12, state.units.length + state.projectiles.length * 0.25);
+    const steps = Math.round(AI_EVAL.pushSecs / MATCH.step);
+    // Whatever a spell check spent earlier in this decision comes out of the same budget
+    const spent = (brain.stats.steps - (brain.decisionSteps == null ? brain.stats.steps : brain.decisionSteps)) * busy;
+    const runs = Math.min(cands.length, Math.floor((AI_EVAL.workBudget - spent) / busy / steps));
+    if (runs < 1) return null;
+    const model = foeModel(state, brain);
+    const tried = [];
+    let best = null;
+    for (const cd of cands.slice(0, runs)) {
+      const v = rollout(state, side, cd, AI_EVAL.pushSecs, brain.stats, model);
+      if (v == null) continue;
+      tried.push({ cardId: cd.cardId, lane: cd.lane, value: r2(v) });
+      if (!best || v > best.v) best = { cd, v };
+    }
+    brain.stats.rollouts += tried.length;
+    if (!best) return null;
+    return { cardId: best.cd.cardId, x: best.cd.x, y: best.cd.y, why: { kind: 'push', by: 'lookahead', secs: AI_EVAL.pushSecs, lane: best.cd.lane, value: r2(best.v), tried } };
   }
 
   // A play the match refused a moment ago is not tried again at the same spot right away
@@ -4397,6 +4588,7 @@
     const p = state.players[side];
     const options = p.hand.map((id) => p.cards[id]).filter((c) => c && playCost(state, side, c.id) <= p.elixir && (p.cooldowns[c.id] || 0) <= state.time);
     if (options.length === 0) return null;
+    brain.decisionSteps = brain.stats.steps; // rollouts later in this decision share one work budget
     const troops = options.filter((c) => !c.spell);
 
     const lanes = [laneSummary(state, side, 0), laneSummary(state, side, 1)];
@@ -4409,9 +4601,14 @@
       myPushNear: (e) => mine.some((u) => !u.building && dist(u.x, u.y, e.x, e.y) < 5),
     };
 
-    // 0) A spell that pays for itself (or finishes a tower)
-    const spell = planSpell(state, brain, options, ctx);
-    if (spell) return spell;
+    // 0) A spell that pays for itself (or finishes a tower). With look-ahead, the cast is played out
+    // first and only made if it beats not casting; a "no" stands for a moment so it isn't re-run every think.
+    let spell = brain.spellQuietUntil > state.time && brain.spellQuietSeq === state.playSeq ? null : planSpell(state, brain, options, ctx);
+    if (spell && brain.profile.plan !== false && brain.profile.spellLook !== false && (brain.profile.lookahead | 0) > 0 && typeof structuredClone === 'function') {
+      spell = verifySpell(state, brain, spell);
+      if (!spell) { brain.spellQuietUntil = state.time + AI_EVAL.recheck; brain.spellQuietSeq = state.playSeq; }
+    }
+    if (spell) { if (spell.why) brain.lastPlan = spell; return spell; }
 
     // 1) Defend the more dangerous lane if it isn't already covered. The planner ranks lanes by how
     // soon and how hard their threats will hit (assessThreats), not just by what has crossed.
@@ -4537,14 +4734,16 @@
     const winCons = troops.filter((c) => !c.building && c.targets !== 'air' && (c.winCondition || c.hpScaled >= 600))
       .sort((a, b) => (evoReady(p, b.id) ? 1 : 0) - (evoReady(p, a.id) ? 1 : 0) || b.cost - a.cost);
     if (winCons.length && !tank) {
+      const pushPlan = planPush(state, brain, winCons, enemyPrincesses, bridgeY);
+      if (pushPlan) { brain.lastPlan = pushPlan; return pushPlan; }
       const c = winCons[0];
       let spot;
       if (c.anywhere) {
         // Tunnel straight to the side of the target tower
         const target = enemyPrincesses[attackLane].hp > 0 ? enemyPrincesses[attackLane] : state.towers.find((t) => t.owner === foe && t.tower === 'king');
         spot = target ? findDeploySpot(state, side, c, target.x + (target.x < MID_X ? 2.2 : -2.2), target.y) : null;
-      } else if (c.speed <= 1.0) {
-        // Slow tanks start at the back to build elixir behind them; fast ones go straight to the bridge
+      } else if (startsAtBack(c)) {
+        // Slow tanks start at the back to build elixir behind them; everything else goes straight to the bridge
         spot = findDeploySpot(state, side, c, laneX, side === 'A' ? H - 1.2 : 1.2);
       } else {
         spot = findDeploySpot(state, side, c, BRIDGES[attackLane].cx, bridgeY);
@@ -4676,12 +4875,12 @@
     emote,
     spawnDirect,
     castDirect,
-    ARCHETYPES, VARIANTS, CARD_LIBRARY, CARD_MAP, STARTER_DECK, MAX_DECK, RARITY_ORDER,
+    ARCHETYPES, VARIANTS, REMOVED_VARIANTS, migrateCardId, CARD_LIBRARY, CARD_MAP, STARTER_DECK, MAX_DECK, RARITY_ORDER,
     getCardStatsAtLevel, towerStats, normalizeDeck,
     createMatch, step, deploy, canDeploy, explainTargeting, canDeployOnSnapshot, inDeployZone, snapshot, takeFx, timeLeft,
     isRiverPoint, walkablePoint: (state, x, y, jump) => walkablePoint(state.nav, x, y, jump),
     findPath, enemyOf,
-    createAi, aiUpdate, aiDecide, buildAiDeck, aiEvoPicks, assessThreats, foeCycle, AI_EVAL,
+    createAi, aiUpdate, aiDecide, buildAiDeck, aiEvoPicks, assessThreats, foeCycle, foeModel, AI_EVAL,
     TOKEN_CARDS, MAX_ARENA,
     EVOLUTIONS, EVO_RULES, evolutionOf, evoReady, evolvedStats,
     DEFAULT_RULES, normalizeRules, MODIFIERS, MOD_STACK, MOD_CAPS, combineModFx, playCost, SIZE_FORMS, cardMatches, applyCardMods,

@@ -2026,6 +2026,57 @@
     /**
      * view: interpolated snapshot. opts: { flip, zoneFn, zoneKey, ghost }
      */
+    // Targeting debug overlay (aggro). `list` items: { id, tid, range, sight, locked, why, tower }.
+    // Positions come from the view being drawn, so the lines follow the units exactly. Read-only.
+    function drawAggroDebug(view, list) {
+      const pos = new Map();
+      view.units.forEach((u) => pos.set(u.id, u));
+      view.towers.forEach((t) => pos.set(t.id, t));
+      ctx.save();
+      ctx.lineCap = 'round';
+      for (const d of list) {
+        const u = pos.get(d.id);
+        if (!u) continue;
+        const team = TEAM[u.owner] || TEAM.A;
+        const x = sx(u.x);
+        const y = sy(u.y);
+        const body = (u.half || u.radius || 0.4) * scale;
+        // Sight (where it looks for targets) and attack range, measured from its edge
+        if (d.sight && !d.tower) {
+          ctx.setLineDash([3, 5]);
+          ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+          ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.arc(x, y, body + d.sight * scale, 0, Math.PI * 2); ctx.stroke();
+        }
+        ctx.setLineDash([]);
+        ctx.strokeStyle = `${team.light}55`;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.arc(x, y, body + d.range * scale, 0, Math.PI * 2); ctx.stroke();
+        const t = d.tid ? pos.get(d.tid) : null;
+        if (t) {
+          // Solid when locked on (attacking), dashed while still choosing / walking to it
+          ctx.setLineDash(d.locked || d.tower ? [] : [6, 4]);
+          ctx.strokeStyle = team.main;
+          ctx.lineWidth = Math.max(1.5, scale * 0.08);
+          ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(sx(t.x), sy(t.y)); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = team.main;
+          ctx.beginPath(); ctx.arc(sx(t.x), sy(t.y), Math.max(2.5, scale * 0.12), 0, Math.PI * 2); ctx.fill();
+        }
+        if (d.why) {
+          ctx.font = `600 ${Math.max(9, Math.round(scale * 0.42))}px "Space Grotesk",sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'top';
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+          ctx.strokeText(d.why, x, y + body + 2);
+          ctx.fillStyle = '#fff';
+          ctx.fillText(d.why, x, y + body + 2);
+        }
+      }
+      ctx.restore();
+    }
+
     function render(view, opts) {
       const o = opts || {};
       if (flip !== !!o.flip) { flip = !!o.flip; zoneCache.key = ''; bg = null; }
@@ -2073,6 +2124,7 @@
         view.projectiles.forEach((p) => drawProjectile(p, now));
         air.forEach((d) => drawUnit(d.e, now, dt));
         drawEffects(now);
+        if (o.debug && o.debug.length) drawAggroDebug(view, o.debug);
         drawGhost(o.ghost);
         drawEmotes(view, now);
         drawHud(view, now);

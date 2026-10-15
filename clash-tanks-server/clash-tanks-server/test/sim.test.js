@@ -430,11 +430,11 @@ test('the card library has the new cards, each in one version, with an arena and
     assert.ok(c, id);
     assert.ok(c.desc.length > 20, `${id} has a description`);
     assert.ok(c.arena >= 1 && c.arena <= Sim.MAX_ARENA, `${id} arena`);
-    assert.ok(!Sim.CARD_MAP[`${id}-twin`], `${id} has no variants`);
+    assert.ok(!Sim.CARD_MAP[`${id}-mk-ii`], `${id} has no variants`);
     assert.ok(c.ability && c.ability.name, `${id} has an ability`);
   }
   assert.equal(Sim.CARD_LIBRARY.filter((c) => c.spell).length, 12);
-  assert.equal(Sim.CARD_LIBRARY.filter((c) => c.building).length, 5 + 8);
+  assert.equal(Sim.CARD_LIBRARY.filter((c) => c.building).length, 2 + 8); // Bolt Turret (base + Mk-II) and the 8 new buildings
   // Tokens exist for spawning but can never be put in a deck
   for (const t of Sim.TOKEN_CARDS) {
     assert.ok(!Sim.CARD_LIBRARY.includes(t));
@@ -835,4 +835,14 @@ test('AI vs AI with the new cards plays full, legal matches and uses spells and 
   }
   assert.ok(spells > 0, 'spells were cast');
   assert.ok(buildings > 0, 'buildings were placed');
+});
+
+test('removed Twin/Burst/Core versions are gone, and old ids map to the base card', () => {
+  assert.ok(!Sim.CARD_LIBRARY.some((c) => /-(twin|burst|core)$/.test(c.id)));
+  assert.ok(Sim.CARD_MAP['brawler-mk-ii']);
+  assert.equal(Sim.migrateCardId('brawler-twin'), 'brawler');
+  assert.equal(Sim.migrateCardId('flarepod-core'), 'flarepod');
+  assert.equal(Sim.migrateCardId('brawler-mk-ii'), 'brawler-mk-ii');
+  assert.equal(Sim.migrateCardId('nonsense-twin'), null);
+  assert.equal(Sim.migrateCardId(42), null);
 });

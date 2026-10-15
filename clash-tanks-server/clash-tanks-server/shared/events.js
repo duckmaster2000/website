@@ -619,8 +619,8 @@
   // so the guarantee holds every day (results are cached; it's a few hundred cheap steps at most).
   const ROTATION_EPOCH = Math.floor(Date.UTC(2026, 0, 1) / DAY_MS);
   const dailyCache = new Map();
-  function pickDaily(d, avoid) {
-    const order = shuffle(ROTATING, rng(hashStr(`daily-${d}`)));
+  function pickDaily(d, avoid, salt) {
+    const order = shuffle(ROTATING, rng(hashStr(salt ? `daily-${d}-r${salt}` : `daily-${d}`)));
     const out = [];
     const cats = new Set();
     for (const pass of [0, 1, 2]) {
@@ -649,22 +649,28 @@
     return prev;
   }
 
-  /** Everything the event hub shows for this moment. `forceAll` (dev/admin) opens every event. */
+  /**
+   * Everything the event hub shows for this moment. `forceAll` (dev/admin) opens every event.
+   * `reroll` (admin, a positive integer) swaps in another random line-up and weekly challenge.
+   */
   function rotation(now, opts) {
     const day = dayOf(now);
     const week = weekOf(now);
-    const daily = dailyFor(day);
+    const salt = (opts && opts.reroll) >>> 0;
+    const daily = salt ? pickDaily(day, dailyFor(day - 1), salt) : dailyFor(day);
     const weekend = isWeekend(now);
-    const challenge = CHALLENGES[week % CHALLENGES.length].id;
+    const cw = week + salt;
+    const challenge = CHALLENGES[cw % CHALLENGES.length].id;
     return {
       now, day, week,
       dayEndsAt: (day + 1) * DAY_MS,
       weekEndsAt: weekStart(week + 1),
       permanent: PERMANENT.slice(),
       daily,
-      tomorrow: dailyFor(day + 1),
+      tomorrow: salt ? pickDaily(day + 1, daily, salt) : dailyFor(day + 1),
       challenge,
-      nextChallenge: CHALLENGES[(week + 1) % CHALLENGES.length].id,
+      nextChallenge: CHALLENGES[(cw + 1) % CHALLENGES.length].id,
+      reroll: salt,
       // Weekends feature Chaos Mode; weekdays feature the first daily event
       featured: weekend ? 'chaos' : daily[0],
       weekend,

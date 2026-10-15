@@ -7,6 +7,7 @@
 
 const roadUi = {
   filter: { type: 'all', own: 'all', variants: false, sort: 'cost' },
+  openDetails: new Set(),  // collection cards whose Details are open (kept across re-renders)
   pickSlot: null,   // deck slot chosen first (then a card)
   countRaf: 0,
 };
@@ -371,7 +372,7 @@ function deckSlotHtml(id, idx, picked) {
   const cp = cardProgress(id);
   const ev = deckSlotEvo(id);
   const evoName = ev.cls.includes('evo-on') ? `<small class="ds-evoname">✦ ${escapeHtml(Sim.evolutionOf(id).name)}</small>` : `<small>Lv ${cp.level}</small>`;
-  return `<button type="button" class="deck-slot rarity-${c.rarity} ${picked ? 'picked' : ''}${ev.cls}" data-slot="${idx}" title="${escapeHtml(`${c.name}: ${c.desc}`)}"><span class="ds-cost ${costClass(c.cost)}">${c.cost}</span>${ev.html}<span class="ds-icon">${c.icon}</span><span class="ds-name">${escapeHtml(c.name)}</span>${evoName}</button>`;
+  return `<button type="button" class="deck-slot rarity-${c.rarity} ${picked ? 'picked' : ''}${ev.cls}" data-slot="${idx}" title="${escapeHtml(`${c.name}: ${c.desc}`)}"><span class="ds-cost ${costClass(c.cost)}">${c.cost}</span>${ev.html}<span class="ds-icon ${artCls(id)}">${c.icon}</span><span class="ds-name">${escapeHtml(c.name)}</span>${evoName}</button>`;
 }
 
 function statLineFor(c) {
@@ -447,7 +448,7 @@ function renderDeckEditor() {
   if (ui.aiDeckSlots) {
     ui.aiDeckSlots.innerHTML = aiDeck.map((id, idx) => {
       const c = CARD_MAP[id];
-      return `<button type="button" class="deck-slot ai-deck-slot rarity-${c.rarity}" data-ai-slot="${idx}"><span class="ds-cost ${costClass(c.cost)}">${c.cost}</span><span class="ds-icon">${c.icon}</span><span class="ds-name">${escapeHtml(c.name)}</span><small>AI ${idx + 1}</small></button>`;
+      return `<button type="button" class="deck-slot ai-deck-slot rarity-${c.rarity}" data-ai-slot="${idx}"><span class="ds-cost ${costClass(c.cost)}">${c.cost}</span><span class="ds-icon ${artCls(id)}">${c.icon}</span><span class="ds-name">${escapeHtml(c.name)}</span><small>AI ${idx + 1}</small></button>`;
     }).join('');
   }
 
@@ -469,6 +470,8 @@ function renderDeckEditor() {
     ui.collCount.textContent = `${owned}/${CARD_LIBRARY.length} owned`;
   }
   const picking = state.selectedCard && state.selectedCard.owner === 'collection' ? state.selectedCard.type : null;
+  // While a card waits for a slot, the deck slots invite the tap (see .picking-card in prototype.css)
+  document.body.classList.toggle('picking-card', !!picking);
   ui.cardCollection.innerHTML = list.map((c) => {
     const cp = cardProgress(c.id);
     const unlocked = cp.unlocked;
@@ -481,14 +484,24 @@ function renderDeckEditor() {
     const type = cardType(c);
     const nextStats = unlocked && cp.level < 14 ? getCardStatsAtLevel(c.id, cp.level + 1, cp.abilityUnlocked, cp.mastery || 0) : null;
     const nextLine = nextStats ? (nextStats.spell ? `Next Lv: ${Math.round(nextStats.dmgScaled)}` : `Next Lv: HP ${nextStats.hpScaled} • DMG ${Math.round(nextStats.dmgScaled)}`) : '';
-    return `<article class="collection-card rarity-edge-${c.rarity} ${unlocked ? '' : 'locked'} ${inDeck ? 'in-deck' : ''} ${picking === c.id ? 'picking' : ''} ${c.winCondition ? 'win-condition' : ''}" data-card="${c.id}">
-      <header><span class="cc-cost ${costClass(c.cost)}">${c.cost}</span><strong>${c.icon} ${escapeHtml(c.name)}</strong><span class="rarity-${c.rarity}">${RARITY_STYLE[c.rarity].label}</span></header>
-      <div class="cc-tags"><span class="type-badge type-${type}">${type === 'spell' ? '✦ Spell' : type === 'building' ? '🏯 Building' : '⚔️ Troop'}</span>${c.winCondition ? '<span class="wc-badge">👑 Win Condition</span>' : ''}${c.swarmCount > 1 ? `<span class="swarm-badge">×${c.swarmCount}</span>` : ''}${c.solo && c.arena > 0 ? `<span class="new-badge">${Road.ARENAS[c.arena].icon} ${escapeHtml(Road.ARENAS[c.arena].name)}</span>` : ''}${evoBadge(c)}</div>
-      <p class="cc-desc">${escapeHtml(c.desc || c.role)}</p>
-      ${unlocked ? `<p class="cc-stats">Lv ${cp.level} • ${statLineFor(c)}</p><p class="cc-traits">${cardTraits(c)}</p><p class="cc-own">Copies ${cp.copies} • Mastery ${Math.floor(cp.mastery)}${nextLine ? ` • ${nextLine}` : ''}</p>` : `<p class="cc-unlock">${unlockHint(c)}</p>`}
-      <div class="collection-actions">${unlocked ? `<button type="button" data-select="${c.id}" class="${inDeck ? 'in' : ''}">${inDeck ? '✓ In Deck' : roadUi.pickSlot != null ? `Put in slot ${roadUi.pickSlot + 1}` : 'Use'}</button><button type="button" data-up="${c.id}" ${canUp ? '' : 'disabled'}>Level Up (${need} copies, ${upCost}g)</button><button type="button" data-ability="${c.id}" ${canAbility ? '' : 'disabled'}>${cp.abilityUnlocked ? `✓ ${c.ability.name}` : `${c.ability.name} (Lv${c.ability.minLevel}, ${c.ability.minMastery}M, 400g)`}</button>` : '<button type="button" disabled>Locked</button>'}</div>
+    const state1 = !unlocked ? 'Locked' : inDeck ? 'In deck' : picking === c.id ? 'Selected' : canUp ? 'Upgrade ready' : '';
+    const typeLabel = type === 'spell' ? '✦ Spell' : type === 'building' ? '🏯 Building' : '⚔️ Troop';
+    return `<article class="collection-card rarity-edge-${c.rarity} ${unlocked ? '' : 'locked'} ${inDeck ? 'in-deck' : ''} ${picking === c.id ? 'picking' : ''} ${canUp ? 'can-up' : ''} ${c.winCondition ? 'win-condition' : ''}" data-card="${c.id}" data-rarity="${c.rarity}">
+      <div class="cc-art ${artCls(c.id)}">
+        <span class="cc-cost ${costClass(c.cost)}" title="${c.cost} elixir" aria-label="${c.cost} elixir">${c.cost}</span>
+        <span class="cc-icon" aria-hidden="true">${c.icon}</span>
+        ${unlocked ? `<span class="cc-level">Lv ${cp.level}</span>` : '<span class="cc-level cc-lock">🔒</span>'}
+        ${state1 ? `<span class="cc-state">${state1}</span>` : ''}
+      </div>
+      <div class="cc-body">
+        <header><strong class="cc-name">${escapeHtml(c.name)}</strong><span class="cc-rarity rarity-${c.rarity}">${RARITY_STYLE[c.rarity].label}</span></header>
+        <div class="cc-tags"><span class="type-badge type-${type}">${typeLabel}</span>${c.winCondition ? '<span class="wc-badge">👑 Win Condition</span>' : ''}${c.swarmCount > 1 ? `<span class="swarm-badge">×${c.swarmCount}</span>` : ''}${c.solo && c.arena > 0 ? `<span class="new-badge">${Road.ARENAS[c.arena].icon} ${escapeHtml(Road.ARENAS[c.arena].name)}</span>` : ''}${evoBadge(c)}</div>
+        <p class="cc-desc">${escapeHtml(c.desc || c.role)}</p>
+        ${unlocked ? `<p class="cc-stats">${statLineFor(c)}</p><details class="cc-more" data-details="${c.id}" ${roadUi.openDetails.has(c.id) ? 'open' : ''}><summary>Details</summary><p class="cc-traits">${cardTraits(c)}</p><p class="cc-own">Copies ${cp.copies} • Mastery ${Math.floor(cp.mastery)}${nextLine ? ` • ${nextLine}` : ''}</p></details>` : `<p class="cc-unlock">${unlockHint(c)}</p>`}
+      </div>
+      <div class="collection-actions">${unlocked ? `<button type="button" data-select="${c.id}" class="cc-use ${inDeck ? 'in' : ''}" ${inDeck ? 'aria-pressed="true"' : ''}>${inDeck ? '✓ In Deck' : roadUi.pickSlot != null ? `Put in slot ${roadUi.pickSlot + 1}` : picking === c.id ? 'Selected: tap a slot' : 'Use'}</button><button type="button" data-up="${c.id}" class="cc-up" ${canUp ? '' : 'disabled'} title="${canUp ? 'Level up now' : cp.level >= 14 ? 'Max level' : `Needs ${need} copies (have ${cp.copies}) and ${upCost} gold`}">⬆ Level Up · ${need} copies · ${upCost}g</button><button type="button" data-ability="${c.id}" class="cc-ab" ${canAbility ? '' : 'disabled'} title="${cp.abilityUnlocked ? 'Ability unlocked' : `Needs level ${c.ability.minLevel}, mastery ${c.ability.minMastery} and 400 gold`}">${cp.abilityUnlocked ? `✓ ${c.ability.name}` : `★ ${c.ability.name} · Lv${c.ability.minLevel} · ${c.ability.minMastery}M · 400g`}</button>` : '<button type="button" disabled class="cc-use">🔒 Locked</button>'}</div>
     </article>`;
-  }).join('') || '<p class="note">No cards match.</p>';
+  }).join('') || `<div class="empty-state"><span aria-hidden="true">🔍</span><p><b>No cards match.</b> Try another search or clear the filters.</p><button type="button" data-clear-filters>Clear search &amp; filters</button></div>`;
 }
 
 function bindDeckEditor() {
@@ -532,7 +545,21 @@ function bindDeckEditor() {
     if (e.target.matches('[data-sort]')) roadUi.filter.sort = e.target.value;
     renderCollection();
   });
+  // 'toggle' doesn't bubble, so listen in the capture phase
+  ui.cardCollection?.addEventListener('toggle', (e) => {
+    const d = e.target.closest && e.target.closest('[data-details]');
+    if (!d) return;
+    if (d.open) roadUi.openDetails.add(d.dataset.details);
+    else roadUi.openDetails.delete(d.dataset.details);
+  }, true);
   ui.cardCollection?.addEventListener('click', (e) => {
+    if (e.target.closest('[data-clear-filters]')) {
+      roadUi.filter.type = 'all';
+      roadUi.filter.own = 'all';
+      if (ui.cardSearch) ui.cardSearch.value = '';
+      renderCollection();
+      return;
+    }
     const sel = e.target.closest('[data-select]');
     const up = e.target.closest('[data-up]');
     const ab = e.target.closest('[data-ability]');
@@ -549,6 +576,12 @@ function bindDeckEditor() {
       state.selectedCard = already ? null : { owner: 'collection', type: id };
       writeLog(already ? 'Card deselected.' : `Selected ${CARD_MAP[id].name}: tap a deck slot to swap it in.`);
       renderCollection();
+      // The deck can be off-screen above the collection (phones): bring the slots into view
+      const slots = ui.deckSlots;
+      if (!already && slots) {
+        const r = slots.getBoundingClientRect();
+        if (r.top < 0 || r.bottom > window.innerHeight) slots.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
     } else if (up) {
       upgradeCard(up.dataset.up);
     } else if (ab) {

@@ -133,9 +133,19 @@ All of this applies to **Local PvP, vs AI and Online**.
 | Can't hit enemies that get too close | Mortar Fox |
 
 **Card variants**
-- **Twin** hits 2 targets.
-- **Burst** fires a bonus follow-up shot.
-- **Core** adds splash damage.
+- Each troop and building has a base version and a **Mk-II** (slightly better stats, same cost).
+- The Twin, Burst and Core versions were removed on 2026-10-14. Old saves fold them into the base card: copies add up, and the higher level and mastery carry over.
+
+**Balance pass (2026-10-14, from AI-vs-AI card ratings):** the weakest cards were mostly swarms that area spells wiped in one cast, so swarms got more HP and damage spells hit about 17% softer.
+- HP: Bomb Beetles 70 → 95 (and 6 → 5 elixir), Rabbit Rush 90 → 125, Goblin Bikers 90 → 125, UFO Fleet 170 → 240, Zombie Mob 140 → 170 (speed 0.75 → 0.9), Bee Blitz 40 → 65, Fly Bombers 110 → 150 (attacks every 1.7 s, was 2.0), Siege 1050 → 1300, Nano Drones 95 → 110, Ant March 50 → 60, Bug Squad 70 → 85, Lizard Dash 110 → 125.
+- Spell damage: Boulder Roll 150 → 125, Fire Bomb 200 → 165, Shock 75 → 62, Rocket Rain 120 → 100 (total over 3 waves), Acid Pool 300 → 250, Gravity Well 120 → 100, Orbital Laser 480 → 400, Frost Nova 80 → 65 (freeze unchanged), Paratroopers 55 → 48 per trooper.
+- Follow-up round (same day, after tracking every play of the weakest cards): Rabbit Rush damage 28 → 38, Goblin Bikers 30 → 40, Fly Bombers 45 → 55; Flare Pod damage 90 → 75; Cryo Caster damage 60 → 50 and its slow lasts 1.5 s (was 2.5 s).
+- AI: the push planner now also considers swarm and flying win conditions (UFO Fleet used to be dropped behind its own King Tower like a slow tank and fly the whole map alone). Slow single-body cards (Rock Titan, Storm Zeppelin, Siege, Guardian) still start at the back.
+- Automatic pass (5 rounds × 5,000 AI-vs-AI games; each round nudged families far from the median by up to 15%):
+  - Buffed: repairwave damage 300 → 324; orbitallaser damage 400 → 432; scout HP 230 → 248, damage 45 → 47; junkpack HP 170 → 184, damage 45 → 48; guardian HP 800 → 875, damage 45 → 48; antmarch HP 60 → 65, damage 40 → 42; mortarbunker HP 800 → 873, damage 110 → 117; scrapbots HP 180 → 199, damage 40 → 43; flybombers HP 150 → 165, damage 55 → 59; goblinbikers HP 125 → 152, damage 40 → 46; rabbitrush HP 125 → 156, damage 38 → 44; zombiemob HP 170 → 218, damage 32 → 38; bombbeetles HP 95 → 145, damage 60 → 81.
+  - Nerfed: infernospire HP 1000 → 804, damage 22 → 14; rocktitan HP 2000 → 1672, damage 110 → 76; raylance HP 270 → 228, damage 85 → 60; flarepod HP 250 → 215, damage 75 → 55; drillcat HP 450 → 401, damage 240 → 189; phantomrider HP 380 → 340, damage 75 → 60; boomerang HP 650 → 585, damage 70 → 56; toadtroop HP 170 → 155, damage 45 → 37; boulder damage 125 → 97; bonecrypt HP 450 → 415; wolfpack HP 300 → 279, damage 80 → 69; Paratroopers (per trooper) damage 48 → 38; shieldknight HP 560 → 533, damage 90 → 81; cryocaster HP 370 → 352, damage 50 → 45; dronehangar HP 850 → 819; teslatank HP 850 → 816, damage 260 → 239; boltturret HP 1000 → 964, damage 70 → 65.
+  - Elixir Pump and Overdrive also rated low, but they have no HP/damage worth tuning; left as they are.
+- AI: a decision's look-ahead budget is now shared, so a spell check and a push plan in the same think can't overrun it together.
 
 **New card:** **Bolt Turret**, a defensive building that decays over 30 s. It's unlocked for everyone.
 
@@ -198,9 +208,9 @@ All of this applies to **Local PvP, vs AI and Online** (rules in `clash-sim.js`)
 **Spells** (cast anywhere; crown towers take 30% damage)
 | Spell | Cost | Effect |
 |---|---|---|
-| Fire Bomb | 4 | Flies from your King Tower, 200 damage in 2.5 tiles, knocks troops back |
-| Shock | 2 | Instant, 75 damage in 2.5 tiles, stuns troops, buildings and towers for 0.6 s, resets charges and wind-ups |
-| Rocket Rain | 3 | 3 waves, 120 total damage in 3.8 tiles; clears swarms |
+| Fire Bomb | 4 | Flies from your King Tower, 165 damage in 2.5 tiles, knocks troops back |
+| Shock | 2 | Instant, 62 damage in 2.5 tiles, stuns troops, buildings and towers for 0.6 s, resets charges and wind-ups |
+| Rocket Rain | 3 | 3 waves, 100 total damage in 3.8 tiles; clears swarms |
 - Unlocked for everyone. The default AI deck (if you never changed it) now includes Fire Bomb and Shock.
 
 **AI**
@@ -411,10 +421,54 @@ Difficulty presets (`AI_PRESETS` in `prototype_v4.js`) now set `lookahead`: easy
 - **Implemented and tested:** everything in the two tables above; explainTargeting; threat ranking; card-cycle inference; look-ahead isolation (real match untouched, deep-compared); blind to the opponent's hidden hand and elixir; a Ram Hog answered with a legal play that pulls it off the tower (tower damage less than half of not answering); no retry of refused spots; bounded decision cost; building re-routing; knockback never leaves troops in the river or a tower.
 - **Verified in Chrome:** vs AI (planner and rollouts running, max decision 20 ms), local PvP, and two-window online against this server (both deploys accepted). No console errors.
 - **Implemented, lightly tested:** the "push harder when their answers are cycling" and "don't push into an incoming threat" rules (covered only by the AI-vs-AI benchmark).
-- **Not implemented:** look-ahead for offence and spells (spells keep their value-based planner); modelling the opponent's replies inside rollouts (a rollout assumes they play nothing); bridge-choice hysteresis for troops chasing across the river (no oscillation was found in tests); tower-vs-troop collision uses a circle for the square tower (nav already blocks tower cells, so it's invisible in play); a visual overlay for `explainTargeting`.
+- **Not implemented at the time:** all of these were done later, in section 15.
 - **Golden test re-recorded:** `normal battles play out exactly as recorded` pinned AI-vs-AI results from before the events system. These deliberate changes alter normal battles, so it was re-recorded once. It still catches any event change leaking into normal battles.
 
 **Next step:** give the rollouts a simple opponent reply (e.g. the cheapest seen card that could still be in hand, placed by the same planner) so the AI stops over-trusting a defence that only works if the opponent does nothing. Then extend look-ahead to the offence choice.
+
+### 14. UI overhaul: app shell, battle HUD, cards and deck builder (2026-10-13)
+
+Presentation only: `prototype.html`, `prototype.css`, `prototype_v4.js`, `prototype_road.js`. The engine, card data, rules and saves are untouched (151/151 tests pass), and every original element id is kept.
+
+**Design system.** `:root` in `prototype.css` now holds tokens with fixed meanings: gold = the main action, mint = selected/focus, magenta = elixir, blue = you, red = enemy, plus rarity colours, a type scale (Orbitron for display/numbers, Space Grotesk for text and buttons), a 4/8/12/16/24/32 spacing scale, radii, three depth levels and motion timings. The old variable names are aliases, so older rules still work. The new rules are the "DESIGN SYSTEM LAYER" at the end of the file.
+
+**What changed**
+- **App shell:** a slim app bar replaces the big "access restricted" hero. A tab bar (Battle · Deck · Evolutions · Progress) replaces the single long scrolling page. It is sticky on desktop and a bottom bar on phones, has arrow-key support, and remembers the tab for the session. Starting any match, event or lobby jumps to Battle (`showView`, called from `scrollToBattle`/`showOnlineLobby`).
+- **Battle tab:** one gold **Start Match** call to action. Trophy Road, Events and Sound sit as secondary buttons. Admin and Reset moved to Progress → Settings.
+- **Battle HUD:** team-coloured nameplate edges (with the label, so colour isn't the only cue). The elixir bar is magenta, segmented per point, with the number in an elixir drop and one steady glow when full (no constant pulse). The hand puts the art first, uses a rarity-coloured top edge, and selection lifts the card and rings it. A card you can't afford greys its art and outlines its cost. Elixir costs use the same drop everywhere.
+- **Wide screens (≥1100 px):** a landscape battle layout. Enemy on the left, the arena at almost full window height in the middle (about 470 px wide on a 1366×900 laptop, up from about 340 px), and your hand and elixir on the right next to your side.
+- **Deck tab:** on desktop the deck sits on the left and stays in view while you scroll the collection on the right. Collection cards were rebuilt as art-first tiles with an elixir drop, level, rarity and a state label (In deck / Selected / Upgrade ready / Locked). Long stats moved into "Details". Disabled Level Up and Ability buttons say why on hover. While a card waits for a slot, the slots pulse gently. On phones, picking a card scrolls the deck slots into view.
+- **Feedback:** status messages (previously a line at the very bottom of the page) appear as a pill that slides in: bottom-left on desktop, top in battle on phones. Toasts sit top-right on desktop and can be tapped away.
+- **Edge states:** an empty-search state with a "Clear search & filters" button. **Reset all progress now asks first**; before, one click wiped everything.
+- **Dialogs:** shared backdrop, surface, radius and entrance motion for the results, chest and Trophy Road/Events dialogs. Continue/Play Again is the gold action.
+- **Accessibility:** a visible focus ring everywhere, ARIA tabs, labelled controls, a status live region, and `prefers-reduced-motion` turns animation off.
+
+**Verified (headless Chrome at 360×640, 390×844, 820×1180, 1366×900, 1920×1080):** no console errors and no horizontal overflow on any tab. Flows checked: lock (wrong password, then right), every tab, pick card → slot → saved, empty search → clear, vs AI with tap-select and placement, drag-and-drop deploy, a rejected spot keeps the selection, local PvP with player B's hand, emote panel open/close, victory → Continue, Trophy Road, Event Hub, online lobby, arrow-key tab navigation, and a cancelled reset that keeps progress. Online play itself wasn't re-run this round (no networking code changed).
+
+**Not done at the time:** card portraits, full dialog styling, Details staying open, toast stacking and an online test. All of these were done in section 15.
+
+### 15. Finishing the open items from sections 13 and 14 (2026-10-13)
+
+**AI and engine** (`shared/clash-sim.js`, tests in `test/combat-ai.test.js`, 156/156 pass)
+- **The opponent answers inside rollouts** (`foeModel`, `modelReply`). After `AI_EVAL.reaction` (1 s) the modelled opponent plays its best answer. The model uses only cards the AI has seen them play that the cycle rules say could be back, at the level their units showed, with the AI's own elixir estimate. The copy's real hand and elixir are replaced first, so hidden information never leaks. The elixir their answer costs is added back, so only what it achieves counts.
+- **Spell look-ahead** (`verifySpell`): the planner's best spot for each spell is played out against not casting (3 s). It casts only if the spell wins by `spellMargin`; a "no" stands until the opponent plays or 0.8 s passes.
+- **Attack look-ahead** (`planPush`): the top two fast or tunnelling win conditions are tried in both lanes (8 s, with the opponent's answer). Slow tanks keep the start-at-the-back heuristic.
+- Each piece can be switched off per profile (`replies`, `spellLook`, `pushLook`). Every choice explains itself in `brain.lastPlan.why`.
+- **Measured** (AI vs AI, random decks, both seats): full AI vs the original decision path 110–75 (15 draws, crowns 298–238); vs the section-13 planner 101–83 (16 draws, crowns 304–251). Average decision about 0.37 ms.
+- **Bridge commitment** (`findPath` `stick`/`commit`, `u.bridge`): switching bridges costs 2 extra tiles, and 8 more within 5 tiles of the chosen bridge or within 4 s of choosing it. A unit chasing a target that swings across the middle used to flip about 10 times and never cross; now it flips 0 times and crosses by about 9 s.
+- **Square towers in collision**: troops are pushed out of the tower's square footprint (the same shape nav and attack range use), corners included.
+- The golden normal-battle test was re-recorded again for these intended changes.
+
+**UI** (`prototype_cardart.js` new; `prototype.css`, `prototype_v4.js`, `prototype_road.js`, `prototype_arena.js`, `prototype.html`)
+- **Card portraits** (`CardArt.cls(id)`): each card is drawn in the arena's own visual language: the ground of the arena where it unlocks, a rarity glow, and the unit as the battle's blue token. Swarms show several tokens, flyers hover with a shadow, buildings stand on a stone plinth, and spells show an energy burst. Each portrait is drawn once and cached as a CSS class. Collection tiles show the full scene; the hand, deck slots and next card show a close-up. The emoji stays in the markup as the fallback and for screen readers.
+- **Dialogs**: the chest is now a centred dialog with a treasure chest (domed lid, iron bands, gold corners, lock plate) and a gold roll button. The Trophy Road, Event Hub, Draft and Evolution reveal use the same type, close button, entrance and button language.
+- Collection **Details** stay open across re-renders. **Toasts**: at most 2 on screen, the rest queue; tap to dismiss; they move to the bottom while a dialog is open, and to the top during a phone battle.
+- **Nameplate edges follow your real side** (online player B is red); health bars keep "you = green, them = red".
+- **Targeting overlay** (Progress → Settings checkbox, or the `G` key; local matches): lines from every unit and tower to its target (solid when locked on), sight and range rings, and why it picked that target.
+
+**Verified:** two-window online match through the new UI. The desktop player (A) and phone player (B) each played a card by tapping, both saw the same units at the same server time, and there were no errors. The chest (opening to close), Evolution reveal, Trophy Road and Event Hub open and close on desktop and phone. The overlay toggles by key and checkbox.
+
+**Local testing note:** `~/Documents` is synced by iCloud, which had offloaded 859 files in the server's `node_modules`, so `node server.js` hung while loading express. To run the server locally, either run `npm ci` in the server folder or run a copy outside the synced folder.
 
 ### 10. Fix: placing a swarm froze the game
 Swarm members land a moment apart, which made the drop-in animation compute a negative shadow size; the canvas threw and the frame loop stopped. The renderer now clamps it, and the frame loop keeps running even if a frame throws (the error is logged).

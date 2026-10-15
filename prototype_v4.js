@@ -346,8 +346,40 @@ function bindAdminUi() {
   });
 }
 
+// Older saves can hold the removed Twin/Burst/Core cards: fold them into the base card
+// (copies add up; the higher level, mastery and unlocks carry over) and swap them out of decks.
+function migrateRemovedCards(saved) {
+  const col = saved.collection;
+  if (col && typeof col === 'object') {
+    Object.keys(col).forEach((id) => {
+      if (CARD_MAP[id]) return;
+      const to = Sim.migrateCardId(id);
+      const from = col[id];
+      delete col[id];
+      if (!to || !from || typeof from !== 'object') return;
+      const base = col[to] && typeof col[to] === 'object' ? col[to] : (col[to] = { unlocked: false, level: 1, copies: 0, mastery: 0, abilityUnlocked: false });
+      base.unlocked = !!(base.unlocked || from.unlocked);
+      base.level = Math.max(Number(base.level) || 1, Number(from.level) || 1);
+      base.copies = (Number(base.copies) || 0) + (Number(from.copies) || 0);
+      base.mastery = Math.max(Number(base.mastery) || 0, Number(from.mastery) || 0);
+      base.abilityUnlocked = !!(base.abilityUnlocked || from.abilityUnlocked);
+    });
+  }
+  // A deck that already has the base card drops the duplicate
+  const fixDeck = (d) => {
+    if (!Array.isArray(d)) return d;
+    const out = [];
+    d.forEach((id) => { const to = Sim.migrateCardId(id); if (to && !out.includes(to)) out.push(to); });
+    return out;
+  };
+  saved.deck = fixDeck(saved.deck);
+  saved.aiDeck = fixDeck(saved.aiDeck);
+  if (Array.isArray(saved.decks)) saved.decks = saved.decks.map(fixDeck);
+}
+
 function applySavedProgress(saved) {
   if (saved && typeof saved === 'object') {
+    migrateRemovedCards(saved);
     state.progress.gold = clamp(Number(saved.gold || 800), 0, 9999999);
     state.progress.deck = Array.isArray(saved.deck) ? saved.deck.slice(0, MAX_DECK) : [...STARTER_DECK];
     state.progress.aiDeck = Array.isArray(saved.aiDeck) ? saved.aiDeck.slice(0, MAX_DECK) : [...STARTER_DECK];
@@ -917,16 +949,28 @@ function renderAchievements() {
   }).join('');
 }
 
+// At most two toasts on screen; the rest wait their turn instead of piling up over the game
+const TOAST_MAX = 2;
+const toastQueue = [];
 function toast(icon, title, sub) {
   if (!ui.toasts) return;
+  if (ui.toasts.querySelectorAll('.toast:not(.out)').length >= TOAST_MAX) { toastQueue.push([icon, title, sub]); return; }
   const el = document.createElement('div');
   el.className = 'toast';
   el.innerHTML = `<span class="toast-icon">${icon}</span><div><b></b><small></small></div>`;
   el.querySelector('b').textContent = title;
   el.querySelector('small').textContent = sub || '';
+  el.setAttribute('role', 'status');
+  el.title = 'Tap to dismiss';
   ui.toasts.appendChild(el);
-  setTimeout(() => el.classList.add('out'), 3800);
-  setTimeout(() => el.remove(), 4300);
+  // Tap to dismiss early; otherwise it fades on its own
+  const dismiss = () => {
+    if (el.classList.contains('out')) return;
+    el.classList.add('out');
+    setTimeout(() => { el.remove(); if (toastQueue.length) toast(...toastQueue.shift()); }, 500);
+  };
+  el.addEventListener('click', dismiss, { once: true });
+  setTimeout(dismiss, 3800);
 }
 
 // ─── Emotes ─────────────────────────────────────────────────────────────────
@@ -1097,6 +1141,10 @@ function bindEmotes() {
 function renderStatus() {
   const v = state.view;
   if (!v) return;
+  // Nameplate edges follow the side each player really is (online player B sits at the bottom in red)
+  const wrap = ui.battleWrap || (ui.battleWrap = document.querySelector('.battle-wrap'));
+  const flipped = sideAt('bottom') === 'B';
+  if (wrap && wrap.__flipped !== flipped) { wrap.__flipped = flipped; wrap.classList.toggle('bottom-is-red', flipped); }
   [['bottom', 'A'], ['top', 'B']].forEach(([position, slot]) => {
     const side = sideAt(position);
     const p = v.players[side];
@@ -1162,7 +1210,7 @@ function cardButton(owner, id) {
   const lvl = p.lvl && p.lvl[id] != null ? p.lvl[id] : cp.level;
   const costTag = cost !== card.cost ? ` card-cost-${cost < card.cost ? 'down' : 'up'}` : '';
   const formHtml = form ? `<span class="card-form form-${form}" title="${form === 'mega' ? 'Mega: +1 cost, 160% HP, 130% damage, slower' : 'Tiny: −1 cost, 60% HP, 75% damage, faster'}">${form === 'mega' ? 'MEGA' : 'TINY'}</span>` : '';
-  return `<button class="card rarity-${card.rarity}${card.winCondition ? ' wc' : ''}${card.swarmCount > 1 ? ' swarm' : ''}${card.spell ? ' spell' : ''}${entering ? ' card-enter' : ''}${form ? ` sized-${form}` : ''}${evoB.cls}" data-owner="${owner}" data-type="${id}" data-disabled="${disabled ? '1' : '0'}" data-short="${short ? '1' : '0'}" data-selected="${selected ? '1' : '0'}" title="${card.name}: ${card.role}${cost !== card.cost ? ` (costs ${cost} in this event)` : ''}"><span class="card-rarity">${RARITY_STYLE[card.rarity].label}${tags}</span><span class="card-icon">${card.icon}</span><span class="card-cost ${costClass(cost)}${costTag}">${cost}</span>${formHtml}<span class="card-name">${card.name}</span><span class="card-meta">Lv ${lvl} • ${card.role}</span><span class="card-cd-bar"><i style="width:${cdPct}%"></i></span>${short ? `<span class="card-short" style="transform:scaleX(${fill / 100})"></span>` : ''}${evoB.html}</button>`;
+  return `<button class="card rarity-${card.rarity}${card.winCondition ? ' wc' : ''}${card.swarmCount > 1 ? ' swarm' : ''}${card.spell ? ' spell' : ''}${entering ? ' card-enter' : ''}${form ? ` sized-${form}` : ''}${evoB.cls}" data-owner="${owner}" data-type="${id}" data-disabled="${disabled ? '1' : '0'}" data-short="${short ? '1' : '0'}" data-selected="${selected ? '1' : '0'}" title="${card.name}: ${card.role}${cost !== card.cost ? ` (costs ${cost} in this event)` : ''}"><span class="card-rarity">${RARITY_STYLE[card.rarity].label}${tags}</span><span class="card-icon ${artCls(id)}">${card.icon}</span><span class="card-cost ${costClass(cost)}${costTag}">${cost}</span>${formHtml}<span class="card-name">${card.name}</span><span class="card-meta">Lv ${lvl} • ${card.role}</span><span class="card-cd-bar"><i style="width:${cdPct}%"></i></span>${short ? `<span class="card-short" style="transform:scaleX(${fill / 100})"></span>` : ''}${evoB.html}</button>`;
 }
 
 function deckAvgCost(ids) {
@@ -1194,7 +1242,7 @@ function renderHandDeck(owner) {
   noteHandChanges(owner, hand);
   const nextCard = p && p.next ? CARD_MAP[p.next] : null;
   const nextHtml = nextCard
-    ? `<div class="next-card-preview"><span class="next-label">NEXT</span><span class="next-icon">${nextCard.icon}</span><span class="next-name">${nextCard.name}</span></div>`
+    ? `<div class="next-card-preview"><span class="next-label">NEXT</span><span class="next-icon ${artCls(nextCard.id)}">${nextCard.icon}</span><span class="next-name">${nextCard.name}</span></div>`
     : '';
   return hand.map((id) => cardButton(owner, id)).join('') + nextHtml + avgElixirBar(hand);
 }
@@ -1216,7 +1264,54 @@ function renderDecks() {
   }
 }
 
-function writeLog(msg) { if (ui.log) ui.log.textContent = msg; }
+// The status line under the game: re-shown (and briefly highlighted) whenever the message changes
+let logTimer = 0;
+function writeLog(msg) {
+  if (!ui.log) return;
+  ui.log.textContent = msg;
+  ui.log.classList.remove('flash');
+  void ui.log.offsetWidth; // restart the highlight
+  ui.log.classList.add('flash', 'shown');
+  clearTimeout(logTimer);
+  logTimer = setTimeout(() => ui.log && ui.log.classList.remove('shown'), 5200);
+}
+
+// ── App shell: Battle / Deck / Evolutions / Progress ─────────────────────
+const VIEWS = ['battle', 'deck', 'evo', 'progress'];
+function showView(name, focusTab) {
+  if (!VIEWS.includes(name)) name = 'battle';
+  document.querySelectorAll('.app-tab').forEach((t) => {
+    const on = t.dataset.view === name;
+    t.setAttribute('aria-selected', on ? 'true' : 'false');
+    t.tabIndex = on ? 0 : -1;
+    if (on && focusTab) t.focus();
+  });
+  document.querySelectorAll('.view').forEach((v) => { v.hidden = v.dataset.view !== name; });
+  document.body.dataset.view = name;
+  try { sessionStorage.setItem('pt_view', name); } catch (_) { /* private mode */ }
+  // The arena canvas sizes itself to its box, which is 0x0 while hidden
+  if (name === 'battle') window.dispatchEvent(new Event('resize'));
+}
+
+function bindShell() {
+  const tabs = [...document.querySelectorAll('.app-tab')];
+  tabs.forEach((t) => t.addEventListener('click', () => showView(t.dataset.view)));
+  // Arrow keys move between tabs (WAI-ARIA tabs pattern)
+  document.querySelector('.app-tabs')?.addEventListener('keydown', (e) => {
+    const i = tabs.findIndex((t) => t.getAttribute('aria-selected') === 'true');
+    let n = -1;
+    if (e.key === 'ArrowRight') n = (i + 1) % tabs.length;
+    else if (e.key === 'ArrowLeft') n = (i - 1 + tabs.length) % tabs.length;
+    else if (e.key === 'Home') n = 0;
+    else if (e.key === 'End') n = tabs.length - 1;
+    if (n < 0) return;
+    e.preventDefault();
+    showView(tabs[n].dataset.view, true);
+  });
+  let saved = null;
+  try { saved = sessionStorage.getItem('pt_view'); } catch (_) { /* private mode */ }
+  showView(saved || 'battle');
+}
 
 // Only touch the DOM when the markup actually changed (avoids rebuilding every frame)
 function setHtml(el, html) {
@@ -1501,6 +1596,7 @@ function renderArena() {
     zoneFn: zones && zones.fn,
     zoneKey: zones && zones.key,
     ghost: placementGhost(),
+    debug: aggroDebugList(),
   });
 }
 
@@ -2011,8 +2107,6 @@ function cardTraits(c) {
   if (c.special.includes('kamikaze')) parts.push('explodes on contact');
   if (c.special.includes('deathBomb')) parts.push('drops a bomb when destroyed');
   if (c.minRange) parts.push(`can't hit within ${c.minRange} tiles`);
-  if (c.style === 'double') parts.push('hits 2 targets');
-  if (c.style === 'burst') parts.push('bonus follow-up shot');
   if (c.anywhere) parts.push('deploy anywhere');
   const m = c.mech || {};
   if (m.spawner) parts.push(`spawns ${CARD_MAP[m.spawner.card].name} every ${m.spawner.every}s`);
@@ -2262,6 +2356,7 @@ function onlineDeckPayload() {
 }
 
 function showOnlineLobby() {
+  showView('battle');
   state.running = false; // pause the local match while you look for an opponent
   if (ui.lobbyPanel) ui.lobbyPanel.hidden = false;
   if (ui.shareBox) ui.shareBox.hidden = true;
@@ -2272,6 +2367,7 @@ function showOnlineLobby() {
 }
 
 function scrollToBattle() {
+  showView('battle');
   const wrap = document.querySelector('.battle-wrap');
   if (wrap) wrap.scrollIntoView({ block: 'start', behavior: 'smooth' });
 }
@@ -2553,6 +2649,7 @@ function cacheUi() {
 }
 
 function bindCore() {
+  bindShell();
   bindBoardInput();
   bindEmotes();
   bindLobby();
@@ -2579,6 +2676,11 @@ function bindCore() {
   });
 
   ui.resetUpgrades?.addEventListener('click', () => {
+    // Wipes every card, trophy, deck and reward for good, so it asks first
+    if (!window.confirm('Reset ALL progress?\n\nThis deletes your cards, levels, decks, gold, trophies, Evolutions and event rewards on this device. It cannot be undone.')) {
+      writeLog('Reset cancelled. Your progress is unchanged.');
+      return;
+    }
     localStorage.removeItem(PROGRESS_KEY);
     state.progress = {
       gold: 800,
@@ -2726,5 +2828,35 @@ function boot() {
   ui.unlock?.addEventListener('click', tryUnlock);
   ui.password?.addEventListener('keydown', (e) => { if (e.key === 'Enter') tryUnlock(); });
 }
+
+// ── Targeting debug overlay (aggro) ───────────────────────────────────────
+// Lines from every unit and tower to its current target, its sight and range rings, and why it
+// picked that target (Sim.explainTargeting has the full report). Local matches only: an online
+// client only has snapshots, not the targeting state. Purely a reader: it changes nothing.
+let aggroDebug = false;
+function setAggroDebug(on) {
+  aggroDebug = !!on;
+  const box = $('ptAggroDebug');
+  if (box) box.checked = aggroDebug;
+  writeLog(aggroDebug ? 'Targeting overlay on (G to toggle): lines show what each unit is going for and why.' : 'Targeting overlay off.');
+}
+function aggroDebugList() {
+  const m = state.match;
+  if (!aggroDebug || !m || state.viewSource !== 'local') return null;
+  const out = [];
+  for (const u of m.units) {
+    if (u.hp <= 0 || u.targets === 'none') continue;
+    out.push({ id: u.id, tid: u.targetId, range: u.range, sight: u.building ? u.range : u.sight, locked: u.locked, why: u.targetWhy || '' });
+  }
+  for (const t of m.towers) if (t.hp > 0 && t.active) out.push({ id: t.id, tid: t.targetId, range: t.range, tower: true });
+  return out;
+}
+window.addEventListener('keydown', (e) => {
+  if (e.key !== 'g' && e.key !== 'G') return;
+  if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA')) return;
+  if (!ui.content || ui.content.hidden) return;
+  setAggroDebug(!aggroDebug);
+});
+document.addEventListener('change', (e) => { if (e.target && e.target.id === 'ptAggroDebug') setAggroDebug(e.target.checked); });
 
 boot();
