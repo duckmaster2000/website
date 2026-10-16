@@ -355,6 +355,82 @@ function deckWarnings(ids) {
   return out;
 }
 
+// ─── Deck analysis ─────────────────────────────────────────────────────────
+// Plain rules read from each card's own stats (level 1), so every rating can name the cards behind
+// it. A guide to coverage, not a prediction of who wins.
+const hitsAirCard = (c) => c.targets === 'any' || c.targets === 'air' || !!(c.mech && c.mech.spawner && CARD_MAP[c.mech.spawner.card] && CARD_MAP[c.mech.spawner.card].targets === 'any');
+const unitDps = (c) => (c.dmg * (c.swarmCount || 1)) / Math.max(0.3, c.cd || 1);
+function analyzeDeck(ids) {
+  const cards = ids.map((id) => CARD_MAP[id]).filter(Boolean);
+  const names = (list) => list.map((c) => c.name);
+  const unit = (c) => !c.spell;
+  const air = cards.filter((c) => (unit(c) && hitsAirCard(c)) || (c.spell && c.dmg > 0 && c.targets !== 'ground'));
+  const airScore = air.reduce((s, c) => s + (c.spell ? 0.5 : 1), 0);
+  const splash = cards.filter((c) => (unit(c) && (c.splash > 0 || (c.special || '').includes('chain') || (c.special || '').includes('spin'))) || (c.spell && c.dmg > 0 && c.splash >= 2.5));
+  const tankKill = cards.filter((c) => unit(c) && c.targets !== 'buildings' && c.targets !== 'none' && (unitDps(c) >= 110 || (c.mech && c.mech.ramp)));
+  const winCons = cards.filter((c) => c.winCondition);
+  const spells = cards.filter((c) => c.spell);
+  const bigSpell = spells.filter((c) => c.dmg >= 150 || c.freeze || (c.zone && (c.zone.kind === 'laser' || c.zone.kind === 'spawn')));
+  const buildings = cards.filter((c) => c.building);
+  const costs = cards.map((c) => c.cost).sort((a, b) => a - b);
+  const cycle = costs.slice(0, 4).reduce((s, x) => s + x, 0);
+  const avg = costs.reduce((s, x) => s + x, 0) / Math.max(1, costs.length);
+  const lvl = (x, ok, good) => (x >= good ? 3 : x >= ok ? 2 : x > 0 ? 1 : 0);
+  const rows = [
+    { key: 'air', label: 'Anti-air', score: lvl(airScore, 1.5, 2.5), cards: names(air), tip: 'Troops, buildings or spells that can hit flying units.' },
+    { key: 'splash', label: 'Swarm control', score: lvl(splash.length, 2, 3), cards: names(splash), tip: 'Splash, chain or big-radius damage for groups.' },
+    { key: 'tank', label: 'Tank killing', score: lvl(tankKill.length, 1, 2), cards: names(tankKill), tip: 'High damage per second against single big targets.' },
+    { key: 'win', label: 'Win conditions', score: lvl(winCons.length, 1, 2), cards: names(winCons), tip: 'Cards that go straight for towers.' },
+    { key: 'spell', label: 'Spells', score: spells.length >= 2 && bigSpell.length ? 3 : lvl(spells.length, 1, 2), cards: names(spells), tip: 'One small spell for swarms and one big one is a common mix.' },
+    { key: 'cycle', label: 'Cycle', score: cycle <= 9 ? 3 : cycle <= 12 ? 2 : 1, cards: [`cheapest 4 cards cost ${cycle}`], tip: 'Low = you get back to your key cards faster.' },
+  ];
+  const strengths = [];
+  const weaknesses = [];
+  if (!winCons.length) weaknesses.push('No win condition: nothing goes straight for towers.');
+  if (airScore === 0) weaknesses.push('Nothing hits air: flying troops will reach your towers freely.');
+  else if (airScore < 1.5) weaknesses.push(`Light anti-air (only ${names(air).join(', ')}).`);
+  if (!splash.length) weaknesses.push('No splash: swarms like Junk Pack or Goblin Bikers are hard to stop.');
+  if (!tankKill.length) weaknesses.push('No tank killer: big tanks like Rock Titan will soak a lot of damage.');
+  if (!spells.length) weaknesses.push('No spells.');
+  if (avg > 4.6) weaknesses.push(`Heavy deck (average ${avg.toFixed(1)}): slow to cycle, risky against fast pushes.`);
+  if (avg < 2.9) weaknesses.push(`Very light deck (average ${avg.toFixed(1)}): may struggle to stop big pushes.`);
+  if (airScore >= 2.5) strengths.push('Solid anti-air.');
+  if (splash.length >= 3) strengths.push('Strong against swarms.');
+  if (tankKill.length >= 2) strengths.push('Good at melting tanks.');
+  if (buildings.length) strengths.push(`${names(buildings).join(', ')} can pull building-targeting troops away from your towers.`);
+  if (cycle <= 9) strengths.push('Fast cycle.');
+  return { rows, strengths, weaknesses, avg };
+}
+
+function deckAnalysisHtml(ids) {
+  const a = analyzeDeck(ids);
+  const pips = (n) => `<span class="da-pips" aria-hidden="true">${[1, 2, 3].map((i) => `<i class="${i <= n ? 'on' : ''}"></i>`).join('')}</span>`;
+  const word = ['none', 'weak', 'ok', 'strong'];
+  return `<details class="deck-analysis" ${roadUi.analysisOpen ? 'open' : ''} data-analysis><summary>📊 Deck analysis</summary>
+    <ul class="da-rows">${a.rows.map((r) => `<li class="da-${r.score}" title="${escapeHtml(r.tip)}"><b>${r.label}</b>${pips(r.score)}<span class="da-word">${word[r.score]}</span><small>${r.cards.length ? escapeHtml(r.cards.join(', ')) : '—'}</small></li>`).join('')}</ul>
+    ${a.strengths.length ? `<p class="da-good">${a.strengths.map((x) => `✓ ${escapeHtml(x)}`).join('<br>')}</p>` : ''}
+    ${a.weaknesses.length ? `<p class="da-bad">${a.weaknesses.map((x) => `⚠️ ${escapeHtml(x)}`).join('<br>')}</p>` : ''}
+    <p class="note">Ratings come from each card's own stats (who it can hit, splash, damage per second, cost). They show coverage, not a guaranteed win rate.</p>
+  </details>`;
+}
+
+function deckName(i) {
+  const n = state.progress.deckNames && state.progress.deckNames[i];
+  return n || `Deck ${i + 1}`;
+}
+
+function renameDeck(i) {
+  const cur = deckName(i);
+  const v = window.prompt('Name this deck (up to 20 characters):', cur);
+  if (v == null) return;
+  const name = v.replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 20);
+  if (!state.progress.deckNames) state.progress.deckNames = ['', '', ''];
+  state.progress.deckNames[i] = name;
+  saveProgress();
+  renderCollection();
+  writeLog(name ? `Deck ${i + 1} renamed to "${name}".` : `Deck ${i + 1} name cleared.`);
+}
+
 function setActiveDeck(i) {
   const p = state.progress;
   p.activeDeck = clamp(i, 0, 2);
@@ -364,7 +440,7 @@ function setActiveDeck(i) {
   saveProgress();
   renderCollection();
   renderDecks();
-  writeLog(`Deck ${p.activeDeck + 1} selected.`);
+  writeLog(`${deckName(p.activeDeck)} selected.`);
 }
 
 function deckSlotHtml(id, idx, picked) {
@@ -431,13 +507,14 @@ function renderDeckEditor() {
   const deck = activeDeckIds();
 
   if (ui.deckTabs) {
-    ui.deckTabs.innerHTML = [0, 1, 2].map((i) => `<button type="button" class="deck-tab ${p.activeDeck === i ? 'on' : ''}" data-deck-tab="${i}">Deck ${i + 1}</button>`).join('');
+    ui.deckTabs.innerHTML = [0, 1, 2].map((i) => `<button type="button" role="tab" aria-selected="${p.activeDeck === i}" class="deck-tab ${p.activeDeck === i ? 'on' : ''}" data-deck-tab="${i}">${escapeHtml(deckName(i))}</button>`).join('')
+      + `<button type="button" class="deck-rename" data-deck-rename="${p.activeDeck}" title="Rename ${escapeHtml(deckName(p.activeDeck))}" aria-label="Rename this deck">✏️</button>`;
   }
   if (ui.deckSummary) {
     const cards = deck.map((id) => CARD_MAP[id]);
     const n = (t) => cards.filter((c) => cardType(c) === t).length;
     const warn = deckWarnings(deck);
-    ui.deckSummary.innerHTML = `${avgElixirBar(deck)}${evoSlotsSummary(deck)}<span class="ds-counts">⚔️ ${n('troop')} troops · ✦ ${n('spell')} spells · 🏯 ${n('building')} buildings</span>${warn.length ? `<ul class="deck-warn">${warn.map((w) => `<li>⚠️ ${escapeHtml(w)}</li>`).join('')}</ul>` : '<span class="deck-ok">✓ Balanced deck</span>'}`;
+    ui.deckSummary.innerHTML = `${avgElixirBar(deck)}${evoSlotsSummary(deck)}<span class="ds-counts">⚔️ ${n('troop')} troops · ✦ ${n('spell')} spells · 🏯 ${n('building')} buildings</span>${warn.length ? `<ul class="deck-warn">${warn.map((w) => `<li>⚠️ ${escapeHtml(w)}</li>`).join('')}</ul>` : '<span class="deck-ok">✓ Balanced deck</span>'}${deckAnalysisHtml(deck)}`;
   }
   if (ui.deckSlots) ui.deckSlots.innerHTML = deck.map((id, idx) => deckSlotHtml(id, idx, roadUi.pickSlot === idx)).join('');
 
@@ -506,9 +583,13 @@ function renderDeckEditor() {
 
 function bindDeckEditor() {
   ui.deckTabs?.addEventListener('click', (e) => {
+    const r = e.target.closest('[data-deck-rename]');
+    if (r) { renameDeck(Number(r.dataset.deckRename)); return; }
     const b = e.target.closest('[data-deck-tab]');
     if (b) setActiveDeck(Number(b.dataset.deckTab));
   });
+  // Remember whether the analysis is open across re-renders
+  ui.deckSummary?.addEventListener('toggle', (e) => { if (e.target.matches('[data-analysis]')) roadUi.analysisOpen = e.target.open; }, true);
   ui.deckSlots?.addEventListener('click', (e) => {
     const evoBtn = e.target.closest('[data-evo-toggle]');
     if (evoBtn) { e.stopPropagation(); toggleEvoEquip(evoBtn.dataset.evoToggle); return; }

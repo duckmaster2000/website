@@ -77,7 +77,9 @@
     let lastNow = performance.now();
     const watch = { time: -1, double: false, phase: 'regular' };
     let ribbons = [];                        // small notices at the top of the arena (events)
-    const reduceMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // Reduced motion: the system setting, unless the player picked Full or Reduced in Settings
+    let reduceMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    try { const m = localStorage.getItem('prototype_motion'); if (m === 'reduce') reduceMotion = true; else if (m === 'full') reduceMotion = false; } catch (_) {}
 
     // ── Coordinates ──
     const sx = (x) => (flip ? W - x : x) * scale;
@@ -638,6 +640,18 @@
       }
       drawStatus(u, x, y, r, face, team, now);
       if (u.evo) drawEvoCrest(u, x, y, r, now);
+      if (u.upg) drawUpgradeMark(u, x, y, r, now);
+      if (u.emp) {
+        // War Drum: its aura, beating slowly
+        const beat = reduceMotion ? 0.5 : 0.5 + 0.5 * Math.sin(now / 300);
+        ctx.save();
+        ctx.strokeStyle = team.light;
+        ctx.globalAlpha = 0.25 + 0.2 * beat;
+        ctx.lineWidth = Math.max(1.5, scale * 0.07);
+        ctx.setLineDash([scale * 0.3, scale * 0.25]);
+        ctx.beginPath(); ctx.arc(x, y, u.emp * scale, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
+      }
       if (u.form || u.boss || u.mn) drawEventBadge(u, x, y, r, now);
       if (u.wind && !u.melee) {
         ctx.strokeStyle = 'rgba(255,230,120,0.9)';
@@ -686,6 +700,52 @@
     }
 
     // Gradient rim, crest, and stack/rally readouts so evolved units read at a glance
+    // C.H.A.O.S.: an upgraded unit wears a ring and a 🧬 tag in its upgrade's rarity colour
+    const UPG_COLOR = { common: '#8fd3ff', rare: '#ffb347', epic: '#ff5ce1' };
+    function drawUpgradeMark(u, x, y, r, now) {
+      const def = window.ClashSim && window.ClashSim.CHAOS_UPGRADE_MAP[u.upg];
+      const col = UPG_COLOR[def ? def.rarity : 'common'];
+      ctx.save();
+      ctx.globalAlpha = 0.75 + 0.25 * Math.sin(now / 260 + u.x);
+      ctx.strokeStyle = col;
+      ctx.lineWidth = Math.max(1.5, scale * 0.08);
+      ctx.setLineDash([Math.max(3, scale * 0.18), Math.max(2, scale * 0.12)]);
+      ctx.beginPath(); ctx.arc(x, y, r * (u.building ? 1.32 : 1.12), now / 900, now / 900 + Math.PI * 2); ctx.stroke();
+      ctx.restore();
+      outlinedText('🧬', x - r * 0.9, y - r * 0.9, Math.max(9, scale * 0.4), col, 'rgba(0,0,0,0.7)', 900);
+    }
+
+    // C.H.A.O.S. Blackout: darkness everywhere except around the viewer's own towers, troops and spells
+    let darkCanvas = null;
+    function drawBlackout(view, side) {
+      if (!darkCanvas) darkCanvas = document.createElement('canvas');
+      if (darkCanvas.width !== canvas.width || darkCanvas.height !== canvas.height) { darkCanvas.width = canvas.width; darkCanvas.height = canvas.height; }
+      const d = darkCanvas.getContext('2d');
+      d.globalCompositeOperation = 'source-over';
+      d.clearRect(0, 0, darkCanvas.width, darkCanvas.height);
+      d.fillStyle = 'rgba(4,6,18,0.84)';
+      d.fillRect(0, 0, darkCanvas.width, darkCanvas.height);
+      d.globalCompositeOperation = 'destination-out';
+      const light = (x, y, rad) => {
+        const px = sx(x), py = sy(y), pr = rad * scale;
+        const g = d.createRadialGradient(px, py, pr * 0.35, px, py, pr);
+        g.addColorStop(0, 'rgba(0,0,0,1)');
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+        d.fillStyle = g;
+        d.beginPath(); d.arc(px, py, pr, 0, Math.PI * 2); d.fill();
+      };
+      view.towers.forEach((t) => { if (t.owner === side && t.hp > 0) light(t.x, t.y, t.tower === 'king' ? 6 : 5.5); });
+      view.units.forEach((u) => { if (u.owner === side && u.hp > 0) light(u.x, u.y, u.building ? 3.6 : 3); });
+      (view.zones || []).forEach((z) => { if (z.owner === side) light(z.x, z.y, (z.r || 1) + 1); });
+      // Effects drawn earlier can leave alpha or blending changed: draw the darkness at full strength
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.drawImage(darkCanvas, 0, 0);
+      ctx.restore();
+    }
+
     function drawEvoCrest(u, x, y, r, now) {
       const rim = ctx.createLinearGradient(x - r, y - r, x + r, y + r);
       rim.addColorStop(0, EVO1);
@@ -1297,6 +1357,8 @@
           case 'popup': e.life = 420; break;
           case 'dash': e.life = 380; break;
           case 'taunt': e.life = 900; break;
+          case 'thorns': e.life = 300; break;
+          case 'trap': e.life = 750; shake = Math.max(shake, 4); break;
           case 'evolve': e.life = f.small ? 700 : 1300; if (!f.small) shake = Math.max(shake, 4); break;
           case 'shockwave': e.life = 550; shake = Math.max(shake, 3); break;
           case 'pulse': e.life = 500; break;
@@ -1537,6 +1599,24 @@
               ctx.lineWidth = 2;
               ctx.beginPath(); ctx.arc(x, y, (e.r || 3) * scale * easeOut(t), 0, Math.PI * 2); ctx.stroke();
             }
+            break;
+          case 'thorns': {
+            // Spikes flick out of a melee attacker that hit a Thorn Golem
+            ctx.strokeStyle = `rgba(120,230,90,${1 - t})`;
+            ctx.lineWidth = Math.max(1.5, scale * 0.06);
+            for (let i = 0; i < 6; i++) {
+              const a = (i / 6) * Math.PI * 2;
+              const r0 = scale * 0.25, r1 = scale * (0.35 + 0.35 * easeOut(t));
+              ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * r0, y + Math.sin(a) * r0); ctx.lineTo(x + Math.cos(a) * r1, y + Math.sin(a) * r1); ctx.stroke();
+            }
+            break;
+          }
+          case 'trap':
+            ctx.strokeStyle = `rgba(200,150,90,${1 - t})`;
+            ctx.lineWidth = Math.max(3, scale * 0.14);
+            ctx.beginPath(); ctx.arc(x, y, (e.r || 2) * scale * easeOut(t), 0, Math.PI * 2); ctx.stroke();
+            ctx.globalAlpha = 1 - t;
+            outlinedText('SNAP!', x, y - scale * 1.1, scale * 0.6, '#ffd08a', '#3a2410', 900);
             break;
           case 'taunt':
             ctx.strokeStyle = `rgba(255,70,70,${1 - t})`;
@@ -2124,6 +2204,7 @@
         view.projectiles.forEach((p) => drawProjectile(p, now));
         air.forEach((d) => drawUnit(d.e, now, dt));
         drawEffects(now);
+        if (view.blackout && o.viewer) drawBlackout(view, o.viewer);
         if (o.debug && o.debug.length) drawAggroDebug(view, o.debug);
         drawGhost(o.ghost);
         drawEmotes(view, now);
@@ -2156,7 +2237,7 @@
     }
 
     resize();
-    const api = { render, resize, toWorld, addFx, announce, ribbon, showEmote, setNames, setTheme, reset, onCue: null, get flip() { return flip; }, get theme() { return themeName; } };
+    const api = { render, resize, toWorld, addFx, announce, ribbon, showEmote, setNames, setTheme, reset, onCue: null, setReduceMotion: (on) => { reduceMotion = !!on; }, get flip() { return flip; }, get theme() { return themeName; } };
     return api;
   }
 

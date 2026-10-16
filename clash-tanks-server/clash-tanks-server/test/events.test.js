@@ -495,7 +495,8 @@ test('every PvP event survives a full AI-vs-AI match with only legal moves', () 
       Sim.step(state);
     }
     assert.equal(bad, 0, `${ev.id}: legal moves`);
-    assert.ok(plays > 10, `${ev.id}: the AI actually plays (${plays})`);
+    // Not idle. Slow-elixir events (Scavenger) and heavy-card events (Heavyweights) play ~9 cards a match
+    assert.ok(plays > 6, `${ev.id}: the AI actually plays (${plays})`);
     assert.equal(state.running, false, `${ev.id}: ends`);
   }
 });
@@ -630,8 +631,10 @@ test('rotation: 4 daily events, no repeats from yesterday, mixed categories, wee
     assert.ok(Events.availability(r.challenge, now).ok);
     assert.equal(Events.availability(r.challenge === 'gauntlet' ? 'ladder' : 'gauntlet', now).ok, false);
     const off = Events.EVENTS.find((e) => e.schedule === 'rotating' && !r.daily.includes(e.id));
-    assert.equal(Events.availability(off.id, now).ok, false);
-    assert.equal(Events.availability(off.id, now, { forceAll: true }).ok, true);
+    // Since the mode library (2026-10-15) rotation only features events; the rest stay playable, casually
+    assert.equal(Events.availability(off.id, now).ok, true);
+    assert.equal(Events.availability(off.id, now).casual, true);
+    assert.equal(Events.availability(r.daily[0], now).featured, true);
   }
 });
 
@@ -641,28 +644,42 @@ const NOW = Date.UTC(2026, 9, 13, 10);
 const win = (id, extra) => Object.assign({ matchId: `m-${Math.random()}`, eventId: id, result: 'win', ai: 'normal', mode: 'ai', cardsPlayed: 9, towersLost: 0, towersStanding: 3, duration: 120 }, extra || {});
 const gold = (res) => res.rewards.filter((r) => r.kind === 'gold').reduce((s, r) => s + r.amount, 0);
 
+// Events featured on the test date (only featured rotating events pay event gold)
+const FEAT = () => Events.rotation(NOW).daily;
+
 test('a result is applied exactly once, and first-win prizes pay once ever', () => {
   const P = Events.freshProgress();
-  const r = win('overload', { matchId: 'abc' });
+  const ev = FEAT()[0];
+  const r = win(ev, { matchId: 'abc' });
   const first = Events.settleMatch(P, r, NOW);
   assert.ok(first.applied);
   assert.ok(first.rewards.some((x) => x.kind === 'chest'), 'first win chest');
   const again = Events.settleMatch(P, r, NOW);
   assert.equal(again.applied, false);
   assert.equal(again.rewards.length, 0);
-  const second = Events.settleMatch(P, win('overload'), NOW);
+  const second = Events.settleMatch(P, win(ev), NOW);
   assert.ok(!second.rewards.some((x) => x.label === 'First win bonus'));
-  assert.equal(P.records.overload.wins, 2);
+  assert.equal(P.records[ev].wins, 2);
+});
+
+test('a rotating event that is not featured today is casual: records count, no event gold', () => {
+  const P = Events.freshProgress();
+  const off = Events.EVENTS.find((e) => e.schedule === 'rotating' && !FEAT().includes(e.id)).id;
+  const res = Events.settleMatch(P, win(off), NOW);
+  assert.ok(res.applied && res.casual);
+  assert.equal(res.rewards.filter((x) => x.kind === 'gold' || x.kind === 'chest').length, 0);
+  assert.equal(P.records[off].wins, 1);
 });
 
 test('daily caps: rewarded wins stop after the cap, records keep counting, the next day resets', () => {
   const P = Events.freshProgress();
   const golds = [];
-  for (let i = 0; i < 5; i++) golds.push(gold(Events.settleMatch(P, win('mirror'), NOW)));
+  const ev = 'chaos'; // permanent, so featured every day
+  for (let i = 0; i < 5; i++) golds.push(gold(Events.settleMatch(P, win(ev), NOW)));
   assert.ok(golds[3] < golds[2], 'fewer rewards past the cap');
-  assert.equal(P.daily.wins.mirror, Events.DAILY_WIN_CAP);
-  assert.equal(P.records.mirror.wins, 5);
-  const tomorrow = Events.settleMatch(P, win('mirror'), NOW + Events.DAY_MS);
+  assert.equal(P.daily.wins[ev], Events.DAILY_WIN_CAP);
+  assert.equal(P.records[ev].wins, 5);
+  const tomorrow = Events.settleMatch(P, win(ev), NOW + Events.DAY_MS);
   assert.ok(tomorrow.rewards.some((x) => /Victory \(1\//.test(x.label)));
 });
 
@@ -829,9 +846,9 @@ test('performance: Total Chaos with a big battle stays fast', () => {
 // section 15 (opponent model in rollouts, spell/attack look-ahead, bridge commitment, square towers), and on
 // 2026-10-14 when the Twin/Burst/Core card versions were removed and for that day's balance pass
 // (swarm HP buffs, spell damage nerfs), then the follow-up round (swarm damage, Flare Pod and Cryo Caster
-// nerfs, AI push planning for swarm win conditions) and the automatic 5-round pass. Re-record only for
+// nerfs, AI push planning for swarm win conditions) and the automatic 5-round pass; again on 2026-10-15 for a 4-round pass. Re-record only for
 // an intended change to normal battles, never to make an event change pass.
-const GOLDEN = [{"seed":11,"dA":["rocktitan","boulder","tartrap","cryocaster","mechmice-mk-ii","crackergang","stormzeppelin","overdrive"],"dB":["flybombers-mk-ii","frostnova","boulder","boltturret","hawkstrike","beeblitz","scrapbots","lizarddash"],"lvl":5,"evo":[],"sig":"A king 99.75 3 1 9041.53 6245.56 11 11"},{"seed":23,"dA":["ufofleet","acidpool","rocketrain","phantomrider","cryocaster","nanodrones","antmarch","rocktitan"],"dB":["scout-mk-ii","boulder","rocketrain","sirenbeacon","raylance","bombbeetles","shieldknight","flakgunner"],"lvl":3,"evo":["rocketrain"],"sig":"B crowns 180.00 0 1 11310.70 12174.72 26 23"},{"seed":37,"dA":["stormzeppelin","firebomb","gravitywell","flaktower","flarepod-mk-ii","bugsquad","medicbot","crackergang-mk-ii"],"dB":["goblinbikers","firebomb","rocketrain","flaktower","flarepod-mk-ii","crackergang","bugsquad","frostnova"],"lvl":3,"evo":["firebomb","flarepod-mk-ii"],"sig":"B crowns 180.00 0 2 9687.77 17225.74 20 21"},{"seed":41,"dA":["rocktitan","boulder","gravitywell","sirenbeacon","cryocaster","bugsquad","scrapbots","crackergang"],"dB":["flybombers","boulder","shock","infernospire","bombbeetles","crackergang","shieldknight","scrapbots-mk-ii"],"lvl":7,"evo":[],"sig":"B crowns 180.00 0 1 15775.99 21019.43 22 23"},{"seed":58,"dA":["goblinbikers","boulder","rocketrain","teslapit","nanodrones","bugsquad","brawler","wolfpack"],"dB":["siege","boulder","gravitywell","bonecrypt","bombbeetles","voltbug","lizarddash-mk-ii","mechmice"],"lvl":3,"evo":["rocketrain","brawler"],"sig":"B crowns 180.00 0 1 10244.46 13352.15 23 26"},{"seed":64,"dA":["ufofleet","acidpool","gravitywell","teslapit","flarepod","flakgunner","junkpack","guardian"],"dB":["rocktitan","firebomb","boulder","flarepod","beeblitz","mechmice","raylance","teslapit"],"lvl":2,"evo":["flarepod","junkpack"],"sig":"A king 172.05 3 0 11554.66 10161.12 20 21"}];
+const GOLDEN = [{"seed":11,"dA":["rocktitan","boulder","tartrap","cryocaster","mechmice-mk-ii","crackergang","stormzeppelin","overdrive"],"dB":["flybombers-mk-ii","frostnova","boulder","boltturret","hawkstrike","beeblitz","scrapbots","lizarddash"],"lvl":5,"evo":[],"sig":"A king 94.75 3 2 8952.60 7757.56 10 11"},{"seed":23,"dA":["ufofleet","acidpool","rocketrain","phantomrider","cryocaster","nanodrones","antmarch","rocktitan"],"dB":["scout-mk-ii","boulder","rocketrain","sirenbeacon","raylance","bombbeetles","shieldknight","flakgunner"],"lvl":3,"evo":["rocketrain"],"sig":"B crowns 180.00 0 1 11013.58 14993.65 23 22"},{"seed":37,"dA":["stormzeppelin","firebomb","gravitywell","flaktower","flarepod-mk-ii","bugsquad","medicbot","crackergang-mk-ii"],"dB":["goblinbikers","firebomb","rocketrain","flaktower","flarepod-mk-ii","crackergang","bugsquad","frostnova"],"lvl":3,"evo":["firebomb","flarepod-mk-ii"],"sig":"B crowns 180.00 0 1 10207.49 14989.45 20 18"},{"seed":41,"dA":["rocktitan","boulder","gravitywell","sirenbeacon","cryocaster","bugsquad","scrapbots","crackergang"],"dB":["flybombers","boulder","shock","infernospire","bombbeetles","crackergang","shieldknight","scrapbots-mk-ii"],"lvl":7,"evo":[],"sig":"A overtime 180.95 1 0 17163.14 19381.25 24 24"},{"seed":58,"dA":["goblinbikers","boulder","rocketrain","teslapit","nanodrones","bugsquad","brawler","wolfpack"],"dB":["siege","boulder","gravitywell","bonecrypt","bombbeetles","voltbug","lizarddash-mk-ii","mechmice"],"lvl":3,"evo":["rocketrain","brawler"],"sig":"B crowns 180.00 0 1 10587.98 12385.02 23 28"},{"seed":64,"dA":["ufofleet","acidpool","gravitywell","teslapit","flarepod","flakgunner","junkpack","guardian"],"dB":["rocktitan","firebomb","boulder","flarepod","beeblitz","mechmice","raylance","teslapit"],"lvl":2,"evo":["flarepod","junkpack"],"sig":"A king 162.20 3 0 11546.05 9376.44 18 20"}];
 
 test('normal battles play out exactly as recorded (events never leak into them)', () => {
   for (const g of GOLDEN) {

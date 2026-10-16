@@ -434,7 +434,7 @@ test('the card library has the new cards, each in one version, with an arena and
     assert.ok(c.ability && c.ability.name, `${id} has an ability`);
   }
   assert.equal(Sim.CARD_LIBRARY.filter((c) => c.spell).length, 12);
-  assert.equal(Sim.CARD_LIBRARY.filter((c) => c.building).length, 2 + 8); // Bolt Turret (base + Mk-II) and the 8 new buildings
+  assert.equal(Sim.CARD_LIBRARY.filter((c) => c.building).length, 2 + 8 + 2); // Bolt Turret (base + Mk-II), the 8 step-9 buildings, Snare Mine and War Drum
   // Tokens exist for spawning but can never be put in a deck
   for (const t of Sim.TOKEN_CARDS) {
     assert.ok(!Sim.CARD_LIBRARY.includes(t));
@@ -825,13 +825,13 @@ test('AI vs AI with the new cards plays full, legal matches and uses spells and 
         if (res) assert.ok(res.ok, `AI only makes legal moves (${res.reason})`);
       }
       Sim.step(s);
-      Sim.takeFx(s);
+      // Count every building played (not just those still standing at the end)
+      buildings += Sim.takeFx(s).filter((f) => f.type === 'deploy' && Sim.CARD_MAP[f.cardId] && Sim.CARD_MAP[f.cardId].building).length;
       steps++;
       assert.ok(s.players.A.elixir >= 0 && s.players.B.elixir >= 0);
     }
     assert.ok(!s.running, 'match finished');
     spells += s.castLog.length;
-    buildings += s.units.filter((u) => u.building).length;
   }
   assert.ok(spells > 0, 'spells were cast');
   assert.ok(buildings > 0, 'buildings were placed');
@@ -845,4 +845,116 @@ test('removed Twin/Burst/Core versions are gone, and old ids map to the base car
   assert.equal(Sim.migrateCardId('brawler-mk-ii'), 'brawler-mk-ii');
   assert.equal(Sim.migrateCardId('nonsense-twin'), null);
   assert.equal(Sim.migrateCardId(42), null);
+});
+
+// ── Thorn Golem, Siphon Priest, Snare Mine, War Drum (2026-10-15) ─────────────
+function arenaWith() {
+  const s = Sim.createMatch({ seed: 3, decks: { A: Sim.STARTER_DECK, B: Sim.STARTER_DECK } });
+  s.towers.forEach((t) => { t.hp = t.hpMax = 1e7; t.dmg = 0; }); // towers stay out of it
+  return s;
+}
+const stepN = (s, n) => { for (let i = 0; i < n; i++) Sim.step(s); };
+
+test('Thorn Golem reflects part of melee hits (capped per hit), never ranged ones, and never back and forth', () => {
+  const s = arenaWith();
+  const g = Sim.spawnDirect(s, 'A', 'thorngolem', 9, 20, 1);
+  g.speed = 0; g.targets = 'none';
+  const brute = Sim.spawnDirect(s, 'B', 'brawler', 9, 19.2, 1);
+  stepN(s, 120);
+  assert.ok(g.hp < g.hpMax, 'the golem was hit');
+  assert.ok(brute.hp < brute.hpMax, 'the melee attacker took thorns');
+  const taken = brute.hpMax - brute.hp;
+  const dealt = g.hpMax - g.hp;
+  assert.ok(taken <= dealt * 0.35 + 1, 'at most 35% comes back');
+  const t = arenaWith();
+  const g2 = Sim.spawnDirect(t, 'A', 'thorngolem', 9, 20, 1);
+  g2.speed = 0; g2.targets = 'none';
+  const archer = Sim.spawnDirect(t, 'B', 'voltbug', 9, 16.5, 1);
+  archer.speed = 0;
+  stepN(t, 200);
+  assert.ok(g2.hp < g2.hpMax);
+  assert.equal(archer.hp, archer.hpMax, 'ranged attackers are not reflected');
+  // Two golems hitting each other would loop if thorns were reflected again; they don't
+  const u = arenaWith();
+  const a = Sim.spawnDirect(u, 'A', 'thorngolem', 9, 20, 1);
+  const b = Sim.spawnDirect(u, 'B', 'thorngolem', 9, 19.2, 1);
+  a.targets = b.targets = 'ground'; a.speed = b.speed = 0;
+  stepN(u, 60);
+  assert.ok(Number.isFinite(a.hp) && Number.isFinite(b.hp));
+});
+
+test('Siphon Priest heals itself from the damage it deals, never above full', () => {
+  const s = arenaWith();
+  const p = Sim.spawnDirect(s, 'A', 'siphonpriest', 9, 20, 1);
+  p.speed = 0;
+  p.hp = p.hpMax * 0.5;
+  const dummy = Sim.spawnDirect(s, 'B', 'guardian', 9, 17, 1);
+  dummy.speed = 0; dummy.targets = 'none';
+  stepN(s, 160);
+  assert.ok(dummy.hp < dummy.hpMax, 'it attacked');
+  assert.ok(p.hp > p.hpMax * 0.5, 'and healed');
+  stepN(s, 2000);
+  assert.ok(p.hp <= p.hpMax);
+});
+
+test('Snare Mine is hidden, ignores flyers, and goes off once on ground troops: damage and a root in its area', () => {
+  const s = arenaWith();
+  const m = Sim.spawnDirect(s, 'A', 'snaremine', 9, 20, 1);
+  stepN(s, 30);
+  assert.equal(m.hidden, true, 'buried');
+  const flyer = Sim.spawnDirect(s, 'B', 'hawkstrike', 9, 20.4, 1);
+  flyer.speed = 0; flyer.targets = 'none';
+  stepN(s, 30);
+  assert.ok(m.hp > 0, 'flyers pass over it');
+  const walkers = [Sim.spawnDirect(s, 'B', 'brawler', 9.4, 20.6, 1), Sim.spawnDirect(s, 'B', 'junkpack', 8.2, 21.2, 1)];
+  walkers.forEach((w) => { w.targets = 'none'; });
+  Sim.step(s);
+  assert.ok(m.hp <= 0, 'sprung');
+  walkers.forEach((w) => { assert.ok(w.hp < w.hpMax, 'damaged'); if (w.hp > 0) assert.ok(w.stunT > 1.5, 'survivors are rooted'); });
+  assert.equal(flyer.hp, flyer.hpMax, 'the flyer was not hit');
+  const fx = Sim.takeFx(s);
+  assert.equal(fx.filter((f) => f.type === 'trap').length, 1, 'once');
+});
+
+test('War Drum: friendly troops in range hit 35% harder; out of range and enemies do not', () => {
+  const hitFor = (withDrum, dx, drumOwner) => {
+    const s = arenaWith();
+    if (withDrum) Sim.spawnDirect(s, drumOwner || 'A', 'wardrum', 9 + dx, 22, 1);
+    const b = Sim.spawnDirect(s, 'A', 'brawler', 9, 20, 1);
+    b.speed = 0;
+    const d = Sim.spawnDirect(s, 'B', 'guardian', 9, 19.3, 1);
+    d.speed = 0; d.targets = 'none';
+    stepN(s, 120);
+    return d.hpMax - d.hp;
+  };
+  const base = hitFor(false, 0);
+  assert.ok(base > 0);
+  assert.ok(Math.abs(hitFor(true, 0) - base * 1.35) < base * 0.02, 'in range: +35%');
+  assert.ok(Math.abs(hitFor(true, 6) - base) < 1, 'out of range: normal');
+  assert.ok(Math.abs(hitFor(true, 0, 'B') - base) < 1, "the enemy's drum doesn't help you");
+});
+
+test('the AI plays the new buildings sensibly: a mine against ground pushes, a drum next to its own push', () => {
+  const deck = ['snaremine', 'wardrum', 'brawler', 'scout', 'voltbug', 'flarepod', 'firebomb', 'ramhog'];
+  let mines = 0, drums = 0, drumNearTroops = 0;
+  for (let i = 0; i < 4; i++) {
+    const s = Sim.createMatch({ seed: 60 + i, decks: { A: Sim.STARTER_DECK, B: deck } });
+    const ai = [Sim.createAi('A', null, 10 + i), Sim.createAi('B', null, 20 + i)];
+    for (let k = 0; k < 3600 && s.running; k++) {
+      ai.forEach((b) => {
+        const r = Sim.aiUpdate(s, b, STEP);
+        if (r && r.ok && b.side === 'B' && r.units && r.units[0]) {
+          if (r.units[0].cardId === 'snaremine') mines++;
+          if (r.units[0].cardId === 'wardrum') {
+            drums++;
+            if (s.units.some((u) => u.owner === 'B' && u.kind === 'troop' && Math.hypot(u.x - r.units[0].x, u.y - r.units[0].y) <= 4)) drumNearTroops++;
+          }
+        }
+      });
+      Sim.step(s);
+    }
+  }
+  assert.ok(mines > 0, 'mines get played');
+  assert.ok(drums > 0, 'drums get played');
+  assert.ok(drumNearTroops / drums >= 0.5, 'drums mostly go next to its own troops');
 });

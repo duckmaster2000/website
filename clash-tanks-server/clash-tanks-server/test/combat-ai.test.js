@@ -443,3 +443,18 @@ test('troops are pushed out of a tower\'s square corner, not just its circle', (
   run(s, 0.5);
   assert.ok(gap() >= u.radius - 1e-6, `pushed clear (gap ${gap().toFixed(3)})`);
 });
+
+test('AI mistakes: off by default; at 1 every play is a legal slip (hesitation or an off-target spot), never a stat change', () => {
+  assert.equal(Sim.createAi('A', null, 1).profile.mistakes, 0);
+  const s = Sim.createMatch({ seed: 4, decks: { A: Sim.STARTER_DECK, B: Sim.STARTER_DECK } });
+  const brain = Sim.createAi('B', { mistakes: 1, thinkMin: 0.1, thinkMax: 0.1 }, 3);
+  let plays = 0, bad = 0;
+  for (let i = 0; i < 2400 && s.running; i++) {
+    const r = Sim.aiUpdate(s, brain, STEP);
+    if (r) { if (r.ok) plays++; else bad++; }
+    Sim.step(s);
+  }
+  assert.ok(plays > 3, 'still plays');
+  assert.equal(bad, 0, 'slips are always legal');
+  s.towers.filter((t) => t.owner === 'B').forEach((t) => assert.ok(t.hpMax <= Sim.towerStats(1, 1).kingHp + 1));
+});

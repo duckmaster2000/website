@@ -54,6 +54,7 @@
               </select>
               <label class="ranked-toggle" id="ptRankedWrap" title="Ranked: trophies count, the AI brings an arena deck. Off: practice with your own AI deck and tuning."><input type="checkbox" id="ptRanked" checked /> 🏆 Ranked</label>
               <button id="ptStartMatch" type="button" class="btn-cta">⚔️ Start Match</button>
+              <button id="ptTrainingBtn" type="button" title="Practice drills: one goal each, no trophies">🎯 Training</button>
             </div>
             <div class="mc-group mc-more">
               <button id="ptRoadBtn" type="button" class="road-btn" aria-label="Open the Trophy Road">🏆 Trophy Road</button>
@@ -254,6 +255,10 @@
             <h3>Settings &amp; data</h3>
           </div>
           <div class="settings-row">
+            <button id="ptTutorialBtn" type="button">📘 Play the tutorial</button>
+            <label class="settings-toggle settings-range" for="ptVolume">🔊 Volume <input type="range" id="ptVolume" min="0" max="100" step="5" value="80" /> <output id="ptVolumeOut">80%</output></label>
+            <label class="settings-toggle settings-range" for="ptMusic">🎵 Music <input type="range" id="ptMusic" min="0" max="100" step="5" value="35" /> <output id="ptMusicOut">35%</output></label>
+            <label class="settings-toggle" for="ptMotion">🎞 Motion <select id="ptMotion"><option value="auto">Auto (system)</option><option value="full">Full</option><option value="reduce">Reduced</option></select></label>
             <button id="ptAdminToggle" type="button">🛠 Admin Panel</button>
             <button id="ptResetUpgrades" type="button" class="btn-danger">Reset all progress…</button>
             <label class="settings-toggle" for="ptAggroDebug" title="Draws what every unit and tower is targeting, its ranges, and why it picked that target. Local matches only. Shortcut: G"><input type="checkbox" id="ptAggroDebug" /> 🎯 Targeting overlay (debug, G)</label>
@@ -364,6 +369,10 @@
   <script src="prototype_road.js"></script>
   <script src="prototype_evo.js"></script>
   <script src="prototype_events.js"></script>
+  <script src="prototype_chaos.js"></script>
+  <script src="prototype_tutorial.js"></script>
+  <script src="prototype_music.js"></script>
+  <script src="prototype_training.js"></script>
   <script src="prototype_v4.js"></script>
 </body>
 </html>

@@ -85,17 +85,17 @@
     // ── Swarms ──
     { slug: 'junkpack', name: 'Junk Pack', icon: '🔧', rarity: 'common', cost: 3, role: 'melee swarm', count: 3, hp: 184, dmg: 48, cd: 1.3, range: 0.5, speed: 1.0, targets: 'ground', proj: 'melee', radius: 0.42, deployCd: 1.1,
       ability: ab('Mob Rush', 5, 10, 1.1, 1.08) },
-    { slug: 'bugsquad', name: 'Bug Squad', icon: '🐛', rarity: 'rare', cost: 4, role: 'ranged swarm', count: 4, hp: 85, dmg: 30, cd: 1.2, range: 4.0, speed: 1.5, targets: 'any', proj: 'spark', radius: 0.35, deployCd: 1.2,
+    { slug: 'bugsquad', name: 'Bug Squad', icon: '🐛', rarity: 'rare', cost: 4, role: 'ranged swarm', count: 4, hp: 95, dmg: 32, cd: 1.2, range: 4.0, speed: 1.5, targets: 'any', proj: 'spark', radius: 0.35, deployCd: 1.2,
       ability: ab('Hive Mind', 6, 12, 1.12, 1.1) },
     { slug: 'mechmice', name: 'Mech Mice', icon: '🐭', rarity: 'common', cost: 2, role: 'cycle swarm', count: 2, hp: 110, dmg: 45, cd: 1.0, range: 0.4, speed: 2.0, targets: 'ground', proj: 'melee', radius: 0.35, deployCd: 0.95,
       ability: ab('Scuttle', 5, 10, 1.08, 1.1) },
     { slug: 'goblinbikers', name: 'Goblin Bikers', icon: '🏍️', rarity: 'epic', cost: 5, role: 'tower rushers', count: 5, hp: 152, dmg: 46, cd: 1.1, range: 0.5, speed: 2.0, targets: 'buildings', proj: 'melee', radius: 0.38, deployCd: 1.3,
       ability: ab('Turbo Gang', 7, 15, 1.12, 1.1) },
-    { slug: 'nanodrones', name: 'Nano Drones', icon: '🤖', rarity: 'rare', cost: 4, role: 'air swarm', count: 3, air: true, hp: 110, dmg: 32, cd: 1.0, range: 2.0, speed: 1.5, targets: 'any', proj: 'spark', radius: 0.4, deployCd: 1.2,
+    { slug: 'nanodrones', name: 'Nano Drones', icon: '🤖', rarity: 'rare', cost: 4, role: 'air swarm', count: 3, air: true, hp: 122, dmg: 34, cd: 1.0, range: 2.0, speed: 1.5, targets: 'any', proj: 'spark', radius: 0.4, deployCd: 1.2,
       ability: ab('Network Link', 6, 12, 1.1, 1.08) },
     { slug: 'bombbeetles', name: 'Bomb Beetles', icon: '💣', rarity: 'legendary', cost: 5, role: 'kamikaze splash', count: 6, hp: 145, dmg: 81, cd: 1.0, range: 1.6, speed: 2.0, targets: 'any', proj: 'melee', splash: 1.5, radius: 0.35, special: 'kamikaze', deployCd: 1.5,
       ability: ab('Chain Detonation', 7, 15, 1.16, 1.08) },
-    { slug: 'antmarch', name: 'Ant March', icon: '🐜', rarity: 'common', cost: 2, role: 'cheap swarm', count: 3, hp: 65, dmg: 42, cd: 1.0, range: 0.4, speed: 1.5, targets: 'ground', proj: 'melee', radius: 0.3, deployCd: 0.9,
+    { slug: 'antmarch', name: 'Ant March', icon: '🐜', rarity: 'common', cost: 2, role: 'cheap swarm', count: 3, hp: 70, dmg: 44, cd: 1.0, range: 0.4, speed: 1.5, targets: 'ground', proj: 'melee', radius: 0.3, deployCd: 0.9,
       ability: ab('Column Charge', 5, 10, 1.08, 1.1) },
     { slug: 'crickethop', name: 'Cricket Hop', icon: '🦗', rarity: 'common', cost: 2, role: 'river jumpers', count: 2, hp: 130, dmg: 50, cd: 1.0, range: 0.5, speed: 2.0, targets: 'ground', proj: 'melee', radius: 0.38, special: 'jump', deployCd: 0.95,
       ability: ab('Leap Spring', 5, 10, 1.09, 1.09) },
@@ -107,26 +107,26 @@
       ability: ab('Cold Blooded', 6, 12, 1.12, 1.06) },
     { slug: 'toadtroop', name: 'Toad Troop', icon: '🐸', rarity: 'rare', cost: 4, role: 'splash swarm', count: 3, hp: 155, dmg: 37, cd: 1.4, range: 4.0, speed: 1.0, targets: 'ground', proj: 'shell', splash: 1.0, radius: 0.4, deployCd: 1.2,
       ability: ab('Leapfrog Volley', 6, 12, 1.1, 1.1) },
-    { slug: 'wolfpack', name: 'Wolf Pack', icon: '🐺', rarity: 'rare', cost: 5, role: 'fast melee pack', count: 3, hp: 279, dmg: 69, cd: 1.2, range: 0.5, speed: 1.5, targets: 'ground', proj: 'melee', radius: 0.45, deployCd: 1.3,
+    { slug: 'wolfpack', name: 'Wolf Pack', icon: '🐺', rarity: 'rare', cost: 5, role: 'fast melee pack', count: 3, hp: 268, dmg: 64, cd: 1.2, range: 0.5, speed: 1.5, targets: 'ground', proj: 'melee', radius: 0.45, deployCd: 1.3,
       ability: ab('Pack Fury', 6, 12, 1.14, 1.08) },
     { slug: 'zombiemob', name: 'Zombie Mob', icon: '🧟', rarity: 'rare', cost: 4, role: 'slow horde', count: 5, hp: 218, dmg: 38, cd: 1.4, range: 0.5, speed: 0.9, targets: 'ground', proj: 'melee', radius: 0.4, deployCd: 1.2,
       ability: ab('Reanimate', 6, 12, 1.07, 1.16) },
     { slug: 'hawkstrike', name: 'Hawk Strike', icon: '🦅', rarity: 'epic', cost: 4, role: 'air hunters', count: 3, air: true, hp: 140, dmg: 45, cd: 1.1, range: 0.7, speed: 2.0, targets: 'any', proj: 'melee', radius: 0.42, deployCd: 1.2,
       ability: ab('Talon Dive', 7, 15, 1.14, 1.08) },
-    { slug: 'crackergang', name: 'Cracker Gang', icon: '🎆', rarity: 'epic', cost: 5, role: 'ranged gang', count: 4, hp: 120, dmg: 45, cd: 1.4, range: 4.5, speed: 1.25, targets: 'any', proj: 'slug', radius: 0.38, deployCd: 1.3,
+    { slug: 'crackergang', name: 'Cracker Gang', icon: '🎆', rarity: 'epic', cost: 5, role: 'ranged gang', count: 4, hp: 116, dmg: 42, cd: 1.4, range: 4.5, speed: 1.25, targets: 'any', proj: 'slug', radius: 0.38, deployCd: 1.3,
       ability: ab('Flashbang', 7, 15, 1.12, 1.1) },
     { slug: 'flybombers', name: 'Fly Bombers', icon: '🪰', rarity: 'epic', cost: 5, role: 'air tower bombers', count: 5, air: true, hp: 165, dmg: 59, cd: 1.7, range: 0.4, speed: 1.25, targets: 'buildings', proj: 'melee', splash: 1.0, radius: 0.42, special: 'deathBomb', deployCd: 1.3,
       ability: ab('Kamikaze Drop', 7, 15, 1.14, 1.06) },
     { slug: 'rabbitrush', name: 'Rabbit Rush', icon: '🐇', rarity: 'epic', cost: 5, role: 'burrowing rushers', count: 5, hp: 156, dmg: 44, cd: 1.0, range: 0.5, speed: 2.0, targets: 'buildings', proj: 'melee', radius: 0.36, special: 'jump', deployCd: 1.25,
       ability: ab('Burrow Blitz', 7, 15, 1.12, 1.1) },
-    { slug: 'ufofleet', name: 'UFO Fleet', icon: '🛸', rarity: 'legendary', cost: 6, role: 'air siege', count: 4, air: true, hp: 240, dmg: 45, cd: 1.5, range: 4.0, speed: 1.0, targets: 'buildings', proj: 'beam', radius: 0.45, deployCd: 1.5,
+    { slug: 'ufofleet', name: 'UFO Fleet', icon: '🛸', rarity: 'legendary', cost: 6, role: 'air siege', count: 4, air: true, hp: 260, dmg: 48, cd: 1.5, range: 4.0, speed: 1.0, targets: 'buildings', proj: 'beam', radius: 0.45, deployCd: 1.5,
       ability: ab('Abduction Ray', 7, 15, 1.16, 1.06) },
-    { slug: 'dustdevils', name: 'Dust Devils', icon: '🌪️', rarity: 'legendary', cost: 6, role: 'spinning splash', count: 3, hp: 330, dmg: 75, cd: 1.5, range: 0.6, speed: 1.0, targets: 'ground', proj: 'melee', splash: 1.4, radius: 0.45, special: 'spin', deployCd: 1.45,
+    { slug: 'dustdevils', name: 'Dust Devils', icon: '🌪️', rarity: 'legendary', cost: 6, role: 'spinning splash', count: 3, hp: 359, dmg: 80, cd: 1.5, range: 0.6, speed: 1.0, targets: 'ground', proj: 'melee', splash: 1.4, radius: 0.45, special: 'spin', deployCd: 1.45,
       ability: ab('Vortex Spin', 7, 15, 1.14, 1.1) },
-    { slug: 'makoswarm', name: 'Mako Swarm', icon: '🦈', rarity: 'legendary', cost: 7, role: 'heavy horde', count: 6, hp: 220, dmg: 60, cd: 1.4, range: 0.5, speed: 1.0, targets: 'ground', proj: 'melee', radius: 0.45, deployCd: 1.6,
+    { slug: 'makoswarm', name: 'Mako Swarm', icon: '🦈', rarity: 'legendary', cost: 7, role: 'heavy horde', count: 6, hp: 238, dmg: 64, cd: 1.4, range: 0.5, speed: 1.0, targets: 'ground', proj: 'melee', radius: 0.45, deployCd: 1.6,
       ability: ab('Feeding Frenzy', 7, 15, 1.18, 1.1) },
     // ── Buildings ──
-    { slug: 'boltturret', name: 'Bolt Turret', icon: '🏯', rarity: 'common', cost: 4, role: 'defensive building', building: true, lifetime: 30, hp: 964, dmg: 65, cd: 0.9, range: 5.5, speed: 0, targets: 'ground', proj: 'bolt', radius: 0.95, deployCd: 1.2,
+    { slug: 'boltturret', name: 'Bolt Turret', icon: '🏯', rarity: 'common', cost: 4, role: 'defensive building', building: true, lifetime: 30, hp: 924, dmg: 60, cd: 0.9, range: 5.5, speed: 0, targets: 'ground', proj: 'bolt', radius: 0.95, deployCd: 1.2,
       ability: ab('Overclock', 5, 10, 1.1, 1.1) },
     // ── Spells: cast anywhere on the arena. Projectile spells fly from your king tower. ──
     // `splash` is the spell radius; crown towers take `towerMult` of the damage.
@@ -141,7 +141,7 @@
     // `mech` holds the card's special mechanic; see the Mechanics section below.
 
     // Spells. `zone` spells leave a lingering area; `instant` ones land immediately.
-    { slug: 'frostnova', name: 'Frost Nova', icon: '❄️', rarity: 'epic', cost: 4, role: 'freeze spell', spell: true, instant: true, hp: 0, dmg: 65, cd: 1, range: 0, speed: 0, targets: 'any', proj: 'frost', splash: 3.0, radius: 0, towerMult: 0.3, freeze: 3.0, deployCd: 1.1, arena: 2,
+    { slug: 'frostnova', name: 'Frost Nova', icon: '❄️', rarity: 'epic', cost: 4, role: 'freeze spell', spell: true, instant: true, hp: 0, dmg: 78, cd: 1, range: 0, speed: 0, targets: 'any', proj: 'frost', splash: 3.0, radius: 0, towerMult: 0.3, freeze: 3.0, deployCd: 1.1, arena: 2,
       desc: 'Freezes every enemy in the area (troops, buildings and towers) for 3 seconds.',
       ability: ab('Deep Freeze', 6, 12, 1.1, 1) },
     { slug: 'acidpool', name: 'Acid Pool', icon: '🧪', rarity: 'epic', cost: 4, role: 'damage-over-time spell', spell: true, instant: true, hp: 0, dmg: 250, cd: 1, range: 0, speed: 0, targets: 'any', proj: 'acid', splash: 3.0, radius: 0, towerMult: 0.3, deployCd: 1.1, arena: 3,
@@ -164,7 +164,7 @@
       zone: { kind: 'pull', dur: 2.2, tick: 0.5, pull: 2.4 },
       desc: 'Drags enemy troops toward its centre for 2 seconds while damaging them. Great for grouping troops or pulling them into tower range.',
       ability: ab('Event Horizon', 6, 12, 1.1, 1) },
-    { slug: 'orbitallaser', name: 'Orbital Laser', icon: '🛰️', rarity: 'legendary', cost: 6, role: 'heavy precision strike', spell: true, instant: true, hp: 0, dmg: 432, cd: 1, range: 0, speed: 0, targets: 'any', proj: 'laser', splash: 3.5, radius: 0, towerMult: 0.3, stun: 0.4, deployCd: 1.4, arena: 8,
+    { slug: 'orbitallaser', name: 'Orbital Laser', icon: '🛰️', rarity: 'legendary', cost: 6, role: 'heavy precision strike', spell: true, instant: true, hp: 0, dmg: 464, cd: 1, range: 0, speed: 0, targets: 'any', proj: 'laser', splash: 3.5, radius: 0, towerMult: 0.3, stun: 0.4, deployCd: 1.4, arena: 8,
       zone: { kind: 'laser', delay: 0.9, targets: 3 },
       desc: 'After a short lock-on, beams hit the 3 toughest enemies in the area for heavy damage.',
       ability: ab('Focused Lens', 7, 15, 1.1, 1) },
@@ -181,7 +181,7 @@
     { slug: 'flaktower', name: 'Flak Tower', icon: '🎯', rarity: 'rare', cost: 4, role: 'anti-air building', building: true, lifetime: 35, hp: 950, dmg: 115, cd: 0.9, range: 6.5, speed: 0, targets: 'air', proj: 'flak', splash: 1.0, radius: 0.9, deployCd: 1.2, arena: 2,
       desc: 'Shreds flying troops with splash flak. Cannot hit ground troops at all.',
       ability: ab('Proximity Fuse', 5, 10, 1.1, 1.1) },
-    { slug: 'infernospire', name: 'Inferno Spire', icon: '🌋', rarity: 'epic', cost: 5, role: 'tank-melting building', building: true, lifetime: 35, hp: 804, dmg: 14, cd: 0.4, range: 6.0, speed: 0, targets: 'any', proj: 'beam', radius: 0.9, deployCd: 1.3, arena: 5,
+    { slug: 'infernospire', name: 'Inferno Spire', icon: '🌋', rarity: 'epic', cost: 5, role: 'tank-melting building', building: true, lifetime: 35, hp: 713, dmg: 11, cd: 0.4, range: 6.0, speed: 0, targets: 'any', proj: 'beam', radius: 0.9, deployCd: 1.3, arena: 5,
       mech: { ramp: 4 },
       desc: 'Its beam heats up the longer it stays on one target, reaching 10× damage after 4 seconds. Stuns and target swaps reset it.',
       ability: ab('Superheat', 6, 12, 1.1, 1.1) },
@@ -204,7 +204,7 @@
       mech: { elixir: { every: 9, amount: 1, onDeath: 1 } },
       desc: 'Pumps 1 elixir every 9 seconds (7 over its life) and 1 more when destroyed. Pays off only if it survives.',
       ability: ab('Pressure Valve', 7, 15, 1, 1.1) },
-    { slug: 'sirenbeacon', name: 'Siren Beacon', icon: '🚨', rarity: 'rare', cost: 3, role: 'taunt building', building: true, lifetime: 25, hp: 1800, dmg: 0, cd: 1, range: 0, speed: 0, targets: 'none', proj: 'none', radius: 0.9, deployCd: 1.1, arena: 4,
+    { slug: 'sirenbeacon', name: 'Siren Beacon', icon: '🚨', rarity: 'rare', cost: 3, role: 'taunt building', building: true, lifetime: 25, hp: 1980, dmg: 0, cd: 1, range: 0, speed: 0, targets: 'none', proj: 'none', radius: 0.9, deployCd: 1.1, arena: 4,
       mech: { taunt: 6.5 },
       desc: 'A loud, sturdy decoy. Enemy troops within 6.5 tiles drop what they are doing and attack it.',
       ability: ab('Louder Siren', 5, 10, 1, 1.12) },
@@ -214,11 +214,11 @@
       mech: { heal: { radius: 3.0, perSec: 26 } },
       desc: 'Heals nearby friendly troops by 26 HP per second while plinking at enemies.',
       ability: ab('Triage', 6, 12, 1.05, 1.1) },
-    { slug: 'rocktitan', name: 'Rock Titan', icon: '🗿', rarity: 'legendary', cost: 8, role: 'giant building-buster', hp: 1672, dmg: 76, cd: 1.5, range: 0.6, speed: 0.6, targets: 'buildings', proj: 'melee', radius: 0.9, deployCd: 1.8, arena: 8,
+    { slug: 'rocktitan', name: 'Rock Titan', icon: '🗿', rarity: 'legendary', cost: 8, role: 'giant building-buster', hp: 1610, dmg: 70, cd: 1.5, range: 0.6, speed: 0.6, targets: 'buildings', proj: 'melee', radius: 0.9, deployCd: 1.8, arena: 8,
       mech: { deathSpawn: { card: 'rockshard', count: 2 }, deathSplash: { radius: 2, dmg: 140 } },
       desc: 'Enormous and slow. Only attacks buildings. When it falls it shatters, damaging nearby enemies and splitting into 2 Rock Shards.',
       ability: ab('Bedrock', 7, 15, 1.06, 1.12) },
-    { slug: 'teslatank', name: 'Tesla Tank', icon: '🔋', rarity: 'legendary', cost: 6, role: 'charged splash cannon', hp: 816, dmg: 239, cd: 5.0, range: 4.5, speed: 0.75, targets: 'ground', proj: 'pulse', splash: 1.5, radius: 0.7, deployCd: 1.5, arena: 5,
+    { slug: 'teslatank', name: 'Tesla Tank', icon: '🔋', rarity: 'legendary', cost: 6, role: 'charged splash cannon', hp: 779, dmg: 217, cd: 5.0, range: 4.5, speed: 0.75, targets: 'ground', proj: 'pulse', splash: 1.5, radius: 0.7, deployCd: 1.5, arena: 5,
       mech: { chargeShot: true },
       desc: 'Charges a devastating splash blast every 5 seconds. Stuns and freezes reset its charge.',
       ability: ab('Capacitor Bank', 7, 15, 1.12, 1.06) },
@@ -230,7 +230,7 @@
       mech: { deathSpawn: { card: 'stormsprite', count: 4 } },
       desc: 'A huge flying tank that heads for buildings. When it pops, 4 Storm Sprites burst out and attack everything.',
       ability: ab('Thunderhead', 7, 15, 1.06, 1.12) },
-    { slug: 'cryocaster', name: 'Cryo Caster', icon: '🧊', rarity: 'epic', cost: 4, role: 'slowing splash caster', hp: 352, dmg: 45, cd: 1.4, range: 5.0, speed: 1.0, targets: 'any', proj: 'ice', splash: 1.0, radius: 0.45, deployCd: 1.2, arena: 2,
+    { slug: 'cryocaster', name: 'Cryo Caster', icon: '🧊', rarity: 'epic', cost: 4, role: 'slowing splash caster', hp: 339, dmg: 42, cd: 1.4, range: 5.0, speed: 1.0, targets: 'any', proj: 'ice', splash: 1.0, radius: 0.45, deployCd: 1.2, arena: 2,
       mech: { slowOnHit: { mult: 0.7, dur: 1.5 } },
       desc: 'Ice shards splash air and ground and slow whatever they hit by 30% for 1.5 seconds.',
       ability: ab('Permafrost', 6, 12, 1.1, 1.06) },
@@ -253,6 +253,23 @@
       mech: { zap: { chain: 3, radius: 2.5, stun: 0.5 } },
       desc: 'Leaps onto an enemy, then arcs to up to 3 more nearby, stunning each for half a second.',
       ability: ab('Static Leap', 5, 10, 1.1, 1.1) },
+    // Mechanics no other card has (2026-10-15): damage reflection, lifesteal, a hidden trap, a damage aura
+    { slug: 'thorngolem', name: 'Thorn Golem', icon: '🌵', rarity: 'epic', cost: 5, role: 'thorned tank', hp: 1300, dmg: 70, cd: 1.5, range: 0.6, speed: 0.75, targets: 'buildings', proj: 'melee', radius: 0.7, deployCd: 1.4, arena: 7,
+      mech: { reflect: { pct: 0.35, cap: 60 } },
+      desc: 'A slow tank that walks to buildings. Melee attackers take back 35% of every hit (up to 60 per hit). Ranged troops, spells and towers are not reflected.',
+      ability: ab('Bramble Hide', 7, 15, 1.06, 1.1) },
+    { slug: 'siphonpriest', name: 'Siphon Priest', icon: '🩸', rarity: 'epic', cost: 4, role: 'lifestealing caster', hp: 402, dmg: 58, cd: 1.1, range: 4.0, speed: 1.0, targets: 'any', proj: 'spark', radius: 0.45, deployCd: 1.2, arena: 8,
+      mech: { lifesteal: 0.3 },
+      desc: 'A ranged caster that heals itself for 30% of the damage it deals. Hard to wear down slowly; burst it or stun it.',
+      ability: ab('Blood Rite', 7, 15, 1.08, 1.08) },
+    { slug: 'snaremine', name: 'Snare Mine', icon: '🪤', rarity: 'rare', cost: 2, role: 'hidden trap', building: true, lifetime: 30, hp: 246, dmg: 185, cd: 1, range: 0, speed: 0, targets: 'none', proj: 'none', radius: 0.55, deployCd: 1.0, arena: 9,
+      mech: { hide: true, trap: { trigger: 1.2, radius: 2.2, stun: 2.0 } },
+      desc: 'Buried and untargetable. The first enemy ground troop to step near it sets it off: heavy damage and a 2 s root in a wide area. Flyers pass over it. Lasts 30 s.',
+      ability: ab('Barbed Snare', 6, 12, 1.12, 1) },
+    { slug: 'wardrum', name: 'War Drum', icon: '🥁', rarity: 'rare', cost: 2, role: 'damage aura', building: true, lifetime: 30, hp: 600, dmg: 0, cd: 1, range: 0, speed: 0, targets: 'none', proj: 'none', radius: 0.8, deployCd: 1.1, arena: 9,
+      mech: { empower: { radius: 5, mult: 1.35 } },
+      desc: 'Your troops within 5 tiles deal 35% more damage. Doesn\'t attack. Lasts 30 s; enemies can destroy it to end the beat.',
+      ability: ab('Battle Rhythm', 6, 12, 1, 1.15) },
   ];
 
   // Token units: spawned by other cards, never in a deck or the collection
@@ -268,6 +285,11 @@
     { slug: 'colossus', name: 'Iron Colossus', icon: '🤖', rarity: 'legendary', cost: 0, role: 'event boss', hp: 4400, dmg: 135, cd: 1.8, range: 0.9, speed: 0.55, targets: 'ground', proj: 'melee', splash: 1.2, radius: 1.1, structureMult: 0.45,
       mech: { boss: { slamEvery: 7, slamEnraged: 4.5, slamDelay: 1.6, slamRadius: 2.2, slamDmg: 230, slamTower: 0.25, summonAt: [0.7, 0.4], summon: { card: 'ironling', count: 3 }, guardMult: 0.5, enrageBelow: 0.35, enrageMult: 1.35 } } },
     { slug: 'ironling', name: 'Ironling', icon: '⚙️', rarity: 'common', cost: 0, role: 'boss guard', hp: 240, dmg: 36, cd: 1.1, range: 0.5, speed: 1.2, targets: 'ground', proj: 'melee', radius: 0.42, structureMult: 0.3 },
+    // Boss Rush bosses: the same boss mechanics with different weaknesses
+    { slug: 'stonewarden', name: 'Stone Warden', icon: '🗿', rarity: 'legendary', cost: 0, role: 'event boss', hp: 5600, dmg: 120, cd: 2.0, range: 1.0, speed: 0.45, targets: 'ground', proj: 'melee', splash: 1.5, radius: 1.2, structureMult: 0.45,
+      mech: { boss: { slamEvery: 8, slamEnraged: 5.5, slamDelay: 1.8, slamRadius: 3.0, slamDmg: 260, slamTower: 0.25, summonAt: [0.66, 0.33], summon: { card: 'rockshard', count: 2 }, guardMult: 0.5, enrageBelow: 0.3, enrageMult: 1.3 } } },
+    { slug: 'hivequeen', name: 'Hive Queen', icon: '🐝', rarity: 'legendary', cost: 0, role: 'event boss', hp: 3600, dmg: 90, cd: 1.2, range: 0.9, speed: 0.75, targets: 'ground', proj: 'melee', splash: 1.0, radius: 1.0, structureMult: 0.45,
+      mech: { boss: { slamEvery: 6, slamEnraged: 4, slamDelay: 1.4, slamRadius: 1.8, slamDmg: 170, slamTower: 0.25, summonAt: [0.75, 0.5, 0.25], summon: { card: 'hangardrone', count: 4 }, guardMult: 0.5, enrageBelow: 0.35, enrageMult: 1.4 } } },
   ];
 
   // Which Trophy Road arena (0-9) unlocks each original card into chests and rewards.
@@ -986,6 +1008,12 @@
     buildingElixir: 0,         // generation bonus per living friendly building (up to 3)
     deckSwaps: [],             // [{ at, A: [ids], B: [ids] }]: both hands are replaced at `at`
     deckLevel: 0,              // card level for swapped-in decks (0 = each side's average level)
+    cardLevel: 0,              // >0: every card in both decks plays at this level (C.H.A.O.S.: 11); the collection is untouched
+    blackout: false,           // C.H.A.O.S. Blackout: the arena is dark outside each side's own light (drawing only)
+    upgrades: null,            // C.H.A.O.S.: { checkpoints: [{ at, rarity }], choiceSecs, pause, autoPick, perCard }
+    // Game-mode library (see "Objective modes" and normalizeRules): all off in a normal battle
+    infiniteElixir: false, towerLevel: 0, unitCap: 0, announceStages: false, deployDepth: 0, kingOnly: false, vault: null, towerHp: null,
+    playLimit: null, defenses: [], scoreToWin: 0, touchdown: null, capture: null, payload: null, treasure: null, gambit: null,
     hill: null,                // { spots: [{x,y}], every, r, rate, points }: King of the Hill
     waves: null,               // [{ at, units: [{ card, n, lane, level }] }]: scripted attackers for side B
     boss: null,                // { at, card, lane, level }: a scripted boss for side B
@@ -1029,7 +1057,10 @@
       buildingElixir: num(r.buildingElixir, 0, 0, 0.5),
       deckLevel: Math.floor(num(r.deckLevel, 0, 0, 14)),
       modWarn: num(r.modWarn, d.modWarn, 0, 10),
+      cardLevel: Math.floor(num(r.cardLevel, 0, 0, 14)),
+      blackout: !!r.blackout,
     };
+    out.upgrades = normalizeUpgradeRules(r.upgrades);
     out.startElixir = Math.min(out.startElixir, out.maxElixir);
     const phases = Array.isArray(r.elixirPhases) && r.elixirPhases.length ? r.elixirPhases : d.elixirPhases;
     out.elixirPhases = phases
@@ -1042,6 +1073,7 @@
       hp: num(m.hp, 1, 0.2, 4), dmg: num(m.dmg, 1, 0.2, 4), speed: num(m.speed, 1, 0.3, 2.5),
       radius: num(m.radius, 1, 0.4, 2), splash: num(m.splash, 1, 0.5, 2), lifetime: num(m.lifetime, 1, 0.3, 3),
       count: num(m.count, 1, 1, 3),
+      cd: num(m.cd, 1, 0.3, 3),   // attack interval multiplier (Rage: < 1 is faster)
     }));
     const e = r.evo && typeof r.evo === 'object' ? r.evo : {};
     out.evo = { cycleDelta: Math.round(num(e.cycleDelta, 0, -3, 3)), startCharged: !!e.startCharged, disabled: !!e.disabled, all: !!e.all };
@@ -1076,6 +1108,30 @@
       .filter((m) => m && MODIFIERS[m.id])
       .map((m) => ({ id: m.id, at: num(m.at, 0, 0, 900), dur: num(m.dur, MODIFIERS[m.id].dur, 1, 900) }))
       .sort((a, b) => a.at - b.at);
+    // ── Mode rules (game-mode library, 2026-10-15). All off by default. ──
+    out.infiniteElixir = !!r.infiniteElixir;                       // elixir is always full
+    out.towerLevel = Math.floor(num(r.towerLevel, 0, 0, 14));      // >0: both sides' towers at this level (standard-level modes)
+    out.unitCap = Math.floor(num(r.unitCap, 0, 0, 200));            // per side, 0 = none
+    out.announceStages = !!r.announceStages;                       // elixir-rate changes are announced (Ramp-Up)
+    out.deployDepth = num(r.deployDepth, 0, 0, 8);                 // troops/buildings must be this far behind the river
+    out.kingOnly = !!r.kingOnly;                                   // no Princess Towers (Heist): the King is the vault
+    out.vault = r.vault && typeof r.vault === 'object' ? { hp: num(r.vault.hp, 1, 0.5, 6), shoots: !!r.vault.shoots } : null;
+    out.towerHp = r.towerHp && typeof r.towerHp === 'object' ? { princess: num(r.towerHp.princess, 1, 0.1, 5), king: num(r.towerHp.king, 1, 0.1, 5) } : null;
+    out.playLimit = r.playLimit && typeof r.playLimit === 'object' ? { A: Math.floor(num(r.playLimit.A, 0, 0, 99)), B: Math.floor(num(r.playLimit.B, 0, 0, 99)) } : null;
+    out.defenses = (Array.isArray(r.defenses) ? r.defenses : []).slice(0, 16)
+      .filter((d) => d && CARD_MAP[d.card] && CARD_MAP[d.card].building && (d.side === 'A' || d.side === 'B'))
+      .map((d) => ({ card: String(d.card), side: d.side, x: num(d.x, MID_X, 1, W - 1), y: num(d.y, H / 2, 1, H - 1), level: Math.floor(num(d.level, 1, 1, 14)) }));
+    out.scoreToWin = Math.floor(num(r.scoreToWin, 0, 0, 1000));
+    out.touchdown = r.touchdown ? { depth: num(r.touchdown.depth, 2.5, 1, 6) } : null;
+    out.capture = r.capture && Array.isArray(r.capture.spots) && r.capture.spots.length
+      ? { spots: r.capture.spots.slice(0, 4).map((pt) => ({ x: num(pt.x, MID_X, 1, W - 1), y: num(pt.y, H / 2, 1, H - 1) })), r: num(r.capture.r, 2.2, 1, 4), rate: num(r.capture.rate, 4, 0.5, 50) }
+      : null;
+    out.payload = r.payload ? { x: num(r.payload.x, BRIDGES[0].cx, 1, W - 1), r: num(r.payload.r, 2.2, 1, 4), speed: num(r.payload.speed, 0.5, 0.1, 3), end: num(r.payload.end, 4, 2, 10) } : null;
+    out.treasure = r.treasure ? { every: num(r.treasure.every, 18, 5, 120), life: num(r.treasure.life, 20, 5, 120), r: num(r.treasure.r, 1.4, 0.6, 3), hold: num(r.treasure.hold, 1.2, 0.2, 5), elixir: num(r.treasure.elixir, 2, 0, 10) } : null;
+    out.gambit = r.gambit && Array.isArray(r.gambit.pool)
+      ? { pool: [...new Set(r.gambit.pool.map(String))].filter((id) => CARD_MAP[id] && !CARD_MAP[id].token).slice(0, 60) }
+      : null;
+    if (out.gambit && out.gambit.pool.length < 8) out.gambit = null;
     return out;
   }
 
@@ -1111,6 +1167,7 @@
         splash: r2(s.splash * m.splash),
         lifetime: s.lifetime ? r2(s.lifetime * m.lifetime) : s.lifetime,
         swarmCount: s.swarmCount > 1 ? Math.min(10, Math.ceil(s.swarmCount * m.count)) : s.swarmCount,
+        cd: m.cd && m.cd !== 1 ? r2(Math.max(0.3, s.cd * m.cd)) : s.cd,
       };
     }
     return s;
@@ -1301,6 +1358,446 @@
     };
   }
 
+  // ─── C.H.A.O.S. card upgrades ────────────────────────────────────────────
+  //
+  // In a C.H.A.O.S. match (rules.upgrades) each side is offered two card-specific upgrades at set
+  // checkpoints, picks one, and that card keeps it for the rest of the match. The battle pauses while
+  // a choice is open (rules.upgrades.pause); an unanswered choice takes the left offer when its timer
+  // runs out. An upgrade is baked into that player's per-match card stats (p.cards), so it can never
+  // reach the shared card table, the collection, or another match.
+  //
+  // An upgrade definition (all fields but id/card/rarity/name/desc are optional):
+  //   stats   multipliers hp, dmg, cd, speed, lifetime, stun, knockback; additions range, splash, count, waves
+  //   mech    merged into the card's own mechanics (slowOnHit, shield, deathSplash, deathSpawn, spawner, ramp, dash)
+  //   em      merged into the unit's Evolution-style mechanics (shockwave, chain, cluster, stackHits, rally,
+  //           dive, pulse, allyShield, impactZone, deathSummon, pierceLine); an equipped Evolution wins a clash
+  //   spell   merged into the spell's Evolution-style effects (afterZone, echo, seek); zoneEcho repeats a zone spell
+  //   zone    { mult: {...}, add: {...} } for lingering spells (duration, slow, troop count, roll length)
+  //   special appended to the card's special keywords (e.g. 'chain')
+  //   role    'offense' | 'defense' | 'both': what the AI weighs it as
+  //
+  // To add one: add an entry to CHAOS_UPGRADES (and the card to CHAOS_POOL), and add it to the tests'
+  // every-upgrade smoke run. See CLASH_TANKS.md, "C.H.A.O.S. mode".
+
+  const UPGRADE_RARITIES = {
+    common: { name: 'Common', value: 1 },
+    rare: { name: 'Rare', value: 2 },
+    epic: { name: 'Epic', value: 3 },
+  };
+  const UPGRADE_RARITY_ORDER = ['common', 'rare', 'epic'];
+
+  const chaosUp = (card, rarity, id, name, desc, fx) => Object.assign({ id: `${card}_${id}`, card, rarity, name, desc, role: 'both' }, fx);
+  const CHAOS_UPGRADES = [
+    // Troops
+    chaosUp('brawler', 'common', 'plating', 'Iron Plating', '+30% HP.', { stats: { hp: 1.3 }, role: 'defense' }),
+    chaosUp('brawler', 'rare', 'quake', 'Quake Fist', 'Every 3rd punch makes a shockwave around its target: splash damage and knockback.', { em: { shockwave: { every: 3, radius: 1.6, dmgMult: 0.6, knock: 1 } } }),
+    chaosUp('brawler', 'epic', 'unbreakable', 'Unbreakable', 'Deploys with a 450 HP shield and +15% HP.', { stats: { hp: 1.15 }, mech: { shield: 450 }, role: 'defense' }),
+    chaosUp('scout', 'common', 'fleet', 'Fleet Foot', '+30% speed and +15% damage.', { stats: { speed: 1.3, dmg: 1.15 }, role: 'offense' }),
+    chaosUp('scout', 'rare', 'party', 'Scout Party', 'Deploys 2 Scouts instead of 1.', { stats: { count: 1 }, role: 'offense' }),
+    chaosUp('scout', 'epic', 'sharpshooter', 'Sharpshooter', '+2 range, and every shot pierces everything in a line.', { stats: { range: 2 }, em: { pierceLine: { width: 0.55, falloff: 0.7 } }, role: 'offense' }),
+    chaosUp('voltbug', 'common', 'overcharge', 'Overcharge', '+35% damage.', { stats: { dmg: 1.35 } }),
+    chaosUp('voltbug', 'rare', 'storm', 'Storm Chain', 'Lightning jumps to 4 more enemies and briefly stuns the first.', { em: { chain: { count: 4, stunPrimary: 0.25 } } }),
+    chaosUp('voltbug', 'epic', 'thunderhead', 'Thunderhead', 'Lightning jumps to 5 more enemies, stuns the first, and slows everything it hits.', { em: { chain: { count: 5, stunPrimary: 0.4 } }, mech: { slowOnHit: { mult: 0.6, dur: 1.5 } } }),
+    chaosUp('drillcat', 'common', 'tempered', 'Tempered Drill', '+30% HP.', { stats: { hp: 1.3 }, role: 'defense' }),
+    chaosUp('drillcat', 'rare', 'bore', 'Bore Through', 'Each hit in a row on the same target drills 40% deeper (up to +120%).', { em: { stackHits: { per: 0.4, max: 3 } } }),
+    chaosUp('drillcat', 'epic', 'diamond', 'Diamond Core', 'Hits stack 55% deeper (up to +220%), and it explodes when destroyed.', { em: { stackHits: { per: 0.55, max: 4 } }, mech: { deathSplash: { radius: 1.8, dmg: 160 } } }),
+    chaosUp('ramhog', 'common', 'hide', 'Thick Hide', '+30% HP.', { stats: { hp: 1.3 }, role: 'offense' }),
+    chaosUp('ramhog', 'rare', 'stampede', 'Stampede', 'Two Ram Hogs, each with 75% HP.', { stats: { count: 1, hp: 0.75 }, role: 'offense' }),
+    chaosUp('ramhog', 'epic', 'wrecking', 'Wrecking Ram', 'Charges in behind a 350 HP shield and explodes when destroyed.', { mech: { shield: 350, deathSplash: { radius: 1.8, dmg: 150 } }, role: 'offense' }),
+    chaosUp('flarepod', 'common', 'wide', 'Wide Flare', 'Splash radius +0.5 tiles.', { stats: { splash: 0.5 }, role: 'defense' }),
+    chaosUp('flarepod', 'rare', 'cluster', 'Cluster Flare', 'Each flare bursts into 3 bomblets around the impact.', { em: { cluster: { count: 3, spread: 1.5, dmgMult: 0.4, radius: 0.9 } } }),
+    chaosUp('flarepod', 'epic', 'searing', 'Searing Ground', '+20% damage, and every flare leaves a 3 s patch that slows enemies by 50%.', { stats: { dmg: 1.2 }, em: { impactZone: { kind: 'slow', slow: 0.5, dur: 3, radius: 1.6 } }, role: 'defense' }),
+    chaosUp('cryocaster', 'common', 'deepfreeze', 'Deep Freeze', 'Its slow is 50% (from 30%) and lasts 2 s.', { mech: { slowOnHit: { mult: 0.5, dur: 2 } }, role: 'defense' }),
+    chaosUp('cryocaster', 'rare', 'shatter', 'Shatter', '+50% damage.', { stats: { dmg: 1.5 } }),
+    chaosUp('cryocaster', 'epic', 'glacier', 'Glacier', 'Every shard leaves a 3.5 s patch of ice that slows enemies by 55%.', { em: { impactZone: { kind: 'slow', slow: 0.45, dur: 3.5, radius: 2 } }, role: 'defense' }),
+    chaosUp('guardian', 'common', 'reinforced', 'Reinforced', '+30% HP.', { stats: { hp: 1.3 }, role: 'defense' }),
+    chaosUp('guardian', 'rare', 'aegis', 'Aegis Pulse', 'When it lands and every 8 s, shields the 4 nearest allies for 110 HP.', { em: { allyShield: { every: 8, amount: 110, radius: 3, max: 4 } } }),
+    chaosUp('guardian', 'epic', 'prime', 'Bastion Prime', 'A 300 HP shield of its own, and shields up to 6 allies for 160 HP every 5 s.', { mech: { shield: 300 }, em: { allyShield: { every: 5, amount: 160, radius: 3.5, max: 6 } } }),
+    chaosUp('junkpack', 'common', 'bigger', 'Bigger Pack', 'Deploys 4 instead of 3.', { stats: { count: 1 } }),
+    chaosUp('junkpack', 'rare', 'rally', 'Scrap Rally', 'When a packmate falls, the rest get 35% faster (up to 2 stacks).', { em: { rally: { per: 0.35, max: 2 } } }),
+    chaosUp('junkpack', 'epic', 'horde', 'Junkyard Horde', 'Deploys 5, and they rally when packmates fall.', { stats: { count: 2 }, em: { rally: { per: 0.35, max: 2 } } }),
+    chaosUp('wolfpack', 'common', 'fangs', 'Sharp Fangs', '+25% damage.', { stats: { dmg: 1.25 } }),
+    chaosUp('wolfpack', 'rare', 'fury', 'Pack Fury', 'When a wolf falls, the rest get 40% faster (up to 2 stacks).', { em: { rally: { per: 0.4, max: 2 } } }),
+    chaosUp('wolfpack', 'epic', 'alpha', 'Alpha Pack', 'Deploys 4 wolves with +20% HP.', { stats: { count: 1, hp: 1.2 } }),
+    chaosUp('hawkstrike', 'common', 'talons', 'Talons', '+25% damage.', { stats: { dmg: 1.25 } }),
+    chaosUp('hawkstrike', 'rare', 'dive', 'Dive Strike', 'Opens on each target with a 2.5× dive hit (every 4 s).', { em: { dive: { mult: 2.5, cd: 4 } }, role: 'offense' }),
+    chaosUp('hawkstrike', 'epic', 'flock', 'Raptor Flock', 'Deploys 5 hawks, and each dives for 2.5× damage.', { stats: { count: 2 }, em: { dive: { mult: 2.5, cd: 4 } } }),
+    chaosUp('phantomrider', 'common', 'blade', 'Phantom Blade', '+30% damage.', { stats: { dmg: 1.3 } }),
+    chaosUp('phantomrider', 'rare', 'restless', 'Restless', 'Dashes much more often (every 2 s) and from further away.', { mech: { dash: { min: 2, max: 7, speed: 12, cd: 2 } }, role: 'offense' }),
+    chaosUp('phantomrider', 'epic', 'wraith', 'Wraith', 'A 200 HP shield, and 3 Skeletons rise when it is destroyed.', { mech: { shield: 200, deathSpawn: { card: 'cryptskel', count: 3 } } }),
+    chaosUp('rocktitan', 'common', 'bedrock', 'Bedrock', '+20% HP.', { stats: { hp: 1.2 }, role: 'offense' }),
+    chaosUp('rocktitan', 'rare', 'landslide', 'Landslide', 'Breaks into 4 Rock Shards (from 2) when destroyed.', { mech: { deathSpawn: { card: 'rockshard', count: 4 } }, role: 'offense' }),
+    chaosUp('rocktitan', 'epic', 'avalanche', 'Avalanche', 'Every 2nd hit makes a big shockwave that knocks troops away.', { em: { shockwave: { every: 2, radius: 2, dmgMult: 0.8, knock: 1.2 } }, role: 'offense' }),
+    chaosUp('bugsquad', 'common', 'bigger', 'Bigger Squad', 'Deploys 6 instead of 4.', { stats: { count: 2 } }),
+    chaosUp('bugsquad', 'rare', 'sticky', 'Sticky Shots', 'Shots slow enemies by 30% for 1.2 s.', { mech: { slowOnHit: { mult: 0.7, dur: 1.2 } }, role: 'defense' }),
+    chaosUp('bugsquad', 'epic', 'arc', 'Arc Squad', 'Every shot chains to 2 more enemies.', { special: 'chain', em: { chain: { count: 2, stunPrimary: 0 } } }),
+    chaosUp('goblinbikers', 'common', 'nitro', 'Nitro', '+25% speed and +15% damage.', { stats: { speed: 1.25, dmg: 1.15 }, role: 'offense' }),
+    chaosUp('goblinbikers', 'rare', 'armored', 'Armored Bikes', '+50% HP.', { stats: { hp: 1.5 }, role: 'offense' }),
+    chaosUp('goblinbikers', 'epic', 'bombs', 'Bomb Bikes', 'Each biker explodes when destroyed.', { mech: { deathSplash: { radius: 1.4, dmg: 70 } }, role: 'offense' }),
+    chaosUp('mechmice', 'common', 'extra', 'Extra Mouse', 'Deploys 3 instead of 2.', { stats: { count: 1 } }),
+    chaosUp('mechmice', 'rare', 'overclock', 'Overclock', '+30% damage and attacks 20% faster.', { stats: { dmg: 1.3, cd: 0.8 } }),
+    chaosUp('mechmice', 'epic', 'mousebombs', 'Mouse Bombs', 'Each mouse explodes when destroyed.', { mech: { deathSplash: { radius: 1.3, dmg: 90 } } }),
+    chaosUp('crackergang', 'common', 'barrels', 'Long Barrels', '+1.5 range.', { stats: { range: 1.5 } }),
+    chaosUp('crackergang', 'rare', 'spark', 'Spark Rounds', 'Every shot chains to 2 more enemies and stuns the first briefly.', { special: 'chain', em: { chain: { count: 2, stunPrimary: 0.15 } } }),
+    chaosUp('crackergang', 'epic', 'finale', 'Firework Finale', 'Deploys 5, and each one explodes when destroyed.', { stats: { count: 1 }, mech: { deathSplash: { radius: 1.6, dmg: 110 } } }),
+    chaosUp('teslatank', 'common', 'capacitors', 'Capacitors', 'Charges its shot 25% faster.', { stats: { cd: 0.75 } }),
+    chaosUp('teslatank', 'rare', 'coil', 'Overcharged Coil', '+35% damage and +0.5 splash.', { stats: { dmg: 1.35, splash: 0.5 } }),
+    chaosUp('teslatank', 'epic', 'engine', 'Storm Engine', 'Every shot also discharges around itself, knocking nearby troops back.', { em: { pulse: { every: 1, radius: 2.5, dmgMult: 0.5, knock: 1 } }, role: 'defense' }),
+    // Buildings
+    chaosUp('boltturret', 'common', 'battery', 'Extended Battery', 'Lasts 50% longer and has +20% HP.', { stats: { lifetime: 1.5, hp: 1.2 }, role: 'defense' }),
+    chaosUp('boltturret', 'rare', 'arc', 'Arc Pulse', 'Every 3rd shot also blasts everything around it and knocks troops back.', { em: { pulse: { every: 3, radius: 2.5, dmgMult: 0.9, knock: 1.1 } }, role: 'defense' }),
+    chaosUp('boltturret', 'epic', 'chain', 'Chain Turret', 'Bolts chain to 3 more enemies and stun the first.', { special: 'chain', em: { chain: { count: 3, stunPrimary: 0.3 } }, role: 'defense' }),
+    chaosUp('infernospire', 'common', 'core', 'Hotter Core', 'Its beam reaches full heat in 2.5 s (from 4 s).', { mech: { ramp: 2.5 }, role: 'defense' }),
+    chaosUp('infernospire', 'rare', 'heatshield', 'Heat Shield', '+40% HP and lasts 30% longer.', { stats: { hp: 1.4, lifetime: 1.3 }, role: 'defense' }),
+    chaosUp('infernospire', 'epic', 'meltdown', 'Meltdown', 'Heats up in 3 s, and blows up for heavy damage when destroyed or expired.', { mech: { ramp: 3, deathSplash: { radius: 2.5, dmg: 300 } }, role: 'defense' }),
+    chaosUp('bonecrypt', 'common', 'restless', 'Restless Dead', 'Raises a Skeleton every 2 s (from 2.9 s).', { mech: { spawner: { card: 'cryptskel', every: 2, count: 1, onDeath: 3 } }, role: 'defense' }),
+    chaosUp('bonecrypt', 'rare', 'giant', 'Bone Giant', 'A 520 HP Bone Giant rises when it is destroyed or expires, instead of 3 Skeletons.', { em: { deathSummon: { card: 'bonegiant', count: 1, replaces: true } } }),
+    chaosUp('bonecrypt', 'epic', 'necropolis', 'Necropolis', 'Raises 2 Skeletons at a time, lasts 30% longer, and releases 4 at the end.', { stats: { lifetime: 1.3 }, mech: { spawner: { card: 'cryptskel', every: 2.4, count: 2, onDeath: 4 } }, role: 'defense' }),
+    // Spells
+    chaosUp('firebomb', 'common', 'wide', 'Wide Blast', 'Blast radius +0.7 tiles.', { stats: { splash: 0.7 } }),
+    chaosUp('firebomb', 'rare', 'napalm', 'Napalm', 'Leaves burning ground for 3 s.', { spell: { afterZone: { kind: 'dot', dur: 3, tick: 0.5, dmgMult: 0.35, radius: 2 } } }),
+    chaosUp('firebomb', 'epic', 'inferno', 'Inferno Bomb', '+30% damage, and leaves a big fire for 4 s.', { stats: { dmg: 1.3 }, spell: { afterZone: { kind: 'dot', dur: 4, tick: 0.5, dmgMult: 0.5, radius: 2.5 } } }),
+    chaosUp('shock', 'common', 'long', 'Long Shock', 'Stuns for twice as long.', { stats: { stun: 2 }, role: 'defense' }),
+    chaosUp('shock', 'rare', 'overload', 'Overload', 'An aftershock 0.8 s later: 60% damage and a longer stun.', { spell: { echo: { delay: 0.8, dmgMult: 0.6, stun: 0.8 } } }),
+    chaosUp('shock', 'epic', 'thunderclap', 'Thunderclap', '+50% damage, +0.8 radius, and an aftershock.', { stats: { dmg: 1.5, splash: 0.8 }, spell: { echo: { delay: 0.8, dmgMult: 0.6, stun: 0.8 } } }),
+    chaosUp('rocketrain', 'common', 'fourth', 'Fourth Wave', 'A 4th wave of rockets (+33% total damage).', { stats: { waves: 1, dmg: 1.33 } }),
+    chaosUp('rocketrain', 'rare', 'homing', 'Homing Barrage', '6 rockets lock on to different enemies in the circle.', { spell: { seek: { count: 6, dmgMult: 0.3, radius: 1.2 } } }),
+    chaosUp('rocketrain', 'epic', 'swarm', 'Swarm Missiles', '10 homing rockets lock on to different enemies.', { spell: { seek: { count: 10, dmgMult: 0.28, radius: 1.3 } } }),
+    chaosUp('boulder', 'common', 'long', 'Longer Roll', 'Rolls 14 tiles (from 10).', { zone: { add: { length: 4 } } }),
+    chaosUp('boulder', 'rare', 'heavy', 'Heavy Boulder', '+40% damage and 50% more knockback.', { stats: { dmg: 1.4, knockback: 1.5 } }),
+    chaosUp('boulder', 'epic', 'double', 'Double Roll', 'A second boulder rolls the same path a moment later.', { spell: { zoneEcho: 1 } }),
+    chaosUp('acidpool', 'common', 'lingering', 'Lingering Acid', 'Lasts 9 s (from 6 s) at the same strength per second.', { stats: { dmg: 1.5 }, zone: { mult: { dur: 1.5 } }, role: 'defense' }),
+    chaosUp('acidpool', 'rare', 'caustic', 'Caustic', 'Enemies inside are slowed by 45% (from 20%).', { zone: { mult: { slow: 0.69 } }, role: 'defense' }),
+    chaosUp('acidpool', 'epic', 'flood', 'Acid Flood', '+1 radius and +40% damage.', { stats: { splash: 1, dmg: 1.4 } }),
+    chaosUp('paratroopers', 'common', 'extra', 'Extra Squad', 'Drops 8 paratroopers (from 6).', { zone: { add: { count: 2 } }, role: 'offense' }),
+    chaosUp('paratroopers', 'rare', 'rapid', 'Rapid Drop', 'Drops 7, twice as fast.', { zone: { add: { count: 1 }, mult: { dur: 0.5 } }, role: 'offense' }),
+    chaosUp('paratroopers', 'epic', 'division', 'Airborne Division', 'Drops 11 paratroopers.', { zone: { add: { count: 5 } }, role: 'offense' }),
+  ];
+  const CHAOS_UPGRADE_MAP = Object.fromEntries(CHAOS_UPGRADES.map((u) => [u.id, u]));
+  // Cards eligible for C.H.A.O.S. (base versions): exactly the cards that have upgrades
+  const CHAOS_POOL = [...new Set(CHAOS_UPGRADES.map((u) => u.card))];
+
+  /** The upgrades a card can get (keyed by family, so a card's Mk-II shares them). */
+  function upgradesFor(cardId) {
+    const c = CARD_MAP[cardId];
+    return c ? CHAOS_UPGRADES.filter((u) => u.card === c.slug) : [];
+  }
+
+  /** Problems in the upgrade table (missing cards, unknown tokens, impossible combinations). Empty when sound. */
+  function validateUpgrades() {
+    const problems = [];
+    const seen = new Set();
+    for (const u of CHAOS_UPGRADES) {
+      const c = CARD_MAP[u.card];
+      if (seen.has(u.id)) problems.push(`${u.id}: duplicate id`);
+      seen.add(u.id);
+      if (!c || c.token) { problems.push(`${u.id}: unknown card ${u.card}`); continue; }
+      if (!UPGRADE_RARITIES[u.rarity]) problems.push(`${u.id}: unknown rarity ${u.rarity}`);
+      if (!u.name || !u.desc) problems.push(`${u.id}: needs a name and a description`);
+      const m = u.mech || {};
+      ['deathSpawn', 'spawner'].forEach((k) => { if (m[k] && !CARD_MAP[m[k].card]) problems.push(`${u.id}: ${k} card ${m[k].card} does not exist`); });
+      if (u.em && u.em.deathSummon && !CARD_MAP[u.em.deathSummon.card]) problems.push(`${u.id}: deathSummon card does not exist`);
+      if ((u.spell || u.zone) && !c.spell) problems.push(`${u.id}: spell effects on a card that is not a spell`);
+      if (u.zone && !c.zone) problems.push(`${u.id}: zone changes on a spell without a zone`);
+      if (u.spell && u.spell.zoneEcho && !c.zone) problems.push(`${u.id}: zoneEcho needs a zone spell`);
+      if (u.em && u.em.shockwave && c.proj !== 'melee') problems.push(`${u.id}: shockwave needs a melee card`);
+      if (u.em && (u.em.chain || u.em.cluster || u.em.impactZone) && (c.proj === 'melee' || c.building && c.targets === 'none')) problems.push(`${u.id}: projectile effects need a ranged attacker`);
+      if (u.em && u.em.chain && !(c.special || '').includes('chain') && !(u.special || '').includes('chain')) problems.push(`${u.id}: chain needs the chain keyword`);
+      if (u.em && u.em.rally && !(c.swarmCount > 1)) problems.push(`${u.id}: rally needs a swarm card`);
+      if (u.stats && u.stats.count && c.spell) problems.push(`${u.id}: count on a spell`);
+    }
+    for (const id of CHAOS_POOL) {
+      const r = new Set(upgradesFor(id).map((u) => u.rarity));
+      UPGRADE_RARITY_ORDER.forEach((rar) => { if (!r.has(rar)) problems.push(`${id}: no ${rar} upgrade`); });
+    }
+    return problems;
+  }
+
+  // Card stats with an upgrade baked in (a new object; the stats passed in are never changed)
+  function upgradedStats(stats, def) {
+    if (!stats || !def) return stats;
+    const s = { ...stats, upg: def.id };
+    const st = def.stats || {};
+    if (st.hp) { s.hpScaled = Math.round(s.hpScaled * st.hp); }
+    if (st.dmg) s.dmgScaled = +(s.dmgScaled * st.dmg).toFixed(2);
+    if (st.cd) s.cd = r2(Math.max(0.3, s.cd * st.cd));
+    if (st.speed) s.speed = r2(s.speed * st.speed);
+    if (st.lifetime && s.lifetime) s.lifetime = r2(s.lifetime * st.lifetime);
+    if (st.stun) s.stun = r2((s.stun || 0) * st.stun);
+    if (st.knockback) s.knockback = r2((s.knockback || 0) * st.knockback);
+    if (st.range) { s.range = r2(s.range + st.range); s.sight = Math.max(s.sight || 0, s.range + 1.5); }
+    if (st.splash) s.splash = r2((s.splash || 0) + st.splash);
+    if (st.count) s.swarmCount = (s.swarmCount || 1) + st.count;
+    if (st.waves) s.waves = (s.waves || 1) + st.waves;
+    if (def.mech) s.mech = { ...(s.mech || {}), ...def.mech };
+    if (def.special) s.special = `${s.special || ''} ${def.special}`.trim();
+    if (def.zone && s.zone) {
+      const z = { ...s.zone };
+      Object.entries(def.zone.mult || {}).forEach(([k, v]) => { if (typeof z[k] === 'number') z[k] = r2(z[k] * v); });
+      Object.entries(def.zone.add || {}).forEach(([k, v]) => { z[k] = r2((z[k] || 0) + v); });
+      s.zone = z;
+    }
+    return s;
+  }
+
+  // A unit's Evolution-style mechanics: its upgrade's, with an equipped Evolution winning any clash
+  function unitEvoMech(stats) {
+    const um = stats.upg && CHAOS_UPGRADE_MAP[stats.upg] ? CHAOS_UPGRADE_MAP[stats.upg].em : null;
+    const ev = stats.evo ? stats.evo.mech : null;
+    if (!um) return ev || null;
+    return ev ? { ...um, ...ev } : um;
+  }
+
+  // A spell's Evolution-style effects, merged the same way
+  function spellEvoFx(stats) {
+    const us = stats.upg && CHAOS_UPGRADE_MAP[stats.upg] ? CHAOS_UPGRADE_MAP[stats.upg].spell : null;
+    const ev = stats.evo ? stats.evo.spell : null;
+    if (!us) return ev || null;
+    return ev ? { ...us, ...ev } : us;
+  }
+
+  // Deterministic shuffle (Princess Gambit draw order), apart from the battle's random numbers
+  function shuffleWith(list, seed) {
+    const rand = offerRng(seed);
+    for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; }
+    return list;
+  }
+
+  // Small deterministic generator for offers (kept apart from the battle's own random numbers)
+  function offerRng(seed) {
+    let s = seed >>> 0 || 1;
+    return () => { s = (s + 0x6d2b79f5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t ^= t + Math.imul(t ^ (t >>> 7), 61 | t); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  }
+
+  // Rules for the upgrade draft (rules.upgrades), cleaned like every other rule
+  function normalizeUpgradeRules(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    const checkpoints = (Array.isArray(raw.checkpoints) ? raw.checkpoints : []).slice(0, 12)
+      .map((c) => ({ at: num(c && c.at, 0, 0, 900), rarity: UPGRADE_RARITIES[c && c.rarity] ? c.rarity : 'common' }))
+      .sort((a, b) => a.at - b.at);
+    if (!checkpoints.length) return null;
+    return {
+      checkpoints,
+      choiceSecs: num(raw.choiceSecs, 10, 3, 30),
+      pause: raw.pause !== false,
+      autoPick: raw.autoPick === 1 ? 1 : 0,
+      perCard: Math.floor(num(raw.perCard, 1, 1, 3)),
+    };
+  }
+
+  function freshChaos() {
+    return { next: 0, active: null, upgrades: { A: {}, B: {} }, history: [] };
+  }
+
+  // What a side could be offered at this rarity, and why the rest was left out (for the debug view)
+  function upgradeCandidates(state, side, rarity) {
+    const p = state.players[side];
+    const ch = state.chaos;
+    const cfg = state.rules.upgrades;
+    const ids = Object.keys(p.cards);
+    const eligible = [];
+    const rejected = [];
+    for (const id of ids) {
+      const owned = ch.upgrades[side][id] ? 1 : 0;
+      const list = upgradesFor(id);
+      if (!list.length) { rejected.push({ cardId: id, why: 'no upgrades for this card' }); continue; }
+      if (owned >= cfg.perCard) { rejected.push({ cardId: id, why: 'already upgraded' }); continue; }
+      const fits = list.filter((u) => u.rarity === rarity);
+      if (!fits.length) { rejected.push({ cardId: id, why: `no ${rarity} upgrade` }); continue; }
+      fits.forEach((u) => eligible.push({ cardId: id, upgradeId: u.id }));
+    }
+    return { eligible, rejected };
+  }
+
+  const cardKind = (c) => (c.spell ? 'spell' : c.building ? 'building' : 'troop');
+
+  /**
+   * Two offers for a side at a checkpoint: both of the checkpoint's rarity, on two different cards
+   * when possible (preferring two different kinds of card, so the choice is a real trade-off). Falls
+   * back to the nearest rarity that has offers, then to two upgrades of one card. Null when nothing fits.
+   */
+  function makeOffers(state, side, n) {
+    const want = state.rules.upgrades.checkpoints[n].rarity;
+    const rand = offerRng((state.seed ^ Math.imul(n + 1, 0x9e3779b1) ^ (side === 'A' ? 0x51ed : 0xa2c3)) >>> 0);
+    const order = [want].concat(UPGRADE_RARITY_ORDER.filter((r) => r !== want).sort((a, b) => Math.abs(UPGRADE_RARITY_ORDER.indexOf(a) - UPGRADE_RARITY_ORDER.indexOf(want)) - Math.abs(UPGRADE_RARITY_ORDER.indexOf(b) - UPGRADE_RARITY_ORDER.indexOf(want))));
+    for (const rarity of order) {
+      const { eligible } = upgradeCandidates(state, side, rarity);
+      if (!eligible.length) continue;
+      const pick = (list) => list[Math.floor(rand() * list.length)];
+      const first = pick(eligible);
+      const fc = CARD_MAP[first.cardId];
+      const others = eligible.filter((e) => e.cardId !== first.cardId);
+      const contrast = others.filter((e) => cardKind(CARD_MAP[e.cardId]) !== cardKind(fc));
+      const second = contrast.length && rand() < 0.75 ? pick(contrast) : others.length ? pick(others) : pick(eligible.filter((e) => e.upgradeId !== first.upgradeId));
+      if (!second) continue; // only one upgrade fits at this rarity: try another rarity
+      return { rarity, offers: [first, second] };
+    }
+    // Last card standing: two of its upgrades, the wanted rarity (or nearest) first
+    for (const rarity of order) {
+      const first = upgradeCandidates(state, side, rarity).eligible[0];
+      if (!first) continue;
+      const rest = order.filter((r) => r !== rarity).map((r) => upgradeCandidates(state, side, r).eligible.find((e) => e.cardId === first.cardId)).filter(Boolean);
+      if (rest.length) return { rarity, offers: [first, rest[0]] };
+    }
+    return null;
+  }
+
+  // Open a checkpoint: roll both sides' offers. Sides with nothing to offer sit this one out.
+  function openCheckpoint(state, n) {
+    const ch = state.chaos;
+    const offers = {};
+    const picked = {};
+    let any = false;
+    ['A', 'B'].forEach((side) => {
+      if (state.rules.noTowers.includes(side) && state.rules.waves) { offers[side] = null; picked[side] = -1; return; }
+      const o = makeOffers(state, side, n);
+      offers[side] = o;
+      picked[side] = o ? null : -1;
+      if (o) any = true;
+    });
+    if (!any) return false;
+    const cfg = state.rules.upgrades;
+    ch.active = { n, rarity: cfg.checkpoints[n].rarity, wait: cfg.choiceSecs, total: cfg.choiceSecs, offers, picked, auto: {} };
+    pushFx(state, { type: 'upgradeOpen', n });
+    return true;
+  }
+
+  function applyUpgrade(state, side, offer, n, auto) {
+    const p = state.players[side];
+    const def = CHAOS_UPGRADE_MAP[offer.upgradeId];
+    if (!def || !p.cards[offer.cardId]) return;
+    p.cards[offer.cardId] = upgradedStats(p.cards[offer.cardId], def);
+    state.chaos.upgrades[side][offer.cardId] = def.id;
+    pushFx(state, { type: 'upgrade', owner: side, cardId: offer.cardId, upgradeId: def.id, rarity: def.rarity, auto: auto ? 1 : 0 });
+  }
+
+  /** A side picks offer 0 (left) or 1 (right). Resolves once; anything else is refused. */
+  function chooseUpgrade(state, side, idx) {
+    const ch = state.chaos;
+    const a = ch && ch.active;
+    if (!a) return { ok: false, reason: 'No upgrade choice is open' };
+    if (side !== 'A' && side !== 'B') return { ok: false, reason: 'Unknown side' };
+    if (!a.offers[side]) return { ok: false, reason: 'No offer for this side' };
+    if (a.picked[side] != null) return { ok: false, reason: 'Already chosen' };
+    const i = Number(idx);
+    if (i !== 0 && i !== 1) return { ok: false, reason: 'Pick 0 or 1' };
+    resolvePick(state, side, i, false);
+    return { ok: true, upgradeId: a.offers[side].offers[i].upgradeId };
+  }
+
+  function resolvePick(state, side, i, auto) {
+    const ch = state.chaos;
+    const a = ch.active;
+    const o = a.offers[side];
+    a.picked[side] = i;
+    a.auto[side] = !!auto;
+    applyUpgrade(state, side, o.offers[i], a.n, auto);
+    ch.history.push({
+      n: a.n, side, at: r2(state.time), rarity: o.rarity, auto: !!auto,
+      chosen: o.offers[i], other: o.offers[1 - i],
+    });
+  }
+
+  // Runs at the top of every step. Returns true while the battle is paused for a choice.
+  function updateChaos(state, dt) {
+    const ch = state.chaos;
+    const cfg = state.rules.upgrades;
+    if (!ch || !cfg || !state.running) return false;
+    if (!ch.active && ch.next < cfg.checkpoints.length && state.time >= cfg.checkpoints[ch.next].at) {
+      const n = ch.next++;
+      openCheckpoint(state, n);
+    }
+    const a = ch.active;
+    if (!a) return false;
+    a.wait = r2(Math.max(0, a.wait - dt));
+    if (a.wait <= 0) ['A', 'B'].forEach((side) => { if (a.picked[side] == null) resolvePick(state, side, cfg.autoPick, true); });
+    if (a.picked.A != null && a.picked.B != null) {
+      ch.active = null;
+      pushFx(state, { type: 'upgradeClose', n: a.n });
+      return false;
+    }
+    return cfg.pause;
+  }
+
+  // Is play frozen for an upgrade choice right now?
+  function choicePaused(state) {
+    return !!(state.chaos && state.chaos.active && state.rules.upgrades && state.rules.upgrades.pause);
+  }
+
+  /**
+   * How much an upgrade is worth to this AI right now. Reads only its own deck, the public board and
+   * its own offers: the card's role and cost (cheap cards come round more often), whether it's in hand,
+   * the upgrade's rarity and role, the score, which side is under pressure, and the time left.
+   */
+  function scoreUpgrade(state, side, offer, rand) {
+    const def = CHAOS_UPGRADE_MAP[offer.upgradeId];
+    const p = state.players[side];
+    const c = p.cards[offer.cardId];
+    if (!def || !c) return -Infinity;
+    const foe = enemyOf(side);
+    let v = UPGRADE_RARITIES[def.rarity].value * 3;
+    v += c.winCondition ? 2 : 0;
+    v += c.spell ? 0.5 : 0;
+    v += clamp(5 - c.cost, -2, 3) * 0.4; // cheap cards are played more often
+    if (p.hand.includes(offer.cardId)) v += 0.6 + Math.max(0, 1 - timeLeft(state) / 60); // late on, what's in hand matters most
+    const myCrowns = p.crowns;
+    const theirCrowns = state.players[foe].crowns;
+    const myLow = Math.min(...state.towers.filter((t) => t.owner === side && t.hp > 0).map((t) => t.hp / t.hpMax), 1);
+    const behind = theirCrowns > myCrowns;
+    const pressured = myLow < 0.5 || state.units.some((u) => u.owner === foe && u.hp > 0 && !ownHalf(foe, u.y));
+    if (def.role === 'offense') v += behind ? 1.5 : 0.3;
+    if (def.role === 'defense') v += pressured ? 1.5 : 0.2;
+    return v + rand() * 1.2;
+  }
+
+  // The AI's half of a choice: a short moment to "think", then the better-scored offer
+  function aiChooseUpgrade(state, brain, dt) {
+    const a = state.chaos && state.chaos.active;
+    const side = brain.side;
+    if (!a || !a.offers[side] || a.picked[side] != null) { brain.upgradeWait = null; return false; }
+    if (brain.upgradeWait == null) brain.upgradeWait = 0.8 + brain.rand() * 1.4;
+    brain.upgradeWait -= dt;
+    if (brain.upgradeWait > 0) return true;
+    brain.upgradeWait = null;
+    const offers = a.offers[side].offers;
+    const s = offers.map((o) => scoreUpgrade(state, side, o, brain.rand));
+    chooseUpgrade(state, side, s[1] > s[0] ? 1 : 0);
+    return true;
+  }
+
+  // What clients see. Both sides' upgrades are public once chosen (they show on the cards and units);
+  // pending offers are per side, and the server hides the other side's (see server.js).
+  function chaosSnapshot(state) {
+    const ch = state.chaos;
+    const cfg = state.rules.upgrades;
+    if (!ch || !cfg) return undefined;
+    const a = ch.active;
+    return {
+      n: ch.next, total: cfg.checkpoints.length,
+      nextAt: ch.next < cfg.checkpoints.length ? cfg.checkpoints[ch.next].at : null,
+      nextRarity: ch.next < cfg.checkpoints.length ? cfg.checkpoints[ch.next].rarity : null,
+      pause: cfg.pause,
+      active: a ? { n: a.n, rarity: a.rarity, wait: a.wait, total: a.total, offers: { A: a.offers.A, B: a.offers.B }, picked: { ...a.picked } } : null,
+      upgrades: { A: { ...ch.upgrades.A }, B: { ...ch.upgrades.B } },
+      history: ch.history.map((h) => ({ ...h })),
+    };
+  }
+
+  /** Debug view for development tools: the pool, the next checkpoint, what each side could be offered and why not. */
+  function chaosDebug(state) {
+    const ch = state.chaos;
+    const cfg = state.rules.upgrades;
+    if (!ch || !cfg) return null;
+    const next = cfg.checkpoints[ch.next] || null;
+    const sides = {};
+    ['A', 'B'].forEach((side) => {
+      const rarity = next ? next.rarity : 'common';
+      sides[side] = { ...upgradeCandidates(state, side, rarity), upgrades: { ...ch.upgrades[side] } };
+    });
+    return { config: cfg, next, nextIndex: ch.next, active: ch.active, sides, poolSize: CHAOS_POOL.length, upgradeCount: CHAOS_UPGRADES.length, problems: validateUpgrades() };
+  }
+
+
   function makeTower(side, kind, laneIdx, stats) {
     const princess = kind === 'princess';
     return {
@@ -1363,21 +1860,45 @@
       waveNo: 0,                     // survival: waves sent so far
       boss: null,                    // boss battle: { id, spawned, summons, enraged }
       swapNo: 0,                     // deck swaps done
+      chaos: null,                   // C.H.A.O.S.: { next, active, upgrades: { A, B }, history } (see freshChaos)
+      obj: null,                     // objective modes: payload cart, held zones, chests (see freshObjectives)
+      stage: 0,                      // Ramp-Up: index of the current elixir stage
     };
     const rules = state.rules;
     ['A', 'B'].forEach((side) => {
-      const p = createPlayer(side, normalizeDeck(o.decks && o.decks[side]), rules);
+      let deck = normalizeDeck(o.decks && o.decks[side]);
+      // Princess Gambit: no deck of your own; each side draws the shared pool in its own order
+      if (rules.gambit) deck = shuffleWith(rules.gambit.pool.slice(), (state.seed ^ (side === 'A' ? 0x1234 : 0xbeef)) >>> 0).map((id) => ({ id, level: rules.cardLevel || 9 }));
+      if (rules.cardLevel) deck = deck.map((c) => ({ ...c, level: rules.cardLevel }));
+      const p = createPlayer(side, deck, rules);
       state.players[side] = p;
       p.hand.forEach((id) => rollSize(state, p, id));
       if (rules.noTowers.includes(side)) return;
-      const t = (o.towers && o.towers[side]) || {};
-      const stats = towerStats(t.towerLevel, t.kingLevel, { tower: t.towerMult, king: t.kingMult });
-      state.towers.push(makeTower(side, 'princess', 0, stats));
-      state.towers.push(makeTower(side, 'princess', 1, stats));
-      state.towers.push(makeTower(side, 'king', -1, stats));
+      let t = (o.towers && o.towers[side]) || {};
+      if (rules.towerLevel) t = { ...t, towerLevel: rules.towerLevel, kingLevel: rules.towerLevel };
+      const th = rules.towerHp || { princess: 1, king: 1 };
+      const stats = towerStats(t.towerLevel, t.kingLevel, { tower: (t.towerMult || 1) * th.princess, king: (t.kingMult || 1) * th.king * (rules.vault ? rules.vault.hp : 1) });
+      if (!rules.kingOnly) {
+        state.towers.push(makeTower(side, 'princess', 0, stats));
+        state.towers.push(makeTower(side, 'princess', 1, stats));
+      }
+      const king = makeTower(side, 'king', -1, stats);
+      // Heist: the King Tower is the vault, awake from the start; it only shoots if the rules say so
+      if (rules.kingOnly) king.active = true;
+      if (rules.vault && !rules.vault.shoots) king.dmg = 0;
+      state.towers.push(king);
     });
     if (rules.hill) state.hill = { idx: 0, pts: { A: 0, B: 0 }, holder: null, movedAt: 0 };
     if (rules.boss) state.boss = { id: null, spawned: false, summons: 0, enraged: false };
+    if (rules.upgrades) state.chaos = freshChaos();
+    if (hasObjective(rules)) state.obj = freshObjectives(rules);
+    // Preset defences (Inferno Siege): permanent buildings placed before the start
+    rules.defenses.forEach((d) => {
+      const st = getCardStatsAtLevel(d.card, d.level, false, 0);
+      const u = spawnUnit(state, d.side, st, d.x, d.y, 0, 0);
+      u.lifetime = 0;
+    });
+    if (rules.defenses.length) rebuildObstacles(state);
     state.towers.forEach((t) => state.byId.set(t.id, t));
     rebuildObstacles(state);
     buildHash(state);
@@ -1434,6 +1955,7 @@
     if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
     if (x < 0.5 || x > W - 0.5 || y < 0.5 || y > H - 0.5) return false;
     if (card && card.spell) return true; // spells can be cast anywhere
+    if (!behindLine(state.rules.deployDepth, side, y)) return false;
     // Tunnelling troops can surface anywhere that isn't river or a tower/building
     if (!(card && card.anywhere) && !inDeployZone(state, side, x, y, card)) return false;
     return walkablePoint(state.nav, x, y, false);
@@ -1441,10 +1963,17 @@
 
   // Same rules as canDeploy, checked against a snapshot. Online clients use this for the
   // placement preview; the server still makes the final call.
+  // Special arenas can keep deployments a set distance back from the river
+  function behindLine(depth, side, y) {
+    if (!(depth > 0)) return true;
+    return side === 'A' ? y >= RIVER.y1 + depth : y <= RIVER.y0 - depth;
+  }
+
   function canDeployOnSnapshot(snap, side, x, y, card) {
     if (!snap || !Number.isFinite(x) || !Number.isFinite(y)) return false;
     if (x < 0.5 || x > W - 0.5 || y < 0.5 || y > H - 0.5) return false;
     if (card && card.spell) return true;
+    if (!behindLine(snap.deployDepth, side, y)) return false;
     const own = side === 'A' ? y >= RIVER.y1 + 0.5 : y <= RIVER.y0 - 0.5;
     if (!own && !(card && card.anywhere)) {
       if (card && card.building) return false;
@@ -1521,7 +2050,8 @@
       // Mechanics and status effects (see the Mechanics section)
       mech: stats.mech || null,
       evo: stats.evo ? stats.evoSlug : null,     // evolved form (slug of its Evolution)
-      em: stats.evo ? stats.evo.mech || null : null,
+      em: unitEvoMech(stats),                    // Evolution and/or C.H.A.O.S. upgrade mechanics
+      upg: stats.upg || null,                    // C.H.A.O.S. upgrade id
       evoHits: 0, stack: 0, stackTarget: null, diveCd: 0, divedAt: -9, rally: 0, pack: null, shieldT: 0,
       level: stats.level || 1,
       lvlScale: stats.lvlScale || 1,
@@ -1599,6 +2129,17 @@
   // Cycle a played card out of the hand; the card that comes in gets its own Size Roulette roll
   function cycleCard(state, p, cardId) {
     delete p.size[cardId];
+    if (state.rules.gambit) {
+      // Princess Gambit: a played card is gone for this match; the next one in the pile comes in.
+      // Only when the pile runs dry does the discard go back in (same order).
+      const idx = p.hand.indexOf(cardId);
+      if (idx < 0) return;
+      p.discard = p.discard || [];
+      p.discard.push(cardId);
+      if (!p.queue.length) { p.queue = p.discard; p.discard = []; }
+      p.hand[idx] = p.queue.shift();
+      return;
+    }
     const incoming = cycleHand(p, cardId);
     if (incoming) rollSize(state, p, incoming);
   }
@@ -1619,9 +2160,17 @@
   /** Play a card. Returns { ok: true, units } or { ok: false, reason }. */
   function deploy(state, side, cardId, x, y) {
     if (!state.running) return { ok: false, reason: 'Match is over' };
+    if (choicePaused(state)) return { ok: false, reason: 'Choosing upgrades' };
     const p = state.players[side];
     const stats = p && p.cards[cardId];
     if (!stats) return { ok: false, reason: 'Unknown card' };
+    const lim = state.rules.playLimit && state.rules.playLimit[side];
+    if (lim > 0 && p.cardsPlayed >= lim) return { ok: false, reason: 'No plays left' };
+    if (state.rules.unitCap > 0 && !stats.spell) {
+      let n = 0;
+      for (const u of state.units) if (u.owner === side && u.hp > 0 && u.costShare > 0) n++;
+      if (n + (stats.swarmCount || 1) > state.rules.unitCap) return { ok: false, reason: `Unit limit (${state.rules.unitCap}) reached` };
+    }
     if (!p.hand.includes(cardId)) return { ok: false, reason: 'Card not in hand' };
     const cost = playCost(state, side, cardId);
     if (p.elixir < cost) return { ok: false, reason: 'Not enough elixir' };
@@ -1694,13 +2243,14 @@
     let stats = statsIn;
     if (state.modFx.spellRadius !== 1) stats = { ...stats, splash: r2(stats.splash * state.modFx.spellRadius) };
     const echo = state.rules.spellEcho;
+    const evoSpell = spellEvoFx(stats);
     if (stats.zone) {
       const z = addZone(state, side, stats, x, y);
       if (echo > 0) echoZoneSpell(state, z, echo);
+      if (evoSpell && evoSpell.zoneEcho) echoZoneSpell(state, z, evoSpell.zoneEcho); // C.H.A.O.S. Double Roll
       return;
     }
     const spec = spellSpec(stats);
-    const evoSpell = stats.evo && stats.evo.spell;
     const king = state.towers.find((t) => t.owner === side && t.tower === 'king');
     const fromX = king ? king.x : x;
     const fromY = king ? king.y : y;
@@ -2294,12 +2844,64 @@
     if (source.id) target.lastAttackerId = source.id;
     const p = state.players[source.owner];
     if (p) p.damageDealt += amt;
+    afterHit(state, source, target, amt);
     if (target.tower === 'king' && !target.active) wakeKing(state, target);
     // Floating damage numbers: towers, spells and heavy hits
     if (showNumber || target.kind === 'tower' || amt >= 150) {
       pushFx(state, { type: 'dmg', x: target.x, y: target.y - (target.half || target.radius || 0.4), amt: Math.round(amt), owner: source.owner, big: amt >= 150 });
     }
     return amt;
+  }
+
+  // Thorns and lifesteal: both act on a hit that landed. A reflected hit is never reflected again.
+  function afterHit(state, source, target, amt) {
+    const tm = target.mech;
+    if (tm && tm.reflect && source.melee && source.kind === 'troop' && !source.reflected) {
+      const attacker = state.byId.get(source.id);
+      if (attacker && attacker.hp > 0) {
+        const back = Math.min(amt * tm.reflect.pct, tm.reflect.cap * (target.lvlScale || 1));
+        applyDamage(state, { ...damageSource(target), reflected: true }, attacker, back);
+        pushFx(state, { type: 'thorns', x: attacker.x, y: attacker.y, owner: target.owner });
+      }
+    }
+    if (source.lifesteal > 0 && !source.reflected) {
+      const healer = state.byId.get(source.id);
+      if (healer && healer.hp > 0 && healer.hp < healer.hpMax) {
+        healer.hp = Math.min(healer.hpMax, healer.hp + amt * source.lifesteal);
+        healer.healedAt = state.time;
+      }
+    }
+  }
+
+  // War Drum: the strongest aura covering this troop (buildings of its own side), 1 when none
+  function empowerMult(state, u) {
+    if (u.kind !== 'troop') return 1;
+    let best = 1;
+    for (const b of state.units) {
+      const e = b.mech && b.mech.empower;
+      if (!e || b.owner !== u.owner || b.hp <= 0 || b.deployT > 0) continue;
+      if (dist(b.x, b.y, u.x, u.y) <= e.radius) best = Math.max(best, e.mult);
+    }
+    return best;
+  }
+
+  // Snare Mine: buried until an enemy ground troop comes close, then it goes off once
+  function updateTrap(state, u) {
+    const tr = u.mech.trap;
+    if (u.deployT > 0) return;
+    let sprung = false;
+    queryHash(state, u.x, u.y, tr.trigger + 1, (e) => {
+      if (sprung || e.owner === u.owner || e.kind !== 'troop' || e.air || e.hp <= 0 || e.hidden) return;
+      if (dist(u.x, u.y, e.x, e.y) - e.radius <= tr.trigger) sprung = true;
+    });
+    if (!sprung) return;
+    const hit = splashDamage(state, damageSource(u), u.x, u.y, tr.radius, u.dmg, false);
+    hit.forEach((e) => { if (e.kind !== 'tower') stunEntity(e, tr.stun, false); });
+    pushFx(state, { type: 'splash', x: u.x, y: u.y, r: tr.radius, owner: u.owner });
+    pushFx(state, { type: 'trap', x: u.x, y: u.y, r: tr.radius, owner: u.owner });
+    u.hidden = false;
+    u.hp = 0;
+    u.kamikazed = true;
   }
 
   function wakeKing(state, king) {
@@ -2324,7 +2926,7 @@
   }
 
   function damageSource(u) {
-    return { id: u.id, owner: u.owner, structureMult: u.structureMult, crownMult: u.crownMult || 1, kind: u.kind, evo: !!u.evo, x: u.x, y: u.y };
+    return { id: u.id, owner: u.owner, structureMult: u.structureMult, crownMult: u.crownMult || 1, kind: u.kind, evo: !!u.evo, x: u.x, y: u.y, melee: u.proj === 'melee', lifesteal: (u.mech && u.mech.lifesteal) || 0 };
   }
 
   // Spark Spirit: hit the target, then arc to nearby enemies, stunning each one
@@ -2387,7 +2989,7 @@
 
   // The moment an attack lands (end of wind-up). Melee hits instantly; ranged fires a projectile.
   function fireAttack(state, u, t) {
-    let dmg = u.dmg;
+    let dmg = u.dmg * empowerMult(state, u);
     let heavy = false;
     const m = u.mech;
     if (u.charging) { dmg *= 2; heavy = true; u.charging = false; u.runDist = 0; pushFx(state, { type: 'charge', x: t.x, y: t.y, owner: u.owner }); }
@@ -2521,6 +3123,7 @@
       if (m.elixir) updateElixirPump(state, u, dt);
       if (m.heal) updateHealer(state, u, dt);
       if (m.taunt) updateTaunt(state, u, dt);
+      if (m.trap) updateTrap(state, u);
       if (m.boss) updateBoss(state, u, dt);
     }
     if (u.targets === 'none') return; // spawners, pumps and decoys never attack
@@ -2576,6 +3179,7 @@
     if (m && m.dash && t && startDash(state, u, t)) return;
 
     if (!u.building && t) moveToward(state, u, t, dt, kMove);
+    else if (!t && !u.building && state.obj) walkToObjective(state, u, dt, kMove);
     else if (!t && !u.building && state.rules.guard) holdGuardLine(state, u, dt, kMove);
   }
 
@@ -3523,6 +4127,38 @@
       return;
     }
     if (state.boss && state.boss.dead) { endMatch(state, 'A', 'boss'); return; }
+    // Score modes: the first to the target wins on the spot
+    if (r.scoreToWin > 0) {
+      const sa = Math.floor(state.players.A.score || 0);
+      const sb = Math.floor(state.players.B.score || 0);
+      if (Math.max(sa, sb) >= r.scoreToWin && sa !== sb) { endMatch(state, sa > sb ? 'A' : 'B', 'score'); return; }
+    }
+    // Play limits (Inferno Siege): out of plays with nothing left fighting is a loss
+    if (r.playLimit) {
+      for (const side of ['A', 'B']) {
+        const lim = r.playLimit[side];
+        if (lim > 0 && state.players[side].cardsPlayed >= lim && !state.units.some((u) => u.owner === side && u.hp > 0 && !u.building) && !state.zones.some((z) => z.owner === side)) {
+          endMatch(state, enemyOf(side), 'outOfPlays');
+          return;
+        }
+      }
+    }
+    // Objective modes are decided by the objective, never by crowns
+    if (state.obj) {
+      const end = state.phase === 'regular' ? r.regulation : r.regulation + r.overtime;
+      if (state.time >= end) {
+        const lead = objectiveLeader(state);
+        if (lead) { endMatch(state, lead, state.phase === 'overtime' ? 'overtimeScore' : 'scoreTime'); return; }
+        if (state.phase === 'regular' && r.overtime > 0) { state.phase = 'overtime'; return; }
+        endMatch(state, 'draw', 'scoreTime');
+        return;
+      }
+      if (state.phase === 'overtime') {
+        const lead = objectiveLeader(state);
+        if (lead && !r.payload) { endMatch(state, lead, 'overtimeScore'); return; }
+      }
+      return;
+    }
     if (state.phase === 'regular' && state.time >= r.regulation) {
       // Survival: holding out to the end is a win. Boss: letting the clock run out is a loss.
       if (r.timeout === 'survive') { endMatch(state, 'A', 'survived'); return; }
@@ -3572,6 +4208,8 @@
   function step(state, dtIn) {
     const dt = dtIn || MATCH.step;
     if (!state.running) return;
+    // C.H.A.O.S.: the battle stands still while an upgrade choice is open (only its timer runs)
+    if (state.chaos && updateChaos(state, dt)) return;
     state.time += dt;
     updateModifiers(state);
     updateDeckSwaps(state);
@@ -3581,8 +4219,14 @@
     const maxElixir = state.rules.maxElixir;
     ['A', 'B'].forEach((side) => {
       const p = state.players[side];
-      p.elixir = clamp(p.elixir + elixirRate(state, side) * dt, 0, maxElixir);
+      p.elixir = state.rules.infiniteElixir ? maxElixir : clamp(p.elixir + elixirRate(state, side) * dt, 0, maxElixir);
     });
+    if (state.rules.announceStages) {
+      // Ramp-Up: say so whenever the elixir rate steps up
+      let stage = 0;
+      state.rules.elixirPhases.forEach((ph, i) => { if (state.time >= ph.at) stage = i; });
+      if (stage !== state.stage) { state.stage = stage; pushFx(state, { type: 'elixirStage', mult: state.rules.elixirPhases[stage].mult, stage }); }
+    }
 
     buildHash(state);
     // Who was standing when this tick began: they may still land an attack due this tick even if
@@ -3599,9 +4243,235 @@
     updateZones(state, dt);
     updateProjectiles(state, dt);
     updateHill(state, dt);
+    if (state.obj) updateObjectives(state, dt);
     updateBossPhases(state);
     processDeaths(state);
     updateClock(state);
+  }
+
+  // ─── Objective modes (Touchdown, Capture the Point, Payload, Treasure Hunt) ─
+  //
+  // These play without crown towers (rules.noTowers lists both sides). A troop with nothing to
+  // fight heads for the mode's objective instead of a tower, and the match is decided by
+  // p.score (rules.scoreToWin) or, for Payload, by where the cart is. All of it runs inside the
+  // shared engine, so it is server-authoritative online like every other rule.
+  //
+  //   touchdown { depth }                 a troop that reaches the enemy's back `depth` tiles scores 1
+  //   capture   { spots, r, rate }        points per second for each zone only your troops stand in
+  //   payload   { x, r, speed, end }      the cart rolls toward the side with no troops near it
+  //   treasure  { every, life, r, hold, elixir }  mirrored chests appear; stand on one alone to claim it
+
+  const hasObjective = (r) => !!(r.touchdown || r.capture || r.payload || r.treasure);
+
+  function freshObjectives(rules) {
+    const o = {};
+    if (rules.payload) o.payload = { x: rules.payload.x, y: H / 2, dir: 0 };
+    if (rules.capture) o.capture = { held: rules.capture.spots.map(() => null) };
+    if (rules.treasure) o.treasure = { chests: [], next: rules.treasure.every * 0.5, n: 0 };
+    return o;
+  }
+
+  // Where a troop with no enemy to fight walks to (null: nowhere special)
+  function objectivePoint(state, u) {
+    const r = state.rules;
+    const o = state.obj;
+    const mine = u.owner === 'A';
+    if (r.touchdown) return { x: clamp(u.x, 1, W - 1), y: mine ? 0.6 : H - 0.6, radius: 0.1 };
+    if (r.payload && o.payload) {
+      // Stand just behind the cart (on your own side of it), so you push it toward the enemy
+      return { x: o.payload.x + (u.x < o.payload.x ? -0.6 : 0.6), y: o.payload.y + (mine ? 1 : -1), radius: 0.6 };
+    }
+    if (r.capture) {
+      let best = null;
+      r.capture.spots.forEach((s, i) => {
+        const d = dist(u.x, u.y, s.x, s.y) - (o.capture.held[i] === u.owner ? 3 : 0); // prefer zones you don't hold yet
+        if (!best || d < best.d) best = { d, x: s.x, y: s.y };
+      });
+      return best ? { x: best.x, y: best.y, radius: r.capture.r * 0.6 } : null;
+    }
+    if (r.treasure && o.treasure) {
+      let best = null;
+      o.treasure.chests.forEach((c) => {
+        if (c.at > state.time) return;
+        const d = dist(u.x, u.y, c.x, c.y);
+        if (!best || d < best.d) best = { d, x: c.x, y: c.y };
+      });
+      return best ? { x: best.x, y: best.y, radius: r.treasure.r * 0.5 } : null;
+    }
+    return null;
+  }
+
+  function walkToObjective(state, u, dt, rate) {
+    const p = objectivePoint(state, u);
+    if (!p) { if (state.rules.guard) holdGuardLine(state, u, dt, rate); return; }
+    if (dist(u.x, u.y, p.x, p.y) <= p.radius + 0.2) { u.vx = 0; u.vy = 0; return; }
+    // An objective is somewhere to stand, not something to shoot: walk all the way, whatever the range
+    const range = u.range;
+    u.range = 0;
+    moveToward(state, u, { id: `obj-${Math.round(p.x * 2)}-${Math.round(p.y * 2)}`, kind: 'point', x: p.x, y: p.y, radius: 0.2, hp: 1 }, dt, rate);
+    u.range = range;
+  }
+
+  // Live troop strength of each side within r of a point (deploying troops don't count yet)
+  function presence(state, x, y, r) {
+    const out = { A: 0, B: 0 };
+    for (const e of state.units) {
+      if (e.kind !== 'troop' || e.hp <= 0 || e.deployT > 0 || !(e.owner in out)) continue;
+      if (dist(e.x, e.y, x, y) <= r + e.radius * 0.5) out[e.owner] += Math.max(0.35, e.costShare || 0);
+    }
+    return out;
+  }
+
+  function addScore(state, side, n, x, y) {
+    const p = state.players[side];
+    p.score = (p.score || 0) + n;
+    pushFx(state, { type: 'score', owner: side, x, y, n, score: Math.floor(p.score) });
+  }
+
+  function updateObjectives(state, dt) {
+    const r = state.rules;
+    const o = state.obj;
+    if (!o || !state.running) return;
+    if (r.touchdown) {
+      const d = r.touchdown.depth;
+      for (const u of state.units) {
+        if (u.kind !== 'troop' || u.hp <= 0 || u.deployT > 0) continue;
+        const scored = u.owner === 'A' ? u.y <= d : u.y >= H - d;
+        if (!scored) continue;
+        addScore(state, u.owner, 1, u.x, u.y);
+        u.hp = 0;
+        u.dead = true; // leaves the field without death effects (it scored, it wasn't killed)
+      }
+    }
+    if (r.capture) {
+      r.capture.spots.forEach((s, i) => {
+        const pw = presence(state, s.x, s.y, r.capture.r);
+        // Strict: a zone scores only while exactly one side stands in it
+        const holder = pw.A > 0 && pw.B === 0 ? 'A' : pw.B > 0 && pw.A === 0 ? 'B' : null;
+        if (holder !== o.capture.held[i] && holder) pushFx(state, { type: 'capture', owner: holder, x: s.x, y: s.y });
+        o.capture.held[i] = holder;
+        if (holder) state.players[holder].score = (state.players[holder].score || 0) + r.capture.rate * dt;
+      });
+    }
+    if (r.payload) {
+      const c = o.payload;
+      const pw = presence(state, c.x, c.y, r.payload.r);
+      c.dir = pw.A > 0 && pw.B === 0 ? -1 : pw.B > 0 && pw.A === 0 ? 1 : 0; // A pushes it up (toward B)
+      c.y = clamp(c.y + c.dir * r.payload.speed * dt, r.payload.end, H - r.payload.end);
+      if (c.y <= r.payload.end) endMatch(state, 'A', 'payload');
+      else if (c.y >= H - r.payload.end) endMatch(state, 'B', 'payload');
+    }
+    if (r.treasure) {
+      const tr = r.treasure;
+      const t = o.treasure;
+      if (state.time >= t.next) {
+        // A mirrored pair: one on each half, so both sides get the same chance
+        t.n++;
+        const lane = t.n % 2;
+        const x = lane ? W - 4 + (t.n % 3) * 0.5 : 4 - (t.n % 3) * 0.5;
+        const y = RIVER.y1 + 4 + (t.n % 3);
+        const warn = 3;
+        t.chests.push({ id: `c${t.n}a`, x, y, at: state.time + warn, until: state.time + warn + tr.life, hold: 0, side: null });
+        t.chests.push({ id: `c${t.n}b`, x: W - x, y: H - y, at: state.time + warn, until: state.time + warn + tr.life, hold: 0, side: null });
+        pushFx(state, { type: 'chestSoon', x, y, x2: W - x, y2: H - y });
+        t.next = state.time + tr.every;
+      }
+      t.chests = t.chests.filter((c) => {
+        if (state.time > c.until || c.claimed) return false;
+        if (state.time < c.at) return true;
+        const pw = presence(state, c.x, c.y, tr.r);
+        const side = pw.A > 0 && pw.B === 0 ? 'A' : pw.B > 0 && pw.A === 0 ? 'B' : null;
+        if (side !== c.side) { c.side = side; c.hold = 0; }
+        if (!side) return true;
+        c.hold += dt;
+        if (c.hold < tr.hold) return true;
+        c.claimed = true; // claimed once, by one side, then gone
+        addScore(state, side, 1, c.x, c.y);
+        giveElixir(state, side, tr.elixir, c.x, c.y);
+        return false;
+      });
+    }
+  }
+
+  // Who leads when time runs out in a score mode (null: level)
+  function objectiveLeader(state) {
+    const r = state.rules;
+    if (r.payload && state.obj.payload) {
+      const y = state.obj.payload.y;
+      return Math.abs(y - H / 2) < 0.05 ? null : y < H / 2 ? 'A' : 'B';
+    }
+    const a = Math.floor(state.players.A.score || 0);
+    const b = Math.floor(state.players.B.score || 0);
+    return a === b ? null : a > b ? 'A' : 'B';
+  }
+
+  function objectiveSnapshot(state) {
+    const r = state.rules;
+    const o = state.obj;
+    if (!o) return undefined;
+    const out = { score: { A: Math.floor(state.players.A.score || 0), B: Math.floor(state.players.B.score || 0) }, toWin: r.scoreToWin || 0 };
+    if (r.touchdown) out.touchdown = { depth: r.touchdown.depth };
+    if (r.capture) out.capture = r.capture.spots.map((s, i) => ({ x: s.x, y: s.y, r: r.capture.r, held: o.capture.held[i] }));
+    if (r.payload) out.payload = { x: o.payload.x, y: r2(o.payload.y), dir: o.payload.dir, r: r.payload.r, end: r.payload.end };
+    if (r.treasure) out.chests = o.treasure.chests.map((c) => ({ id: c.id, x: c.x, y: c.y, wait: r2(Math.max(0, c.at - state.time)), left: r2(Math.max(0, c.until - state.time)), side: c.side, hold: r2(c.hold / r.treasure.hold) }));
+    return out;
+  }
+
+  // ─── The AI in objective modes ──────────────────────────────────────────
+  // Without towers to defend or attack, the AI plays the objective: it answers enemy troops near
+  // what matters (its end zone, a zone, the cart, a chest), and otherwise sends troops at it.
+  function objectiveFocus(state, side) {
+    const r = state.rules;
+    const o = state.obj;
+    const foe = enemyOf(side);
+    const ownHome = side === 'A' ? H : 0;
+    const points = [];
+    if (r.touchdown) {
+      // Defend: enemy troops on our half; attack: either lane
+      points.push({ x: BRIDGES[0].cx, y: H / 2, attack: true }, { x: BRIDGES[1].cx, y: H / 2, attack: true });
+    }
+    if (r.capture) r.capture.spots.forEach((s, i) => points.push({ x: s.x, y: s.y, attack: o.capture.held[i] !== side }));
+    if (r.payload) points.push({ x: o.payload.x, y: o.payload.y, attack: true });
+    if (r.treasure) o.treasure.chests.forEach((c) => { if (!c.claimed) points.push({ x: c.x, y: c.y, attack: true, soon: c.at - state.time }); });
+    // Threats: enemy troops on our half, closest to our home line first
+    const threats = state.units.filter((u) => u.owner === foe && u.kind === 'troop' && u.hp > 0 && ownHalf(side, u.y))
+      .sort((a, b) => Math.abs(a.y - ownHome) - Math.abs(b.y - ownHome));
+    return { points, threats };
+  }
+
+  function aiObjectivePlay(state, brain, troops) {
+    const side = brain.side;
+    const p = state.players[side];
+    if (!troops.length) return null;
+    const { points, threats } = objectiveFocus(state, side);
+    const near = (x, y, rad) => state.units.filter((u) => u.owner === enemyOf(side) && u.hp > 0 && u.kind === 'troop' && dist(u.x, u.y, x, y) <= rad);
+    const laneOf = (list, lead) => ({
+      lead, count: list.length,
+      air: list.filter((u) => u.air).length, ground: list.filter((u) => !u.air).length,
+      tank: list.some((u) => u.hpMax >= 600), threatValue: list.reduce((s, u) => s + (u.costShare || 0), 0),
+    });
+    const usable = troops.filter((c) => !c.building || c.targets !== 'none');
+    // 1) Defend whatever enemy troop is deepest on our half
+    if (threats.length) {
+      const lead = threats[0];
+      const group = near(lead.x, lead.y, 3);
+      const card = chooseDefender(state, brain, usable, laneOf(group, lead));
+      if (card) {
+        const spot = findDeploySpot(state, side, card, lead.x, toward(side, lead.y, 2));
+        if (spot) return { cardId: card.id, x: spot.x, y: spot.y, why: { kind: 'objective-defend' } };
+      }
+    }
+    // 2) Contest the objective: the nearest point we don't control yet, when we can afford it
+    const want = points.filter((pt) => pt.attack && !(pt.soon > 6));
+    if (!want.length || p.elixir < 6 * (state.rules.maxElixir / 10)) return null;
+    const own = side === 'A' ? H : 0;
+    const target = want.sort((a, b) => Math.abs(a.y - own) - Math.abs(b.y - own))[0];
+    const enemies = near(target.x, target.y, 3.5);
+    const card = enemies.length ? chooseDefender(state, brain, usable, laneOf(enemies, enemies[0])) : usable.filter((c) => !c.building).sort((a, b) => (b.speed || 0) - (a.speed || 0) || a.cost - b.cost)[0];
+    if (!card) return null;
+    const ty = ownHalf(side, target.y) ? target.y : (side === 'A' ? RIVER.y1 + 1 : RIVER.y0 - 1);
+    const spot = findDeploySpot(state, side, card, target.x, ty);
+    return spot ? { cardId: card.id, x: spot.x, y: spot.y, why: { kind: 'objective' } } : null;
   }
 
   // ─── Snapshot (what clients draw) ────────────────────────────────────────
@@ -3643,7 +4513,13 @@
       double: elixirMultiplier(state) > 1,
       elixirMult: r2(elixirMultiplier(state)),
       maxElixir: r.maxElixir,
+      blackout: r.blackout ? 1 : undefined,
+      deployDepth: r.deployDepth || undefined,
+      obj: objectiveSnapshot(state),
+      playsLeft: r.playLimit ? { A: r.playLimit.A ? Math.max(0, r.playLimit.A - state.players.A.cardsPlayed) : null, B: r.playLimit.B ? Math.max(0, r.playLimit.B - state.players.B.cardsPlayed) : null } : undefined,
+      pile: r.gambit ? { A: state.players.A.queue.length, B: state.players.B.queue.length } : undefined,
       ev: eventSnapshot(state),
+      chaos: chaosSnapshot(state),
       units: state.units.map((u) => ({
         id: u.id, owner: u.owner, cardId: u.cardId,
         x: r2(u.x), y: r2(u.y),
@@ -3669,6 +4545,8 @@
         rmp: u.mech && u.mech.ramp ? r2(Math.min(1, u.rampT / u.mech.ramp)) : undefined,
         hl: state.time - u.healedAt < 0.5 ? 1 : undefined,
         evo: u.evo ? 1 : undefined,
+        upg: u.upg || undefined,
+        emp: u.mech && u.mech.empower && u.deployT <= 0 ? u.mech.empower.radius : undefined,
         dv: u.evo && state.time - u.divedAt < 0.5 ? 1 : undefined,
         stk: u.em && u.em.stackHits && u.stack ? u.stack : undefined,
         rly: u.rally ? r2(u.rally) : undefined,
@@ -3770,7 +4648,8 @@
       side,
       // plan: rank threats and score placements; lookahead: how many plays to try out in a copy of the match
       // replies / spellLook / pushLook switch the opponent model and the spell / attack look-ahead (all on by default)
-      profile: Object.assign({ thinkMin: 0.5, thinkMax: 0.6, strategicChance: 0.7, aggression: 0.35, leakAt: 9.3, emoteChance: 0.55, plan: true, lookahead: 2, replies: true, spellLook: true, pushLook: true }, profile || {}),
+      // mistakes: chance per play of a slip (hesitate, or place a little off); 0 for full strength
+      profile: Object.assign({ thinkMin: 0.5, thinkMax: 0.6, strategicChance: 0.7, aggression: 0.35, leakAt: 9.3, emoteChance: 0.55, plan: true, lookahead: 2, replies: true, spellLook: true, pushLook: true, mistakes: 0 }, profile || {}),
       thinkT: 1.5,
       rand: rng,
       // What the AI has *seen* the opponent spend (it can't see their elixir, so it estimates)
@@ -3923,6 +4802,8 @@
   const isSiegeBuilding = (c) => c.building && c.range >= 9;
   const isSpawner = (c) => !!(c.mech && c.mech.spawner);
   const isTaunt = (c) => !!(c.mech && c.mech.taunt);
+  const isTrap = (c) => !!(c.mech && c.mech.trap);
+  const isAura = (c) => !!(c.mech && c.mech.empower);
   const hitsAir = (c) => c.targets === 'any' || c.targets === 'air' || (isSpawner(c) && CARD_MAP[c.mech.spawner.card] && CARD_MAP[c.mech.spawner.card].targets === 'any');
 
   function chooseDefender(state, brain, options, lane) {
@@ -3930,7 +4811,8 @@
     let best = null;
     let bestScore = -Infinity;
     options.forEach((c) => {
-      if (c.spell || isPump(c) || isSiegeBuilding(c)) return;
+      if (c.spell || isPump(c) || isSiegeBuilding(c) || isAura(c)) return;
+      if (isTrap(c) && lane.ground === 0) return; // a mine only catches ground troops
       if (c.targets === 'buildings' && !c.building) return; // win conditions don't defend
       if (c.targets === 'air' && lane.air === 0) return;    // anti-air only troops need flyers
       // Pure air threats need something that can reach them (decoys still pull them away)
@@ -4239,11 +5121,13 @@
 
   // The deterministic part of how well card c answers this lane (null: it can't)
   function defenderScore(state, brain, c, lane) {
-    if (c.spell || isPump(c) || isSiegeBuilding(c)) return null;
+    if (c.spell || isPump(c) || isSiegeBuilding(c) || isAura(c)) return null;
+    if (isTrap(c) && lane.ground === 0) return null;
     if (c.targets === 'buildings' && !c.building) return null;
     if (c.targets === 'air' && lane.air === 0) return null;
     if (lane.ground === 0 && lane.air > 0 && !hitsAir(c) && !isTaunt(c)) return null;
     let s = 0;
+    if (isTrap(c)) s += lane.count >= 3 ? 3 : 1.5; // roots a whole group in its path
     if (lane.air > 0 && hitsAir(c)) s += 3;
     if (lane.air > 0 && c.targets === 'air') s += 3;
     if (lane.air > 0 && !hitsAir(c)) s -= 3;
@@ -4357,6 +5241,7 @@
   // it gets its own random stream so the AI can't peek at the real match's upcoming rolls.
   function cloneForRollout(state) {
     const copy = structuredClone({ ...state, fx: [], hash: null });
+    copy.chaos = null; // no upgrade choices inside a look-ahead (chosen upgrades are already in the card stats)
     if (state.modFx === NO_FX) copy.modFx = NO_FX;
     copy.seed = (state.seed ^ 0x5bd1e995) | 0;
     buildHash(copy);
@@ -4588,6 +5473,15 @@
     const p = state.players[side];
     const options = p.hand.map((id) => p.cards[id]).filter((c) => c && playCost(state, side, c.id) <= p.elixir && (p.cooldowns[c.id] || 0) <= state.time);
     if (options.length === 0) return null;
+    const limit = state.rules.playLimit && state.rules.playLimit[side];
+    if (limit > 0 && p.cardsPlayed >= limit) return null; // out of plays (Inferno Siege)
+    // Unit cap (Triple / Infinite Elixir): only cards that still fit
+    if (state.rules.unitCap > 0) {
+      let n = 0;
+      for (const u of state.units) if (u.owner === side && u.hp > 0 && u.costShare > 0) n++;
+      for (let i = options.length - 1; i >= 0; i--) if (!options[i].spell && n + (options[i].swarmCount || 1) > state.rules.unitCap) options.splice(i, 1);
+      if (!options.length) return null;
+    }
     brain.decisionSteps = brain.stats.steps; // rollouts later in this decision share one work budget
     const troops = options.filter((c) => !c.spell);
 
@@ -4609,6 +5503,13 @@
       if (!spell) { brain.spellQuietUntil = state.time + AI_EVAL.recheck; brain.spellQuietSeq = state.playSeq; }
     }
     if (spell) { if (spell.why) brain.lastPlan = spell; return spell; }
+
+    // Objective modes (no towers): play the objective instead of the tower game
+    if (state.obj) {
+      const plan = aiObjectivePlay(state, brain, troops);
+      if (plan) brain.lastPlan = plan;
+      return plan;
+    }
 
     // 1) Defend the more dangerous lane if it isn't already covered. The planner ranks lanes by how
     // soon and how hard their threats will hit (assessThreats), not just by what has crossed.
@@ -4669,7 +5570,9 @@
     }
 
     // 2) Offense: build a push in the weaker enemy lane; don't sit at full elixir
-    const enemyPrincesses = [princessOf(state, foe, 0), princessOf(state, foe, 1)];
+    // Heist (no Princess Towers): both lanes lead to the enemy King, the vault
+    const foeKing = state.rules.kingOnly ? state.towers.find((t) => t.owner === foe && t.tower === 'king') : null;
+    const enemyPrincesses = foeKing ? [foeKing, foeKing] : [princessOf(state, foe, 0), princessOf(state, foe, 1)];
     if (!enemyPrincesses[0] || !enemyPrincesses[1]) return null; // nothing to attack (survival / boss)
     let attackLane = 0;
     if (hill) attackLane = hill.spots[state.hill.idx].x < MID_X ? 0 : 1;
@@ -4709,6 +5612,18 @@
     if (pump && calm && p.elixir >= 7.5 && !mine.some((u) => u.mech && u.mech.elixir)) {
       const spot = findDeploySpot(state, side, pump, TOWER_LAYOUT.princessX[1 - attackLane] + (attackLane ? 1.5 : -1.5), side === 'A' ? H - 1.6 : 1.6);
       if (spot) return { cardId: pump.id, x: spot.x, y: spot.y };
+    }
+
+    // War Drum: only where our own troops are gathering (it does nothing on its own)
+    const aura = troops.find(isAura);
+    if (aura && p.elixir >= aura.cost + 1 && !mine.some((u) => u.mech && u.mech.empower && u.hp > 0)) {
+      const pushers = state.units.filter((u) => u.owner === side && u.kind === 'troop' && u.hp > 0 && u.costShare > 0 && ownHalf(side, u.y));
+      if (pushers.reduce((sum, u) => sum + u.costShare, 0) >= 4) {
+        const cx = pushers.reduce((sum, u) => sum + u.x, 0) / pushers.length;
+        const cy = pushers.reduce((sum, u) => sum + u.y, 0) / pushers.length;
+        const spot = findDeploySpot(state, side, aura, cx + (cx < MID_X ? 1.2 : -1.2), side === 'A' ? Math.max(cy + 1, RIVER.y1 + 1.2) : Math.min(cy - 1, RIVER.y0 - 1.2));
+        if (spot) return { cardId: aura.id, x: spot.x, y: spot.y };
+      }
     }
 
     // Support an existing tank that is heading over the river
@@ -4758,6 +5673,16 @@
       if (cheap) {
         const spot = findDeploySpot(state, side, cheap, cheap.targets === 'buildings' ? BRIDGES[attackLane].cx : laneX, cheap.targets === 'buildings' ? bridgeY : toward(side, TOWER_LAYOUT.princessY[side], 2.8));
         if (spot) return { cardId: cheap.id, x: spot.x, y: spot.y };
+      }
+      // A mine in front of the weaker tower, or a drum behind the King: never sit on them at full elixir
+      const parked = troops.find((c) => isTrap(c) || isAura(c));
+      if (parked) {
+        const myPrincess = [princessOf(state, side, 0), princessOf(state, side, 1)].filter((t) => t && t.hp > 0).sort((a, b) => a.hp / a.hpMax - b.hp / b.hpMax)[0];
+        const s = isTrap(parked) && myPrincess
+          ? { x: myPrincess.x + (myPrincess.x < MID_X ? 1.5 : -1.5), y: toward(side, myPrincess.y, -3.2) }
+          : { x: MID_X, y: side === 'A' ? H - 1.5 : 1.5 };
+        const spot = findDeploySpot(state, side, parked, s.x, s.y);
+        if (spot) return { cardId: parked.id, x: spot.x, y: spot.y };
       }
       const spawner = troops.find((c) => isSpawner(c));
       if (spawner) {
@@ -4835,6 +5760,9 @@
   function aiUpdate(state, brain, dt) {
     aiEmotes(state, brain, dt);
     if (!state.running) return null;
+    // C.H.A.O.S.: answer an open upgrade choice first; nothing else happens while play is frozen
+    if (state.chaos && aiChooseUpgrade(state, brain, dt)) return null;
+    if (choicePaused(state)) return null;
     trackFoeElixir(state, brain, dt);
     brain.thinkT -= dt;
     if (brain.thinkT > 0) return null;
@@ -4849,6 +5777,18 @@
     st.ms += ms;
     if (ms > st.maxMs) st.maxMs = ms;
     if (!plan) return null;
+    // Lower difficulties make honest mistakes (profile.mistakes = chance per play): hesitate a beat,
+    // or drop the card a little off the planned spot (still a legal one). Never a stat bonus.
+    if (pr.mistakes > 0 && brain.rand() < pr.mistakes) {
+      if (brain.rand() < 0.4) return null;
+      const card = state.players[brain.side].cards[plan.cardId];
+      const a = brain.rand() * Math.PI * 2;
+      const d = 1.2 + brain.rand() * 1.8;
+      const nx = clamp(plan.x + Math.cos(a) * d, 0.6, W - 0.6);
+      const ny = clamp(plan.y + Math.sin(a) * d, 0.6, H - 0.6);
+      const spot = card && card.spell ? { x: nx, y: ny } : findDeploySpot(state, brain.side, card, nx, ny);
+      if (spot) { plan.x = spot.x; plan.y = spot.y; if (plan.why) plan.why.slip = true; }
+    }
     const res = deploy(state, brain.side, plan.cardId, plan.x, plan.y);
     if (plan.why) plan.why.ok = res.ok;
     if (!res.ok) brain.refused = { cardId: plan.cardId, x: plan.x, y: plan.y, until: state.time + 2, reason: res.reason };
@@ -4883,6 +5823,8 @@
     createAi, aiUpdate, aiDecide, buildAiDeck, aiEvoPicks, assessThreats, foeCycle, foeModel, AI_EVAL,
     TOKEN_CARDS, MAX_ARENA,
     EVOLUTIONS, EVO_RULES, evolutionOf, evoReady, evolvedStats,
+    CHAOS_UPGRADES, CHAOS_UPGRADE_MAP, CHAOS_POOL, UPGRADE_RARITIES, UPGRADE_RARITY_ORDER, upgradesFor, validateUpgrades, upgradedStats,
+    chooseUpgrade, choicePaused, chaosDebug, makeOffers, scoreUpgrade,
     DEFAULT_RULES, normalizeRules, MODIFIERS, MOD_STACK, MOD_CAPS, combineModFx, playCost, SIZE_FORMS, cardMatches, applyCardMods,
   };
 });

@@ -175,6 +175,8 @@ function hubHtml() {
       <div class="chaos-tiers">${chaosTiles}</div>
     </section>
 
+    ${chaosHubHtml(rot)}
+
     <section class="ev-section">
       <h4 class="ev-h">📅 Today's Events <small>Change in <span data-ends="${rot.dayEndsAt}">${fmtLeft(rot.dayEndsAt - rot.now)}</span></small></h4>
       <div class="ev-grid">${rot.daily.map((id) => eventCardHtml(Events.EVENT_MAP[id], rot, { ends: rot.dayEndsAt })).join('')}</div>
@@ -230,11 +232,13 @@ function hubHtml() {
 
 // ─── Event details ───────────────────────────────────────────────────────────
 
-function deckRulesText(ev) {
+function deckRulesText(ev, tier) {
   const r = ev.deckRules;
-  if (ev.deck === 'draft') return 'You draft your deck before the battle (8 picks).';
-  if (ev.deck === 'mirror') return 'Both players get the same random deck.';
-  if (ev.deck === 'roulette') return 'Random decks, swapped twice during the match.';
+  const kind = Events.deckKind(ev.id, tier);
+  if (kind === 'draft') return 'You draft your deck before the battle (8 picks).';
+  if (kind === 'mirror') return 'Both players get the same random deck.';
+  if (kind === 'roulette') return 'Random decks, swapped twice during the match.';
+  if (ev.deckSource === 'chaos') return `Your C.H.A.O.S. deck: 8 cards from the pool of ${Sim.CHAOS_POOL.length}, all at level ${Events.CHAOS_LEVEL}.`;
   if (!r) return 'Your active deck, as it is.';
   const parts = [];
   if (r.minSpells) parts.push(`at least ${r.minSpells} spells`);
@@ -250,6 +254,7 @@ function evoRulesText(ev, rules) {
   if (rules.evo.all) return `Every card with an Evolution is evolved-capable this match, unlocked or not (no slot limit)${rules.evo.cycleDelta ? `, with ${-rules.evo.cycleDelta} fewer cycle` : ''}.`;
   if (ev.deck === 'mirror') return 'Both sides get the same Evolution (if the deck has a card with one).';
   if (ev.deck !== 'own') return 'Evolutions are off.';
+  if (rules.upgrades) return 'Evolutions are off: C.H.A.O.S. upgrades take their place.';
   return 'Your equipped Evolutions work as normal.';
 }
 
@@ -261,9 +266,10 @@ function elixirRulesText(rules) {
   return `Start ${rules.startElixir}, max ${rules.maxElixir}. Generation ${phases}${rules.overtime ? `, ${rules.overtimeMult}× in overtime` : ''}.${extra.length ? ` Also: ${extra.join('; ')}.` : ''}`;
 }
 
-function myDeckCheck(ev) {
+function myDeckCheck(ev, tier) {
+  if (Events.deckKind(ev.id, tier) !== 'own') return { ok: true, ids: [], problems: [] };
+  if (ev.deckSource === 'chaos') return chaosDeckCheck();
   const ids = deckFor('A');
-  if (ev.deck !== 'own') return { ok: true, ids, problems: [] };
   const v = Events.validateDeck(ev.id, ids);
   return { ok: v.ok, ids, problems: v.problems };
 }
@@ -274,6 +280,7 @@ function detailsHtml(id) {
   const rot = evRotation();
   const P = evProgress();
   const st = eventState(ev, rot);
+  if (ev.tiers && !ev.tiers.some((t) => t.id === hub.tier) && ev.deckSource === 'chaos') hub.tier = ev.tiers[0].id; // C.H.A.O.S.: Standard
   if (ev.tiers && !ev.tiers.some((t) => t.id === hub.tier)) {
     // Default to the highest unlocked tier
     hub.tier = ev.tiers.filter((t) => Events.tierUnlocked(P, ev.id, t.id) || rot.forceAll).pop().id;
@@ -281,14 +288,16 @@ function detailsHtml(id) {
   const rules = Events.buildMatch(ev.id, { seed: 1, tier: hub.tier, decks: { A: STARTER_DECK, B: STARTER_DECK } }).rules;
   const rec = P.records[ev.id] || { played: 0, wins: 0, losses: 0, best: 0, bestTier: -1, fastest: 0, firstWin: {}, milestones: {} };
   const tierOk = !ev.tiers || Events.tierUnlocked(P, ev.id, hub.tier) || rot.forceAll;
-  const deck = myDeckCheck(ev);
+  const deck = myDeckCheck(ev, hub.tier);
+  const modes = Events.modesFor(ev.id, hub.tier);
+  const chaosEv = ev.deckSource === 'chaos';
   const winsToday = st.winsToday;
   const ends = ev.schedule === 'permanent' ? null : rot.dayEndsAt;
   const r = ev.rewards;
   const firstKey = hub.tier || 'base';
-  const canPlay = st.open && tierOk;
+  const canPlay = st.open && tierOk && (!chaosEv || deck.ok);
   const playBtn = (mode, label) => {
-    if (!ev.modes.includes(mode)) return '';
+    if (!modes.includes(mode)) return '';
     return `<button type="button" class="${mode === 'ai' ? 'btn-primary' : ''}" data-ev-play="${mode}" ${canPlay ? '' : 'disabled'}>${label}</button>`;
   };
   return `
@@ -296,23 +305,25 @@ function detailsHtml(id) {
     <button type="button" class="ev-back" data-ev-back aria-label="Back to the Event Hub">‹ Events</button>
     <div class="ev-head-badge" aria-hidden="true">${ev.icon}</div>
     <div><p class="road-kicker">${escapeHtml(ev.category.toUpperCase())} · ${stars(ev.difficulty)}</p><h3>${escapeHtml(ev.name)}</h3>
-    <p class="ev-sub">${ends ? `⏳ <b data-ends="${ends}">${fmtLeft(ends - rot.now)}</b> left` : '♾️ Always open'} · ${ev.modes.map((m) => MODE_LABEL[m]).join(' · ')}</p></div>
+    <p class="ev-sub">${ends ? `⏳ <b data-ends="${ends}">${fmtLeft(ends - rot.now)}</b> left` : '♾️ Always open'} · ${modes.map((m) => MODE_LABEL[m]).join(' · ')}</p></div>
   </header>
   <div class="ev-scroll">
     <p class="ev-desc">${escapeHtml(ev.desc)}</p>
-    ${ev.tiers ? `<div class="ev-tiers" role="radiogroup" aria-label="${ev.id === 'chaos' ? 'Intensity' : 'Difficulty'}">${ev.tiers.map((t, i) => {
+    ${ev.tiers ? `<div class="ev-tiers" role="radiogroup" aria-label="${ev.id === 'chaos' ? 'Intensity' : chaosEv ? 'Variant' : 'Difficulty'}">${ev.tiers.map((t, i) => {
       const un = Events.tierUnlocked(P, ev.id, t.id) || rot.forceAll;
       return `<button type="button" role="radio" aria-checked="${hub.tier === t.id}" class="ev-tier ${hub.tier === t.id ? 'on' : ''} ${un ? '' : 'locked'}" data-ev-tier="${t.id}">${un ? '' : '🔒 '}${escapeHtml(t.name)}${rec.bestTier >= i ? ' ✓' : ''}<small>${escapeHtml(un ? t.blurb : `Win ${ev.tiers[i - 1].name} first`)}</small></button>`;
     }).join('')}</div>` : ''}
     <div class="ev-cols">
       <section class="ev-box"><h5>📜 Rules</h5><ul>${ev.rules.map((x) => `<li>${escapeHtml(x)}</li>`).join('')}</ul></section>
       <section class="ev-box"><h5>🏆 Win</h5><p>${escapeHtml(ev.win)}</p><h5>💀 Lose</h5><p>${escapeHtml(ev.loss)}</p></section>
-      <section class="ev-box"><h5>🃏 Deck</h5><p>${escapeHtml(deckRulesText(ev))}</p>
-        ${ev.deck === 'own' ? (deck.ok ? '<p class="ev-ok">✓ Your active deck is legal.</p>' : `<p class="ev-bad">✕ ${deck.problems.map(escapeHtml).join(' ')}</p><p class="note">You can still play: you'll get a legal loaner deck for this match. Or fix your deck in the deck editor.</p>`) : ''}
+      ${chaosEv ? chaosScheduleHtml(hub.tier) : ''}
+      <section class="ev-box"><h5>🃏 Deck</h5><p>${escapeHtml(deckRulesText(ev, hub.tier))}</p>
+        ${chaosEv ? (Events.deckKind(ev.id, hub.tier) === 'own' ? (deck.ok ? '<p class="ev-ok">✓ Your C.H.A.O.S. deck is ready.</p>' : '<p class="ev-bad">Build your C.H.A.O.S. deck below to play.</p>') : '') : Events.deckKind(ev.id, hub.tier) === 'own' ? (deck.ok ? '<p class="ev-ok">✓ Your active deck is legal.</p>' : `<p class="ev-bad">✕ ${deck.problems.map(escapeHtml).join(' ')}</p><p class="note">You can still play: you'll get a legal loaner deck for this match. Or fix your deck in the deck editor.</p>`) : ''}
         <h5>✦ Evolutions</h5><p>${escapeHtml(evoRulesText(ev, rules))}</p></section>
       <section class="ev-box"><h5>💧 Elixir & clock</h5><p>${escapeHtml(elixirRulesText(rules))}</p><p>Clock: ${Math.floor(rules.regulation / 60)}:${String(rules.regulation % 60).padStart(2, '0')}${rules.overtime ? ` + ${rules.overtime}s overtime` : ', no overtime'}.</p>
         <h5>🎲 Random vs fixed</h5><p><b>Random:</b> ${escapeHtml(ev.random || 'Nothing.')}<br><b>Fixed:</b> ${escapeHtml(ev.fixed || 'Everything.')}</p></section>
       ${ev.id === 'chaos' ? `<section class="ev-box wide"><h5>🌀 Modifiers that can appear (${escapeHtml((ev.tiers.find((t) => t.id === hub.tier) || ev.tiers[0]).name)})</h5><div class="mod-list">${Object.keys(Sim.MODIFIERS).filter((m) => { const d = Sim.MODIFIERS[m]; const tier = Events.CHAOS_TIERS.find((t) => t.id === hub.tier) || Events.CHAOS_TIERS[0]; return d.fixed ? tier.finale : d.sev <= tier.maxSev; }).map((m) => { const d = Sim.MODIFIERS[m]; return `<div class="mod-row cat-${d.cat}"><span class="mod-ic">${d.icon}</span><b>${escapeHtml(d.name)}</b><em>${escapeHtml(d.desc)}</em><i>${d.dur}s</i></div>`; }).join('')}</div>${hub.tier === 'total' ? `<h5>📜 Chaos Laws (one per match)</h5><div class="mod-list">${Events.CHAOS_LAWS.map((l) => `<div class="mod-row"><span class="mod-ic">📜</span><b>${escapeHtml(l.name)}</b><em>${escapeHtml(l.desc)}</em></div>`).join('')}</div>` : ''}</section>` : ''}
+      ${chaosEv ? chaosBuilderHtml(hub.tier) : ''}
       <section class="ev-box"><h5>🎁 Rewards</h5><ul>
         <li>Win: 💰 ${r.win} gold (${Math.max(0, Events.DAILY_WIN_CAP - winsToday)}/${Events.DAILY_WIN_CAP} rewarded wins left today; scaled by AI difficulty)</li>
         <li>Playing: 💰 ${r.play} gold</li>
@@ -323,7 +334,8 @@ function detailsHtml(id) {
     </div>
   </div>
   <footer class="ev-foot-bar">
-    ${ev.modes.includes('ai') ? `<label class="ev-ai">AI <select data-ev-ai ${(ev.id === 'boss' || ev.id === 'survival') ? 'disabled' : ''}>${AI_LEVELS.map((a) => `<option value="${a.id}" ${hub.ai === a.id ? 'selected' : ''}>${a.name}</option>`).join('')}</select></label>` : ''}
+    ${chaosEv && !deck.ok ? '<span class="ev-bad">🧬 Finish your deck first</span>' : ''}
+    ${modes.includes('ai') ? `<label class="ev-ai">AI <select data-ev-ai ${(ev.id === 'boss' || ev.id === 'survival') ? 'disabled' : ''}>${AI_LEVELS.map((a) => `<option value="${a.id}" ${hub.ai === a.id ? 'selected' : ''}>${a.name}</option>`).join('')}</select></label>` : ''}
     ${!st.open ? `<span class="ev-bad">🔒 ${escapeHtml(st.reason || 'Not available')}</span>` : !tierOk ? '<span class="ev-bad">🔒 Locked tier</span>' : ''}
     ${playBtn('ai', ev.id === 'boss' || ev.id === 'survival' ? '⚔️ Play' : '⚔️ vs AI')}${playBtn('pvp', '👥 Local PvP')}${playBtn('online', '🌐 Online')}
   </footer>`;
@@ -374,16 +386,24 @@ function playEvent(spec) {
   const open = spec.challenge ? { ok: true } : Events.availability(ev.id, rot.now, { forceAll: rot.forceAll });
   if (!open.ok) { toast('🔒', `${ev.name} is closed`, open.reason || ''); renderEventsOverlay(); return; }
   if (ev.tiers && !spec.challenge && !Events.tierUnlocked(evProgress(), ev.id, spec.tier) && !rot.forceAll) { toast('🔒', 'Tier locked', 'Win the previous tier first.'); return; }
-  if (!ev.modes.includes(spec.mode)) { toast('⚠️', `${ev.name} can't be played that way`, ''); return; }
+  if (!Events.modesFor(ev.id, spec.tier).includes(spec.mode)) { toast('⚠️', `${ev.name} can't be played that way`, ''); return; }
+  // C.H.A.O.S. needs a finished deck from its pool before anything starts
+  if (ev.deckSource === 'chaos' && Events.deckKind(ev.id, spec.tier) === 'own' && !chaosDeckCheck().ok) {
+    toast('🧬', 'Build your C.H.A.O.S. deck', 'Pick 8 cards from the pool on the event screen.');
+    openEvents(ev.id);
+    return;
+  }
   Sound.unlock();
   if (spec.mode === 'online') { startOnlineEvent(spec); return; }
-  if (ev.deck === 'draft') { openDraft(spec); return; }
+  if (Events.deckKind(ev.id, spec.tier) === 'draft') { openDraft(spec); return; }
   setupEventMatch(spec, null);
 }
 
 // Same shape as setupMatch() in prototype_v4.js, for an event's config
 function setupEventMatch(spec, picks) {
   const ev = Events.EVENT_MAP[spec.eventId];
+  if (state.tutorial) endTutorial(false);
+  state.training = null;
   try {
     forfeitRunningRanked();
     forfeitRunningEvent();
@@ -402,12 +422,13 @@ function setupEventMatch(spec, picks) {
     const b = state.progress.buildings;
     // Event towers are the same for both sides (no AI health bonus)
     const towers = { towerLevel: b.towerLevel, kingLevel: b.baseLevel };
-    const own = deckFor('A');
-    const level = averageDeckLevel(own);
+    const chaosEv = ev.deckSource === 'chaos';
+    const own = chaosEv ? chaosDeckIds() : deckFor('A');
+    const level = chaosEv ? Events.CHAOS_LEVEL : averageDeckLevel(own);
     let ids = own;
     let loaner = false;
-    if (ev.deck === 'own' && !Events.validateDeck(ev.id, own).ok) { ids = Events.loanerDeck(ev.id, seed); loaner = true; }
-    const myEvos = loaner ? [] : state.admin.active ? ids.filter(evoSlug).slice(0, evoSlotsFor(state.mode)) : equippedEvos(ids, state.mode);
+    if (Events.deckKind(ev.id, spec.tier) === 'own' && !Events.validateDeck(ev.id, own).ok) { ids = Events.loanerDeck(ev.id, seed); loaner = true; }
+    const myEvos = loaner || chaosEv ? [] : state.admin.active ? ids.filter(evoSlug).slice(0, evoSlotsFor(state.mode)) : equippedEvos(ids, state.mode);
     const A = loaner ? ids.map((id) => ({ id, level, abilityUnlocked: false, mastery: 0, evo: false })) : deckEntries(ids, myEvos);
     let B = A;
     if (vsAi) {
@@ -421,6 +442,7 @@ function setupEventMatch(spec, picks) {
     state.match = match;
     state.ai = vsAi && !cfg.scripted ? Sim.createAi('B', presetProfile(spec.ai || 'normal')) : null;
     state.rankedMatch = null;
+    state.matchPays = spec.mode !== 'pvp'; // local PvP events are friendly
     const matchId = `ev-${ev.id}-${now.toString(36)}-${Math.floor(Math.random() * 1e9).toString(36)}`;
     state.eventMatch = { matchId, eventId: ev.id, tier: cfg.tier, mode: spec.mode, ai: spec.ai || 'normal', challenge: spec.challenge || null, scripted: cfg.scripted, law: cfg.law, loaner, startedAt: now, engaged: false };
     state.aiTag = `${ev.icon} ${evName(ev, cfg.tier)}${vsAi && !cfg.scripted ? ` · ${(AI_LEVELS.find((a) => a.id === (spec.ai || 'normal')) || AI_LEVELS[1]).name} AI` : ''}`;
@@ -488,7 +510,8 @@ function eventEngaged() {
 // ─── Draft ───────────────────────────────────────────────────────────────────
 
 function openDraft(spec) {
-  const rounds = Events.draftRounds(Math.floor(Math.random() * 2147483647));
+  const pool = Events.EVENT_MAP[spec.eventId] && Events.EVENT_MAP[spec.eventId].deckSource === 'chaos' ? Sim.CHAOS_POOL : undefined;
+  const rounds = Events.draftRounds(Math.floor(Math.random() * 2147483647), pool);
   draftSession = { spec, rounds, picks: [] };
   closeEvents();
   renderDraft();
@@ -516,7 +539,7 @@ function renderDraft() {
   const round = d.rounds[i];
   evUi.draft.querySelector('.draft-modal').innerHTML = `
     <button type="button" class="road-close" data-draft-cancel aria-label="Cancel draft">✕</button>
-    <p class="road-kicker">DRAFT DUEL · ROUND ${Math.min(i + 1, 8)} OF 8</p>
+    <p class="road-kicker">${isChaosEvent(d.spec.eventId) ? 'C.H.A.O.S. DRAFT' : 'DRAFT DUEL'} · ROUND ${Math.min(i + 1, 8)} OF 8</p>
     ${round ? `<h3>${escapeHtml(round.role)}</h3><p class="note">Keep one. Your opponent gets the other.</p>
     <div class="draft-pair">${round.options.map((id, k) => draftCardHtml(id, k)).join('<span class="draft-vs">or</span>')}</div>` : '<h3>Draft complete!</h3>'}
     <div class="draft-decks">
@@ -612,6 +635,7 @@ function eventResultDetails(snap, side, result) {
     hillCrowns: snap ? snap.players[side].hill || 0 : 0,
     duration: snap ? snap.time : 0,
     cardsPlayed: snap ? snap.players[side].played : 0,
+    epicUpgrades: chaosEpicCount(snap, side),
   };
 }
 
@@ -655,7 +679,7 @@ function onEventVictory(winner) {
     crowns: snap ? snap.players[crownSide].crowns : 0,
     stats: matchStats(snap, crownSide).concat(res.score ? [[ev.scoreLabel || 'Score', res.score.toLocaleString()]] : []),
     achievements: newAch,
-    event: { ev, em, res, lines: granted.lines, pvp },
+    event: { ev, em, res, lines: granted.lines, pvp, snap, me: 'A' },
   }));
 }
 
@@ -689,7 +713,7 @@ function onlineEventFinished(om, winner, last, forfeit) {
     stats: matchStats(last, mySide),
     achievements: newAch,
     friendly: true,
-    event: { ev, em: { ...om, mode: 'online' }, res, lines: granted.lines, pvp: false },
+    event: { ev, em: { ...om, mode: 'online' }, res, lines: granted.lines, pvp: false, snap: last, me: mySide },
   }));
 }
 
@@ -707,6 +731,7 @@ function renderWinEvent(x) {
     <div class="we-head">${ev.icon} <b>${escapeHtml(evName(ev, em.tier))}</b>${res.score ? ` · ${escapeHtml(ev.scoreLabel || 'Score')} <b>${res.score.toLocaleString()}</b>${res.newBest ? ' <span class="we-best">NEW BEST!</span>' : ''}` : ''}</div>
     ${ch ? `<div class="we-ch">${chDef.icon} ${escapeHtml(chDef.name)}: ${ch.done ? '🏆 <b>Challenge complete!</b>' : ch.failed ? '💔 Out of lives: the run is over.' : ch.result === 'win' ? `Round ${ch.round + 1} cleared! Next: round ${ch.state.round + 1}.` : `Lost round ${ch.round + 1}. ${'❤️'.repeat(chDef.lives - ch.state.losses)} left.`}</div>` : ''}
     ${res.unlockedTier ? `<div class="we-unlock">🔓 Unlocked ${escapeHtml(res.unlockedTier.name)}!</div>` : ''}
+    ${chaosResultsHtml(x.snap, x.me || 'A')}
     <div class="we-lines">${lines.length ? lines.map((l) => `<div><span>${l.icon}</span><b>${escapeHtml(l.text)}</b>${l.sub ? `<em>${escapeHtml(l.sub)}</em>` : ''}</div>`).join('') : `<div class="note">${res.void ? 'Your opponent left in the first 30 seconds, so this match does not count.' : pvp ? 'Local PvP is friendly: no rewards, records or unlocks.' : res.applied ? 'No rewards this time.' : 'Already counted.'}</div>`}</div>`;
   if (ui.winClaim) {
     const nextRound = ch && ch.state && ch.state.active;
@@ -737,9 +762,8 @@ function playChallenge(id) {
   const started = Events.startChallenge(P, id, evNow());
   saveProgress();
   const round = started.round;
-  const ev = Events.EVENT_MAP[round.event];
   const spec = { eventId: round.event, tier: round.tier, mode: 'ai', ai: round.ai, challenge: id };
-  if (ev.deck === 'draft') { openDraft(spec); return; }
+  if (Events.deckKind(round.event, round.tier) === 'draft') { openDraft(spec); return; }
   setupEventMatch(spec, null);
 }
 
@@ -780,6 +804,7 @@ function renderEventBar() {
       ? `<span class="eb-boss${b.enraged ? ' enraged' : ''}" aria-label="Iron Colossus ${pct}% health">🤖 <b>Iron Colossus</b><span class="eb-bossbar"><i style="width:${pct}%"></i></span><b>${pct}%</b>${b.guard ? '<em>🛡 Guarded: ½ damage</em>' : ''}${b.enraged ? '<em>😡 Enraged</em>' : ''}</span>`
       : `<span class="eb-boss">🤖 Iron Colossus arrives in ${Math.ceil(b.inSec)}s</span>`);
   }
+  if (v.chaos) parts.push(chaosBarHtml(v, me));
   if (ev.swapIn != null && ev.swapIn <= 15) parts.push(`<span class="eb-chip incoming">🎡 Decks swap in <small>${Math.ceil(ev.swapIn)}s</small></span>`);
   setHtml(bar, parts.join(''));
 }
@@ -820,6 +845,7 @@ function bindEvents() {
     if (!t || t.disabled) return;
     if (t.matches('[data-ev-close]')) { closeEvents(); return; }
     if (t.matches('[data-ev-back]')) { hub.screen = 'hub'; hub.id = null; renderEventsOverlay(); return; }
+    if (chaosOverlayClick(t)) return;
     if (t.matches('[data-ev-reroll]')) { hub.reroll = 1 + Math.floor(Math.random() * 0x7ffffffe); Sound.play('select'); renderEventsOverlay(); return; }
     if (t.matches('[data-ev-reroll-reset]')) { hub.reroll = 0; Sound.play('select'); renderEventsOverlay(); return; }
     if (t.dataset.evOpen) {

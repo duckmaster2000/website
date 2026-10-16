@@ -70,50 +70,61 @@ function freshStats() {
   return { matches: 0, wins: 0, losses: 0, draws: 0, towers: 0, threeCrowns: 0, hardWins: 0, onlineWins: 0, spells: 0, cards: 0, emotes: 0, evoUnlocks: 0, evoDeploys: 0 };
 }
 
+// AI difficulty is how the AI plays, never hidden stats: every preset fights with the same towers
+// as you. Higher levels react faster, plan more of their plays, look further ahead (play out
+// replies, spells and attacks in a copy of the match) and push harder. Custom keeps the manual
+// HP sliders, which are an explicit, visible practice handicap.
 const AI_PRESETS = {
   easy: {
-    baseMult: 0.85,
-    towerMult: 0.85,
-    thinkMin: 0.85,
-    thinkMax: 1.15,
-    strategicChance: 0.42,
-    aggression: 0.15,
-    leakAt: 9.9,
+    baseMult: 1,
+    towerMult: 1,
+    thinkMin: 1.0,
+    thinkMax: 1.5,
+    strategicChance: 0.2,
+    aggression: 0.08,
+    leakAt: 10,
     lookahead: 0,
-    description: 'Easy: slow reactions, rarely attacks, weaker towers.'
+    replies: false,
+    spellLook: false,
+    pushLook: false,
+    mistakes: 0.6,
+    description: 'Easy: slow reactions, frequent misplays, rarely attacks. Same towers as you.'
   },
   normal: {
     baseMult: 1,
     towerMult: 1,
-    thinkMin: 0.48,
-    thinkMax: 0.58,
-    strategicChance: 0.7,
-    aggression: 0.35,
-    leakAt: 9.3,
-    lookahead: 2,
-    description: 'Normal: defends threats, builds tank-and-support pushes.'
+    thinkMin: 0.55,
+    thinkMax: 0.7,
+    strategicChance: 0.6,
+    aggression: 0.3,
+    leakAt: 9.4,
+    lookahead: 1,
+    replies: false,
+    mistakes: 0.3,
+    description: 'Normal: defends threats and builds tank-and-support pushes, with the odd misplay. Same towers as you.'
   },
   hard: {
-    baseMult: 1.2,
-    towerMult: 1.18,
-    thinkMin: 0.33,
+    baseMult: 1,
+    towerMult: 1,
+    thinkMin: 0.35,
     thinkMax: 0.46,
-    strategicChance: 0.84,
-    aggression: 0.5,
+    strategicChance: 0.85,
+    aggression: 0.45,
     leakAt: 9.0,
-    lookahead: 3,
-    description: 'Hard: quick reactions, smarter counters, tougher towers.'
+    lookahead: 2,
+    mistakes: 0.1,
+    description: 'Hard: quick reactions, plays out counters and spells before committing. Same towers as you.'
   },
   insane: {
-    baseMult: 1.45,
-    towerMult: 1.4,
-    thinkMin: 0.22,
-    thinkMax: 0.33,
-    strategicChance: 0.92,
-    aggression: 0.65,
+    baseMult: 1,
+    towerMult: 1,
+    thinkMin: 0.2,
+    thinkMax: 0.3,
+    strategicChance: 0.97,
+    aggression: 0.6,
     leakAt: 8.6,
     lookahead: 3,
-    description: 'Insane: near-instant counters, constant pressure, high tower HP.'
+    description: 'Insane: near-instant, deeply planned plays and constant pressure. Same towers as you.'
   },
   custom: {
     baseMult: 1,
@@ -124,7 +135,8 @@ const AI_PRESETS = {
     aggression: 0.35,
     leakAt: 9.3,
     lookahead: 2,
-    description: 'Custom: uses your manual HP multipliers.'
+    mistakes: 0.3,
+    description: 'Custom: Normal-strength play with your own AI tower and King HP multipliers (a visible handicap; practice only).'
   }
 };
 
@@ -162,8 +174,12 @@ const state = {
     achievements: {},
     emoteMuted: false,
     seenSpellNews: false,
+    tutorialDone: false,     // finished the tutorial (its gold is paid once)
+    roadUnlocks: false,      // true for profiles started after 2026-10-15: Trophy Road cards unlock on the road, not up front
+    tutorialSkipped: false,  // declined the first-visit offer (it isn't offered again)
     road: Road.freshRoad(),   // Trophy Road: trophies, claimed rewards, ranked-match guard
     decks: [[...STARTER_DECK], [...STARTER_DECK], [...STARTER_DECK]],
+    deckNames: ['', '', ''],  // your names for the three decks ('' = "Deck N")
     activeDeck: 0,
     rankedAi: true,           // vs AI counts for trophies (arena AI deck, preset difficulty)
     roadEmotes: {},           // emotes unlocked on the Trophy Road
@@ -217,6 +233,15 @@ function cardProgress(id) {
   return state.progress.collection[id];
 }
 
+// New players: Trophy Road cards come from the road, and the "new feature" news for returning
+// players is skipped (the tutorial offer greets them instead)
+function startFreshProfile() {
+  state.progress.roadUnlocks = true;
+  state.progress.seenSpellNews = true;
+  state.progress.road.seenNews = 1;
+  state.progress.events.seen.news = 1;
+}
+
 function unlockInitial() {
   CARD_LIBRARY.forEach((c) => cardProgress(c.id));
   // Starter copies are a one-time gift when the card is first unlocked, not on every page load
@@ -229,9 +254,10 @@ function unlockInitial() {
   // Everyone gets the basic defensive building so that role is available from the start
   const turret = cardProgress('boltturret');
   if (!turret.unlocked) { turret.unlocked = true; turret.copies += 1; }
-  // ...the new cards (one version each), so they show up and can go in a deck right away
+  // ...the Trophy Road cards for profiles from before they were earned on the road (new profiles
+  // unlock them from road milestones and chests instead)
   CARD_LIBRARY.forEach((c) => {
-    if (!c.solo || c.token) return;
+    if (state.progress.roadUnlocks || !c.solo || c.token) return;
     const cp = cardProgress(c.id);
     if (!cp.unlocked) { cp.unlocked = true; cp.copies += 1; }
   });
@@ -396,10 +422,20 @@ function applySavedProgress(saved) {
     state.progress.aiDifficulty = Object.prototype.hasOwnProperty.call(AI_PRESETS, saved.aiDifficulty)
       ? saved.aiDifficulty
       : 'normal';
+    // Presets used to hide tower HP bonuses in aiHealth; only Custom keeps manual multipliers now
+    if (state.progress.aiDifficulty !== 'custom') state.progress.aiHealth = { baseMult: 1, towerMult: 1 };
     state.progress.stats = Object.assign(freshStats(), saved.stats && typeof saved.stats === 'object' ? saved.stats : {});
     state.progress.achievements = saved.achievements && typeof saved.achievements === 'object' ? saved.achievements : {};
     state.progress.emoteMuted = !!saved.emoteMuted;
     state.progress.seenSpellNews = !!saved.seenSpellNews;
+    state.progress.tutorialDone = !!saved.tutorialDone;
+    state.progress.roadUnlocks = !!saved.roadUnlocks;
+    // Training drills: best stars per drill (0-3)
+    state.progress.training = {};
+    if (saved.training && typeof saved.training === 'object') {
+      Object.keys(saved.training).forEach((id) => { if (DRILL_MAP[id]) state.progress.training[id] = Math.max(0, Math.min(3, Math.floor(Number(saved.training[id]) || 0))); });
+    }
+    state.progress.tutorialSkipped = !!saved.tutorialSkipped;
     state.progress.road = Road.normalize(saved.road);
     const cleanDeck = (d) => (Array.isArray(d) ? d.filter((id) => typeof id === 'string' && CARD_MAP[id] && !CARD_MAP[id].token).slice(0, MAX_DECK) : []);
     const decks = Array.isArray(saved.decks) ? saved.decks.slice(0, 3).map(cleanDeck) : [];
@@ -408,6 +444,8 @@ function applySavedProgress(saved) {
     // Older saves only had one deck: it becomes deck 1
     if (!Array.isArray(saved.decks)) decks[0] = cleanDeck(state.progress.deck);
     state.progress.decks = decks;
+    const names = Array.isArray(saved.deckNames) ? saved.deckNames : [];
+    state.progress.deckNames = [0, 1, 2].map((i) => (typeof names[i] === 'string' ? names[i].replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 20) : ''));
     state.progress.deck = decks[state.progress.activeDeck].length ? decks[state.progress.activeDeck] : state.progress.deck;
     state.progress.rankedAi = saved.rankedAi !== false;
     state.progress.evo = Evo.normalize(saved.evo, EVO_SLUGS, evoSlug);
@@ -420,9 +458,15 @@ function applySavedProgress(saved) {
 }
 
 function loadProgress() {
+  let fresh = false;
   try {
-    applySavedProgress(JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}'));
+    const saved = JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}');
+    // A brand-new profile (nothing collected yet) earns Trophy Road cards on the road. Saves that
+    // already have them keep them: nothing is ever taken away.
+    fresh = !saved.collection || !Object.keys(saved.collection).length;
+    applySavedProgress(saved);
   } catch (_) {}
+  if (fresh) startFreshProfile();
   unlockInitial();
   // A ranked match that never finished (page closed mid-battle) counts as a loss, once
   const forfeit = Road.resolvePending(state.progress.road);
@@ -500,19 +544,21 @@ function aiEvoSlots() {
   return Math.min(evoSlotsFor('ai'), a >= 5 ? 2 : a >= 2 ? 1 : 0);
 }
 
-function aiProfile() {
-  const p = getAiProfile();
-  return { thinkMin: p.thinkMin, thinkMax: p.thinkMax, strategicChance: p.strategicChance, aggression: p.aggression, leakAt: p.leakAt, lookahead: p.lookahead };
+// The engine's AI profile for a preset (only the behaviour knobs; presets carry no stat bonuses)
+function profileOf(p) {
+  const out = { thinkMin: p.thinkMin, thinkMax: p.thinkMax, strategicChance: p.strategicChance, aggression: p.aggression, leakAt: p.leakAt, lookahead: p.lookahead, mistakes: p.mistakes || 0 };
+  ['replies', 'spellLook', 'pushLook'].forEach((k) => { if (p[k] === false) out[k] = false; });
+  return out;
 }
 
-function presetProfile(key) {
-  const p = AI_PRESETS[key] || AI_PRESETS.normal;
-  return { thinkMin: p.thinkMin, thinkMax: p.thinkMax, strategicChance: p.strategicChance, aggression: p.aggression, leakAt: p.leakAt, lookahead: p.lookahead };
-}
+function aiProfile() { return profileOf(getAiProfile()); }
+
+function presetProfile(key) { return profileOf(AI_PRESETS[key] || AI_PRESETS.normal); }
 
 function playerName(side) {
   if (onlineActive || state.viewSource === 'online') return side === mySide ? 'You' : 'Opponent';
   if (side === 'B' && state.eventMatch && state.eventMatch.scripted) return state.eventMatch.eventId === 'boss' ? 'Iron Colossus' : 'The Horde';
+  if (side === 'B' && (state.tutorial || state.training)) return 'Training Opponent';
   if (side === 'B') return state.mode === 'ai' ? 'Enemy AI' : 'Commander B';
   return 'Commander A';
 }
@@ -545,6 +591,8 @@ function forfeitRunningRanked() {
 }
 
 function setupMatch() {
+  if (state.tutorial) endTutorial(false);
+  state.training = null;
   forfeitRunningRanked();
   forfeitRunningEvent(); // a normal battle always starts on normal rules (state.eventMatch = null)
   state.mode = ui.mode?.value || 'pvp';
@@ -582,7 +630,11 @@ function setupMatch() {
     towers: { A: mine, B: theirs },
   });
   state.ai = vsAi ? Sim.createAi('B', ranked ? presetProfile(difficulty) : aiProfile()) : null;
-  state.aiTag = !vsAi ? '' : ranked ? `🏆 Ranked · ${Road.AI_RULES[difficulty].label} AI` : 'Practice · no trophies';
+  // Who pays out: local PvP is friendly (you play both sides), and so is practice against an AI you
+  // weakened with the Custom HP sliders. Ranked, and practice at full AI strength, pay as usual.
+  const handicapped = !ranked && (state.progress.aiHealth.baseMult < 1 || state.progress.aiHealth.towerMult < 1);
+  state.matchPays = vsAi && !handicapped;
+  state.aiTag = !vsAi ? '' : ranked ? `🏆 Ranked · ${Road.AI_RULES[difficulty].label} AI` : handicapped ? 'Practice · weakened AI · no rewards' : 'Practice · no trophies';
   state.viewSource = 'local';
   state.running = true;
   state.winner = null;
@@ -602,6 +654,7 @@ function setupMatch() {
 function beginMatchPresentation() {
   matchToken++;
   closeEmotePanel();
+  closeTrainingHub(); // a drill's result or list never stays over a new match
   lastTickSecond = null;
   if (ui.winOverlay) ui.winOverlay.hidden = true;
   if (!arena) return;
@@ -614,6 +667,7 @@ function beginMatchPresentation() {
 
 // Gold trickles in from damage you deal in local modes (same idea as before the arena rework)
 function rewardDamage() {
+  if (!state.matchPays) return;
   const dealt = state.match.players.A.damageDealt;
   state.goldPool += (dealt - state.damageSeen) * 0.014;
   state.damageSeen = dealt;
@@ -628,6 +682,11 @@ function rewardDamage() {
 function stepLocalMatch(dt) {
   const m = state.match;
   if (!m || !state.running) return;
+  if (state.tutorial) {
+    updateTutorial(dt);
+    if (tutorialHolds()) return; // an explanation is on screen: the battle waits
+  }
+  if (state.training) { updateTraining(); if (!state.running) return; } // drill waves and goal
   state.acc = Math.min(state.acc + dt, 0.25);
   while (state.acc >= STEP) {
     state.acc -= STEP;
@@ -814,6 +873,8 @@ function endReasonText(reason) {
 
 function onVictory(winner) {
   if (state.winner) return;
+  if (state.tutorial) { tutorialFinished(winner); return; } // the lesson ends without rewards or records
+  if (state.training) { trainingFinished(); return; }       // drills are judged by their own goal
   if (state.eventMatch) { onEventVictory(winner); return; } // event rewards replace the normal ones
   state.winner = winner;
   state.running = false;
@@ -821,7 +882,10 @@ function onVictory(winner) {
   let cardAward = null;
   let goldBonus = 0;
   const reason = endReasonText(state.match?.endReason);
-  if (winner === 'A') {
+  const paid = !!state.matchPays;
+  if (winner === 'A' && !paid) {
+    writeLog(`${playerName('A')} wins! ${reason}. Friendly match: no rewards.`);
+  } else if (winner === 'A') {
     goldBonus = 140;
     state.progress.gold += goldBonus;
     awardChest();
@@ -842,7 +906,7 @@ function onVictory(winner) {
   const trophy = rm ? settleRanked({ id: rm.id, result, mode: 'ai', difficulty: rm.difficulty }) : null;
   const snap = state.snapCur;
   const me = snap && snap.players.A;
-  const newAch = recordMatch({
+  const newAch = !paid ? [] : recordMatch({
     result,
     crowns: me ? me.crowns : 0,
     kingKill: winner === 'A' && state.match?.endReason === 'king',
@@ -865,6 +929,7 @@ function onVictory(winner) {
     stats: matchStats(snap, crownSide),
     achievements: newAch,
     trophy,
+    friendly: !paid,
   }));
 }
 
@@ -1207,10 +1272,11 @@ function cardButton(owner, id) {
   const tags = `${card.spell ? ' ✦ Spell' : ''}${card.winCondition ? ' 👑' : ''}${card.air ? ' ✈' : ''}${card.swarmCount > 1 ? ` ×${card.swarmCount}` : ''}`;
   const entering = (handEnter[owner] && handEnter[owner][id] || 0) > performance.now();
   const evoB = handEvoBadge(p, id);
+  const upB = chaosHandBadge(owner, id); // C.H.A.O.S. upgrade on this card
   const lvl = p.lvl && p.lvl[id] != null ? p.lvl[id] : cp.level;
   const costTag = cost !== card.cost ? ` card-cost-${cost < card.cost ? 'down' : 'up'}` : '';
   const formHtml = form ? `<span class="card-form form-${form}" title="${form === 'mega' ? 'Mega: +1 cost, 160% HP, 130% damage, slower' : 'Tiny: −1 cost, 60% HP, 75% damage, faster'}">${form === 'mega' ? 'MEGA' : 'TINY'}</span>` : '';
-  return `<button class="card rarity-${card.rarity}${card.winCondition ? ' wc' : ''}${card.swarmCount > 1 ? ' swarm' : ''}${card.spell ? ' spell' : ''}${entering ? ' card-enter' : ''}${form ? ` sized-${form}` : ''}${evoB.cls}" data-owner="${owner}" data-type="${id}" data-disabled="${disabled ? '1' : '0'}" data-short="${short ? '1' : '0'}" data-selected="${selected ? '1' : '0'}" title="${card.name}: ${card.role}${cost !== card.cost ? ` (costs ${cost} in this event)` : ''}"><span class="card-rarity">${RARITY_STYLE[card.rarity].label}${tags}</span><span class="card-icon ${artCls(id)}">${card.icon}</span><span class="card-cost ${costClass(cost)}${costTag}">${cost}</span>${formHtml}<span class="card-name">${card.name}</span><span class="card-meta">Lv ${lvl} • ${card.role}</span><span class="card-cd-bar"><i style="width:${cdPct}%"></i></span>${short ? `<span class="card-short" style="transform:scaleX(${fill / 100})"></span>` : ''}${evoB.html}</button>`;
+  return `<button class="card rarity-${card.rarity}${card.winCondition ? ' wc' : ''}${card.swarmCount > 1 ? ' swarm' : ''}${card.spell ? ' spell' : ''}${entering ? ' card-enter' : ''}${form ? ` sized-${form}` : ''}${evoB.cls}${upB.cls}" data-owner="${owner}" data-type="${id}" data-disabled="${disabled ? '1' : '0'}" data-short="${short ? '1' : '0'}" data-selected="${selected ? '1' : '0'}" title="${card.name}: ${card.role}${cost !== card.cost ? ` (costs ${cost} in this event)` : ''}"><span class="card-rarity">${RARITY_STYLE[card.rarity].label}${tags}</span><span class="card-icon ${artCls(id)}">${card.icon}</span><span class="card-cost ${costClass(cost)}${costTag}">${cost}</span>${formHtml}<span class="card-name">${card.name}</span><span class="card-meta">Lv ${lvl} • ${card.role}</span><span class="card-cd-bar"><i style="width:${cdPct}%"></i></span>${short ? `<span class="card-short" style="transform:scaleX(${fill / 100})"></span>` : ''}${evoB.html}${upB.html}</button>`;
 }
 
 function deckAvgCost(ids) {
@@ -1255,7 +1321,11 @@ function renderDecks() {
     return;
   }
   setHtml(ui.deckA, renderHandDeck('A'));
-  if (state.eventMatch && state.eventMatch.scripted) {
+  if (state.training) {
+    setHtml(ui.deckB, trainingDeckNote());
+  } else if (state.tutorial) {
+    setHtml(ui.deckB, '<div class="note">📘 Tutorial opponent: it plays no cards; it only sends the attack in the "Defend!" step.</div>');
+  } else if (state.eventMatch && state.eventMatch.scripted) {
     setHtml(ui.deckB, `<div class="note">${state.eventMatch.eventId === 'boss' ? '🤖 The Iron Colossus fights on its own: no cards, no elixir.' : '🌊 Scripted waves: the horde plays no cards.'}</div>`);
   } else if (state.mode === 'ai') {
     setHtml(ui.deckB, '<div class="note">Enemy AI controls this deck in real time.</div>');
@@ -1325,7 +1395,15 @@ function setHtml(el, html) {
 const Sound = (() => {
   let ctx = null;
   let enabled = true;
+  let volume = 0.8; // master volume, 0..1 (Settings)
+  let master = null;
   try { enabled = localStorage.getItem('prototype_sound') !== 'off'; } catch (_) {}
+  try { const v = Number(localStorage.getItem('prototype_volume')); if (Number.isFinite(v) && localStorage.getItem('prototype_volume') !== null) volume = Math.max(0, Math.min(1, v)); } catch (_) {}
+  // Every sound goes through one gain node, so the volume slider covers them all
+  function out() {
+    if (!master) { master = ctx.createGain(); master.gain.value = volume; master.connect(ctx.destination); }
+    return master;
+  }
   const lastPlayed = {};
 
   function unlock() {
@@ -1346,7 +1424,7 @@ const Sound = (() => {
     if (o.slide) osc.frequency.exponentialRampToValueAtTime(Math.max(30, freq * o.slide), t0 + dur);
     gain.gain.setValueAtTime(o.vol || 0.05, t0);
     gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    osc.connect(gain).connect(ctx.destination);
+    osc.connect(gain).connect(out());
     osc.start(t0);
     osc.stop(t0 + dur + 0.02);
   }
@@ -1360,7 +1438,7 @@ const Sound = (() => {
     const gain = ctx.createGain();
     gain.gain.value = vol;
     src.buffer = buf;
-    src.connect(gain).connect(ctx.destination);
+    src.connect(gain).connect(out());
     src.start();
   }
 
@@ -1450,7 +1528,14 @@ const Sound = (() => {
     if (on) unlock();
   }
 
-  return { unlock, play, setEnabled, get enabled() { return enabled; } };
+  function setVolume(v) {
+    volume = Math.max(0, Math.min(1, Number(v) || 0));
+    try { localStorage.setItem('prototype_volume', String(volume)); } catch (_) {}
+    if (master) master.gain.value = volume;
+  }
+  // Music (prototype_music.js) shares the context and the master volume
+  function bus() { return ctx ? out() : null; }
+  return { unlock, play, setEnabled, setVolume, bus, get ctx() { return ctx; }, get enabled() { return enabled; }, get volume() { return volume; } };
 })();
 
 // Battle effects from the simulation: draw them and play matching sounds
@@ -1467,6 +1552,7 @@ function handleFx(list) {
       case 'drop': case 'elixir': case 'shieldBreak': case 'popup': case 'dash': case 'taunt': Sound.play(f.type); break;
       case 'evolve': case 'shockwave': case 'pulse': case 'pierce': case 'dive': case 'rally': case 'bastion': Sound.play(f.type); break;
       case 'crown': Sound.play('crown'); break;
+      case 'upgrade': chaosFx(f); break;
       case 'modOn': Sound.play('modOn'); break;
       case 'bossSlam': Sound.play('warn'); break;
       case 'hillMove': Sound.play('warn'); break;
@@ -1597,6 +1683,7 @@ function renderArena() {
     zoneKey: zones && zones.key,
     ghost: placementGhost(),
     debug: aggroDebugList(),
+    viewer: state.viewSource === 'online' ? mySide : 'A', // whose light Blackout shows
   });
 }
 
@@ -1671,6 +1758,7 @@ function bindBoardInput() {
   window.addEventListener('keydown', (e) => {
     if (e.target && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
     if (e.key === 'Escape') { state.selectedCard = null; closeEmotePanel(); renderDecks(); return; }
+    if (chaosKey(e)) return; // C.H.A.O.S.: 1 / 2 pick an upgrade while a choice is open
     if (e.key === 'e' || e.key === 'E') { openEmotePanel('bottom'); return; }
     const n = Number(e.key);
     if (n >= 1 && n <= 4 && state.view) {
@@ -2292,6 +2380,7 @@ function ensureSocket() {
   });
 
   // The server is the referee online; if it refuses a deploy, say why
+  socket.on('upgrade_rejected', ({ reason } = {}) => { writeLog(`Upgrade not taken: ${reason || 'the choice had closed'}`); });
   socket.on('deploy_rejected', ({ reason } = {}) => {
     rejectNote = { text: reason || "Can't deploy", until: performance.now() + 1100 };
     writeLog(reason || "Can't deploy");
@@ -2304,7 +2393,7 @@ function joinRoomByCode(code) {
   if (!c) { if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Enter room code first.'; return; }
   ensureSocket();
   if (!socket) return;
-  socket.emit('join_room', { code: c, deck: onlineDeckPayload() });
+  socket.emit('join_room', { code: c, deck: onlineDeckPayload(), chaosDeck: chaosDeckPayload() });
   if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Joining...';
 }
 
@@ -2312,7 +2401,7 @@ function bindLobby() {
   ui.createRoom?.addEventListener('click', () => {
     ensureSocket();
     if (!socket) return;
-    socket.emit('create_room', { deck: onlineDeckPayload(), ...onlineEventPayload() });
+    socket.emit('create_room', { deck: onlineDeckPayload(), chaosDeck: chaosDeckPayload(), ...onlineEventPayload() });
     if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Creating room...';
   });
 
@@ -2508,7 +2597,7 @@ function joinQueue() {
   if (!socket.connected && ui.lobbyStatus) ui.lobbyStatus.textContent = 'Connecting to game server (can take up to a minute if it was asleep)...';
   const doJoin = () => {
     if (!inQueue) return; // cancelled while connecting
-    socket.emit('join_queue', { deck: onlineDeckPayload(), ...onlineEventPayload() });
+    socket.emit('join_queue', { deck: onlineDeckPayload(), chaosDeck: chaosDeckPayload(), ...onlineEventPayload() });
     if (ui.lobbyStatus) ui.lobbyStatus.textContent = 'Searching for opponent...';
   };
   if (socket.connected) {
@@ -2695,6 +2784,7 @@ function bindCore() {
       achievements: {},
       emoteMuted: false,
       seenSpellNews: true,
+      roadUnlocks: true,
       road: Road.freshRoad(),
       decks: [[...STARTER_DECK], [...STARTER_DECK], [...STARTER_DECK]],
       activeDeck: 0,
@@ -2754,7 +2844,48 @@ function unlockPrototype() {
   }
   window.addEventListener('storage', syncProgressFromOtherTab);
   setupMatch();
+  document.getElementById('ptTutorialBtn')?.addEventListener('click', () => { Sound.unlock(); startTutorial(); });
+  document.getElementById('ptTrainingBtn')?.addEventListener('click', () => { Sound.unlock(); openTrainingHub(); });
+  bindSettings();
+  maybeOfferTutorial();
   requestAnimationFrame(gameLoop);
+}
+
+// Settings: volume and motion (stored per browser, outside game progress)
+function applyMotionSetting(v) {
+  const sys = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const reduce = v === 'reduce' || (v !== 'full' && sys);
+  document.body.classList.toggle('reduce-motion', reduce);
+  if (arena && arena.setReduceMotion) arena.setReduceMotion(reduce);
+}
+
+function bindSettings() {
+  const vol = document.getElementById('ptVolume');
+  const volOut = document.getElementById('ptVolumeOut');
+  const motion = document.getElementById('ptMotion');
+  if (vol) {
+    vol.value = String(Math.round(Sound.volume * 100));
+    if (volOut) volOut.textContent = `${vol.value}%`;
+    vol.addEventListener('input', () => { Sound.setVolume(Number(vol.value) / 100); if (volOut) volOut.textContent = `${vol.value}%`; });
+    vol.addEventListener('change', () => { Sound.unlock(); Sound.play('select'); });
+  }
+  const music = document.getElementById('ptMusic');
+  const musicOut = document.getElementById('ptMusicOut');
+  if (music) {
+    music.value = String(Math.round(Music.level * 100));
+    if (musicOut) musicOut.textContent = Number(music.value) ? `${music.value}%` : 'Off';
+    music.addEventListener('input', () => { Sound.unlock(); Music.setLevel(Number(music.value) / 100); if (musicOut) musicOut.textContent = Number(music.value) ? `${music.value}%` : 'Off'; });
+  }
+  let m = 'auto';
+  try { m = localStorage.getItem('prototype_motion') || 'auto'; } catch (_) {}
+  if (motion) {
+    motion.value = m;
+    motion.addEventListener('change', () => {
+      try { localStorage.setItem('prototype_motion', motion.value); } catch (_) {}
+      applyMotionSetting(motion.value);
+    });
+  }
+  applyMotionSetting(m);
 }
 
 function gameLoop(ts) {
@@ -2785,6 +2916,8 @@ function gameFrame(ts) {
   renderStatus();
   renderDecks();
   renderEventBar();
+  renderChaosChoice();
+  Music.update(state.view, state.running);
   syncEmoteButtons();
   renderArena();
 }

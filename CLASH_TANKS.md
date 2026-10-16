@@ -477,6 +477,76 @@ Swarm members land a moment apart, which made the drop-in animation compute a ne
 - **New cards:** the 28 new cards were all locked behind the Trophy Road (300–5000 🏆), so on a normal save they only appeared greyed out at the bottom of the collection. They're now unlocked for everyone on load (old saves too). Their Trophy Road milestones now give +4 copies instead.
 - **Emotes:** all 14 original emotes are free, and 22 new animated emoji emotes were added (36 in total). The ids are in `Sim.EMOTE_IDS` (the server checks against them) and the art is in `prototype_emotes.js` (an `emoji` field draws an animated badge). The emote wheel scrolls.
 
+### 16. C.H.A.O.S. mode: card upgrades chosen mid-battle (2026-10-14)
+
+A new permanent event, **C.H.A.O.S.** (id `upgrades`), next to the older Chaos Mode (which is unchanged). Details and status: `CHAOS_MODE_PROGRESS.md`.
+
+- **Deck:** a dedicated 8-card C.H.A.O.S. deck, built on the event screen from a pool of 27 cards (18 troops, 3 buildings, 6 spells), saved with event progress (`P.chaosDeck`). Tap a pool card to see its upgrades. Every card plays at level 11 (`rules.cardLevel`); the collection is untouched. Evolutions are off in this mode.
+- **Upgrades:** each pool card has a Common, a Rare and an Epic upgrade (81 in all, `CHAOS_UPGRADES` in clash-sim.js). They are stat changes and engine mechanics: shield, death splash, extra units, the Evolution hooks (quake, chain lightning, cluster, drill stacks, rally, dive, pulse, ally shields, slowing craters, Bone Giant), spell aftershocks, lingering fire, homing rockets, a second boulder.
+- **The choice:** at each checkpoint the battle pauses and each side gets two offers of that checkpoint's rarity, usually for two different kinds of card. Pick one (tap, or the 1 / 2 keys) within 10 s, or the left one is taken. A card can have one upgrade. The pick is baked into that player's card stats for the match, so every later copy has it; units already on the field don't change.
+- **Variants:** Standard (all modes), Draft (vs AI; the deck is drafted from the pool), Blackout (vs AI and online; dark arena with light around your own towers, troops and spells), Power Surge (a choice every 30 s, Rare then Epic, 1.5× elixir). All four use the same engine; a variant only lists its schedule and extra rules (`CHAOS_VARIANTS` in events.js).
+- **Online:** the server runs the choice like everything else; picks arrive as `upgrade_pick`, and each player only receives their own pending offers. The C.H.A.O.S. deck is sent as `chaosDeck` with Find Match / Create Room / Join Room.
+- **AI:** picks after a short pause, by `scoreUpgrade` (rarity, card role and cost, whether it's in hand, the score, pressure on its towers, time left). Look-ahead copies of the match have C.H.A.O.S. switched off.
+- **UI:** hub tiles per variant, the deck builder, the choice screen over the arena (rarity colours, countdown, "waiting for opponent"), 🧬 badges on upgraded cards in hand and on upgraded units, an event-bar chip (upgrades so far, next checkpoint), and both sides' picks (and what they passed on) on the results screen. Admin mode: a table check on the event screen and `chaosDebug()` in the console.
+- **Engine fixes found on the way:** event tiers now honour their `unlock` field (C.H.A.O.S. variants are all open; Chaos Mode and Boss tiers still unlock in order).
+
+#### Adding a C.H.A.O.S. upgrade
+
+1. Add an entry to `CHAOS_UPGRADES` in clash-sim.js: `chaosUp(card, rarity, id, name, desc, { stats, mech, em, spell, zone, special, role })`. Prefer an existing mechanic; `validateUpgrades()` rejects combinations that can't work (a shockwave on a ranged card, chain without the chain keyword, zone changes on a non-zone spell, unknown spawn cards).
+2. A new card joins the pool automatically once it has upgrades; it needs one of each rarity.
+3. `npm test`: `test/chaos.test.js` checks the table and deploys every upgrade in a battle.
+
+#### Testing done (step 16)
+
+- `test/chaos.test.js` (19 tests): table soundness, pool deck rules, level 11 without touching saves or the card table, offers (real cards, rarity, two cards, fallbacks, never stuck), the pause (no time, elixir, movement or deploys), timeout auto-pick, pick-once, real gameplay changes (stats, counts, Quake Fist from the real attack, Napalm, Double Roll), later copies only, no leak into the next match, AI-vs-AI full matches with every choice made by the AI, AI scoring, overtime checkpoints, all variants, the snapshot, and every upgrade deployed. Full suite: 176 tests.
+- Headless Chrome: hub tiles, deck builder (fill, inspect), vs AI choice (pause, click and keyboard picks, AI pick, hand badge), Blackout (pixel check: about 84% dark outside your light), results with both sides' picks, a 390 px phone (builder and choice, no horizontal scroll), and online with two browsers against a local server (own decks, private offers, waiting state, the timeout auto-pick for the player who didn't choose). No console errors.
+
+### 17. Whole-game pass: fair AI, tutorial, deck tools, settings, new mechanics (2026-10-15)
+
+**Fairness and rewards**
+- **AI difficulty is behaviour only.** Easy/Normal/Hard/Insane used to give the AI 0.85×/1×/1.2×/1.45× tower HP without saying so. Every preset now fights with the same towers as you; difficulty comes from reaction time, how often it plans, look-ahead depth, aggression, and a new engine knob, `profile.mistakes` (chance per play to hesitate or place a card 1–3 tiles off target, always legally). Measured on mirrored decks, each level beats the one below (Normal 68% vs Easy, Hard 54% vs Normal, Insane 63% vs Hard). Custom keeps its HP sliders as a visible practice handicap. Old saves that stored the hidden multipliers are reset to 1×.
+- **Fixed: local PvP paid full rewards.** Winning as the bottom player (you control both sides) gave 140 gold, a chest, a card, mastery, damage gold and achievement progress. Local PvP is now friendly (no rewards, records or achievements), like local PvP events; so is practice against an AI weakened below 1× with the Custom sliders. Ranked and full-strength practice pay as before.
+
+**Tutorial** (`prototype_tutorial.js`)
+- A 9-step guided match against a scripted opponent: towers and crowns, elixir, playing a card, troops fighting on their own, the hand cycle, defending a real attack, spells, taking a crown, winning. Explanations freeze the battle until "Next"; action steps wait for you to actually do it. Offered once on a first visit (never forced), skippable, replayable from Settings. It touches no trophies, stats or achievements; finishing it the first time pays 150 gold.
+
+**Deck builder**
+- Name your three decks (✏️ next to the tabs; names are cleaned and saved).
+- 📊 Deck analysis: anti-air, swarm control, tank killing, win conditions, spells and cycle, each rated none/weak/ok/strong with the cards behind it, plus strengths and weaknesses. Plain rules from card stats, stated as coverage, not a win prediction.
+
+**Settings**: master volume (one gain node for every sound) and Motion (Auto follows the system setting; Full or Reduced override it, for menus and arena effects alike).
+
+**Four new cards with mechanics no other card has** (engine hooks any card can use: `reflect`, `lifesteal`, `trap`, `empower`)
+
+| Card | Cost | Arena | Mechanic |
+|---|---|---|---|
+| Thorn Golem | 5 | 7 | Building-targeting tank; melee attackers take back 35% of each hit (max 60 per hit). Ranged, spells and towers aren't reflected; a reflected hit is never reflected again. |
+| Siphon Priest | 4 | 8 | Ranged caster that heals itself for 30% of the damage it deals (never above full). |
+| Snare Mine | 2 | 9 | Buried, untargetable trap; the first enemy ground troop to come near sets it off once: heavy damage and a 2 s root in a wide area. Flyers pass over. |
+| War Drum | 2 | 9 | Building that makes your troops within 5 tiles deal 35% more damage (4.5 / 30% before the section 19 pass). Enemies can destroy it. |
+
+- The AI uses them: the mine as a defender against ground pushes (scored higher against groups), the drum only next to its own gathering push, and either is cycled rather than clogging the hand at full elixir.
+- Tuned from mirrored AI decks with and without the card (40 games each): 46–53% after one adjustment (War Drum was 25%: cost 3 → 2, +25% → +30%; Siphon Priest 63%: lifesteal 40% → 30%).
+- Loaner decks (events) now hold at most one card that deals no damage itself (slows, haste, heals, auras, pumps).
+
+**Tests:** 182 (`npm test`): AI mistakes stay legal and never change stats; each new mechanic (thorn cap and no ranged/looping reflection, lifesteal cap, mine hidden/flyer-proof/once/root, drum +30% only in range and only for its own side); the AI plays the new buildings sensibly. Two older tests were made more robust: the "buildings were placed" check now counts every building played (it only counted buildings still standing at the end), and the per-event "AI isn't idle" check uses one threshold (slow-elixir and heavy-card events play ~9 cards). Browser: the full tutorial (first-visit offer, frozen explanations, real taps, real defence, exactly +150 gold, no stats or trophies, not offered again), deck rename + analysis, volume/motion saved, PvP win pays nothing while practice pays, old Hard multipliers reset, and the new cards in battle (mine springs and roots, drum ring, thorns).
+
+### 18. Trophy Road unlocks, music, training drills (2026-10-15)
+
+- **Trophy Road cards are earned again (new profiles).** Profiles started from now on (including after "Reset all progress") begin with the starter cards, the basic spells and Bolt Turret; each Trophy Road card unlocks from its road milestone, or from chests once you've reached its arena. Existing saves keep every card they have (`progress.roadUnlocks` is only set for fresh profiles; nothing is ever taken away). Fresh profiles also skip the "new feature" news toasts meant for returning players.
+- **Music** (`prototype_music.js`): an original loop generated live with Web Audio (no audio files): a slow pad in menus; bass and an arpeggio in battle, faster with percussion in double elixir and overtime. It runs through the main volume and mute; Settings has its own Music slider (0 = off).
+- **Training drills** (`prototype_training.js`, 🎯 Training next to Start Match): five short situations against a scripted opponent, each with one goal and 1–3 stars (best kept in `progress.training`): Hold the Bridge (Ram Hog pushes), Clear the Skies (air waves), Topple the Titan (kill it before it reaches a tower), Break Through (destroy a defended tower in 60 s), Swarm Storm (survive swarms). Cards are level 9 with level-9 towers; the free enemy waves are level 7, with 10 starting elixir and 1.5× generation (2× for the Titan), so drills test decisions rather than elixir. No rewards, trophies or records. Every drill is cleared by the Hard AI playing your side (Hold the Bridge 1 star, the rest 2–3), so each is winnable with room to improve. The tutorial and the drills share one scripted-match setup.
+
+Browser checks: a fresh profile starts with 12 cards and Trophy Road cards locked; claiming the arena-1 milestone unlocks its card; an old save keeps everything; the drill list, a full drill to 3 stars (saved, no gold or stats), retry/next, and the result panel closing when another match starts; music running after the first tap; local PvP C.H.A.O.S. with both players' choice panels (the match waits for both); the deck analysis on a 375 px phone. 182 tests pass.
+
+### 19. Four more balance rounds (2026-10-15)
+
+Automatic pass: 4 rounds × 5,000 AI-vs-AI games between random level-9 decks; each round nudged card families more than 0.25 below or 0.35 above the median rating by up to 15%. The gap between the strongest and weakest family fell from 1.35 to 1.06. Elixir Pump, Overdrive, Tar Trap and War Drum were left out (HP and damage aren't their strength); War Drum, last in every round, got a direct aura buff instead.
+
+- Buffed: Bug Squad HP 85 → 95, damage 30 → 32; Nano Drones 110 → 122, 32 → 34; Ant March 65 → 70, 42 → 44; UFO Fleet 240 → 260, 45 → 48; Dust Devils 330 → 359, 75 → 80; Mako Swarm 220 → 238, 60 → 64; Siren Beacon HP 1800 → 1980; Snare Mine HP 200 → 246, blast 160 → 185; Frost Nova damage 65 → 78; Orbital Laser 432 → 464; War Drum aura +30% → +35%, 4.5 → 5 tiles.
+- Nerfed: Inferno Spire HP 804 → 713, beam 14 → 11; Rock Titan 1672 → 1610, 76 → 70; Tesla Tank 816 → 779, 239 → 217; Cryo Caster 352 → 339, 45 → 42; Siphon Priest 420 → 402, 64 → 58; Wolf Pack 279 → 268, 69 → 64; Cracker Gang 120 → 116, 45 → 42; Bolt Turret 964 → 924, 65 → 60.
+- Paratroopers went up one round and down the next; no net change.
+
 ## Testing done
 
 - **Step 11 (Evolutions):** 87 automated tests (`npm test`): the cycle (exact evolve pattern, reset, independent charges, failed plays never advance it, unequipped never evolves, fresh per match), deck slot limits, one test per Evolution ability, core-rule interactions (air targeting, freeze, building expiry), a heavy battle with every Evolution at once (stays fast, no runaway spawns), shard/Wild Shard/unlock/overflow/equip rules, save clean-up, and Trophy Road shard stops. Headless Chrome: claim → unlock celebration → equip (locked, full and success feedback) → ranked match charging → ready glow → evolved deploy → saved across reload; a staged battle with all 15 Evolutions and evolved spells (no errors); an AI match with Evolutions on both sides; online: server caps a tampered 3-Evolution deck at 2, both clients see charges, and the third Brawler comes out evolved on the server. Earlier sweeps (Trophy Road, all cards, swarm freeze) re-run clean.

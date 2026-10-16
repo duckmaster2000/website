@@ -40,8 +40,9 @@
     4: ['repairwave', 'medicbot', 'dronehangar', 'sirenbeacon'],
     5: ['infernospire', 'teslatank', 'overdrive', 'elixirpump'],
     6: ['teslapit', 'boomerang', 'gravitywell', 'phantomrider'],
-    7: ['stormzeppelin', 'paratroopers'],
-    8: ['rocktitan', 'orbitallaser'],
+    7: ['stormzeppelin', 'paratroopers', 'thorngolem'],
+    8: ['rocktitan', 'orbitallaser', 'siphonpriest'],
+    9: ['snaremine', 'wardrum'],
   };
 
   // Evolution Shards on the road: [trophies, reward]. These stops sit between the regular ones, so

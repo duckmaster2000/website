@@ -98,6 +98,8 @@ function eventRequest(eventId, tier) {
   const open = Events.availability(ev.id, Date.now());
   if (!open.ok) return { error: `${ev.name} is not available right now. ${open.reason || ''}`.trim() };
   const t = ev.tiers ? (ev.tiers.find((x) => x.id === tier) || ev.tiers[0]).id : null;
+  // A variant can be offline-only (C.H.A.O.S. Draft)
+  if (!Events.modesFor(ev.id, t).includes('online')) return { error: 'That variant cannot be played online.' };
   return { event: { eventId: ev.id, tier: t } };
 }
 
@@ -143,9 +145,20 @@ function generateCode() {
 
 // ─── Room lifecycle ────────────────────────────────────────────────────────
 
-// Each player's deck is stored on their socket when they create/join a room or queue
-function deckOf(socketId) {
-  return io.sockets.sockets.get(socketId)?.data.deck || Sim.normalizeDeck(null, Sim.EVO_RULES.slots.online);
+// Each player's deck is stored on their socket when they create/join a room or queue. Events with
+// their own deck (C.H.A.O.S.) use the deck the player built for it, sent alongside.
+function deckOf(socketId, event) {
+  const data = io.sockets.sockets.get(socketId)?.data || {};
+  const ev = event && Events.EVENT_MAP[event.eventId];
+  if (ev && ev.deckSource === 'chaos' && data.chaosDeck && data.chaosDeck.length) return data.chaosDeck;
+  return data.deck || Sim.normalizeDeck(null, Sim.EVO_RULES.slots.online);
+}
+
+// Remember both decks a client sent (the normal one, and the C.H.A.O.S. one if it has built it)
+function storeDecks(socket, deck, chaosDeck) {
+  socket.data.deck = Sim.normalizeDeck(deck, Sim.EVO_RULES.slots.online);
+  const ids = Events.cleanChaosDeck(Array.isArray(chaosDeck) ? chaosDeck.map((e) => (typeof e === 'string' ? e : e && e.id)) : []);
+  socket.data.chaosDeck = ids.length === Sim.MAX_DECK ? ids.map((id) => ({ id, level: Events.CHAOS_LEVEL })) : null;
 }
 
 // What clients need to know about the match that is starting. The id is unique per match, so a
@@ -162,14 +175,14 @@ function matchInfo(room) {
 
 // Build the match: a normal battle, or an event match configured entirely on the server
 function createRoomMatch(room, seed) {
-  const decks = { A: deckOf(room.sockets.A), B: deckOf(room.sockets.B) };
+  const decks = { A: deckOf(room.sockets.A, room.event), B: deckOf(room.sockets.B, room.event) };
   room.eventLaw = null;
   if (!room.event) return Sim.createMatch({ seed, decks });
   const { eventId, tier } = room.event;
   // Own-deck events: a deck that breaks the event's deck rules is swapped for a legal loaner
   const legal = {};
   ['A', 'B'].forEach((side, i) => {
-    const res = Events.legalDeckFor(eventId, decks[side], seed + i + 1);
+    const res = Events.legalDeckFor(eventId, decks[side], seed + i + 1, tier);
     legal[side] = res.entries;
     if (res.loaner) io.sockets.sockets.get(room.sockets[side])?.emit('deck_loaner', { problems: res.problems || [] });
   });
@@ -210,7 +223,16 @@ function startRoom(room) {
     }
     const snap = Sim.snapshot(room.state);
     snap.fx = fx;
-    io.to(room.code).emit('state_update', snap);
+    if (snap.chaos && snap.chaos.active) {
+      // C.H.A.O.S.: each player sees only their own pending offers
+      ['A', 'B'].forEach((side) => {
+        const id = room.sockets[side];
+        if (!id) return;
+        const other = side === 'A' ? 'B' : 'A';
+        const mine = { ...snap, chaos: { ...snap.chaos, active: { ...snap.chaos.active, offers: { [side]: snap.chaos.active.offers[side], [other]: null } } } };
+        io.to(id).emit('state_update', mine);
+      });
+    } else io.to(room.code).emit('state_update', snap);
     if (!room.state.running && room.state.winner) {
       io.to(room.code).emit('match_over', { winner: room.state.winner, ...matchInfo(room) });
       clearInterval(room.interval);
@@ -245,10 +267,10 @@ function leaveCurrentRoom(socket) {
 io.on('connection', socket => {
   console.log(`connect  ${socket.id}`);
 
-  socket.on('create_room', ({ deck, eventId, tier } = {}) => {
+  socket.on('create_room', ({ deck, chaosDeck, eventId, tier } = {}) => {
     const req = eventRequest(eventId, tier);
     if (req.error) { socket.emit('room_error', { msg: req.error }); return; }
-    socket.data.deck = Sim.normalizeDeck(deck, Sim.EVO_RULES.slots.online);
+    storeDecks(socket, deck, chaosDeck);
     removeFromMatchQueue(socket.id);
     leaveCurrentRoom(socket);
     const code = generateCode();
@@ -270,12 +292,12 @@ io.on('connection', socket => {
     console.log(`Room ${code} created by ${socket.id}`);
   });
 
-  socket.on('join_room', ({ code, deck } = {}) => {
+  socket.on('join_room', ({ code, deck, chaosDeck } = {}) => {
     const upper = String(code || '').toUpperCase().trim();
     const room = rooms.get(upper);
     if (!room) { socket.emit('room_error', { msg: 'Room not found. Check your code.' }); return; }
     if (room.players.length >= 2) { socket.emit('room_error', { msg: 'Room is full.' }); return; }
-    socket.data.deck = Sim.normalizeDeck(deck, Sim.EVO_RULES.slots.online);
+    storeDecks(socket, deck, chaosDeck);
     leaveCurrentRoom(socket);
     room.players.push(socket.id);
     room.sockets.B = socket.id;
@@ -297,6 +319,17 @@ io.on('connection', socket => {
     // Sim.deploy checks the card is in hand, elixir, and that the spot is a legal deploy zone
     const result = Sim.deploy(room.state, side, String(cardId), Number(x), Number(y));
     if (!result.ok) socket.emit('deploy_rejected', { reason: result.reason });
+  });
+
+  // C.H.A.O.S.: a player picks one of their two upgrade offers. The engine checks that a choice is
+  // open, that this side hasn't answered yet, and that the pick is 0 or 1; late or repeat picks are refused.
+  socket.on('upgrade_pick', ({ idx } = {}) => {
+    const code = socketRoom.get(socket.id);
+    const room = code && rooms.get(code);
+    if (!room || !room.state || !room.state.running) return;
+    const side = room.sockets.A === socket.id ? 'A' : 'B';
+    const res = Sim.chooseUpgrade(room.state, side, Number(idx));
+    if (!res.ok) socket.emit('upgrade_rejected', { reason: res.reason });
   });
 
   // Emotes go through the shared engine (validation + rate limits) and reach both players
@@ -326,10 +359,10 @@ io.on('connection', socket => {
     }
   });
 
-  socket.on('join_queue', ({ deck, eventId, tier } = {}) => {
+  socket.on('join_queue', ({ deck, chaosDeck, eventId, tier } = {}) => {
     const req = eventRequest(eventId, tier);
     if (req.error) { socket.emit('queue_error', { msg: req.error }); return; }
-    socket.data.deck = Sim.normalizeDeck(deck, Sim.EVO_RULES.slots.online);
+    storeDecks(socket, deck, chaosDeck);
     leaveCurrentRoom(socket);
     const key = queueKey(req.event);
     addToMatchQueue(socket.id, key);

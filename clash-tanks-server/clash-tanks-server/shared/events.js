@@ -75,12 +75,14 @@
   //   swarmTroopsOnly                     every troop must be a swarm card
   //   minCost                             no card may cost less than this
   //   banned                              card families (slugs) that are not allowed
+  //   pool                                only these card ids are allowed (C.H.A.O.S.)
 
   function cardAllowed(rules, c) {
     if (!rules || !c) return !!c;
     if (rules.minCost && c.cost < rules.minCost) return false;
     if (rules.swarmTroopsOnly && isTroop(c) && !isSwarm(c)) return false;
     if (rules.banned && rules.banned.includes(c.slug)) return false;
+    if (rules.pool && !rules.pool.includes(c.id)) return false;
     return true;
   }
 
@@ -95,7 +97,7 @@
     if (r) {
       const bad = cards.filter((c) => !cardAllowed(r, c));
       if (bad.length) {
-        const why = r.swarmTroopsOnly ? 'only swarm troops are allowed' : r.minCost ? `nothing under ${r.minCost} elixir` : 'banned in this event';
+        const why = r.pool ? 'not in the C.H.A.O.S. card pool' : r.swarmTroopsOnly ? 'only swarm troops are allowed' : r.minCost ? `nothing under ${r.minCost} elixir` : 'banned in this event';
         problems.push(`Not allowed (${why}): ${bad.map((c) => c.name).join(', ')}.`);
       }
       const count = (fn) => cards.filter(fn).length;
@@ -116,9 +118,12 @@
     const rand = rng(seed || 1);
     const pool = shuffle(BASE.filter((c) => cardAllowed(r, c)), rand);
     const deck = [];
+    // Cards that deal no damage themselves (slows, haste, heals, auras, pumps): at most one per loaner deck
+    const utility = (c) => (c.spell && !(c.dmg > 0) && !(c.zone && c.zone.kind === 'spawn')) || (c.spell && c.friendly) || (c.mech && (c.mech.empower || c.mech.elixir));
     const take = (fn, n) => {
       for (const c of pool) {
         if (deck.length >= Sim.MAX_DECK || n <= 0) break;
+        if (utility(c) && deck.some(utility)) continue;
         if (!deck.includes(c) && fn(c)) { deck.push(c); n--; }
       }
     };
@@ -152,13 +157,14 @@
     { role: 'Cycle card', fn: (c) => !c.building && c.cost <= 3 },
   ];
 
-  function draftRounds(seed) {
+  function draftRounds(seed, poolIds) {
     const rand = rng(seed);
     const used = new Set();
+    const from = poolIds ? BASE.filter((c) => poolIds.includes(c.id)) : BASE;
     return DRAFT_ROLES.map((r) => {
-      let options = shuffle(BASE.filter((c) => r.fn(c) && !used.has(c.slug)), rand).slice(0, 2);
+      let options = shuffle(from.filter((c) => r.fn(c) && !used.has(c.slug)), rand).slice(0, 2);
       // Never get stuck: top up from anything unused
-      if (options.length < 2) options = options.concat(shuffle(BASE.filter((c) => !used.has(c.slug) && !options.includes(c)), rand).slice(0, 2 - options.length));
+      if (options.length < 2) options = options.concat(shuffle(from.filter((c) => !used.has(c.slug) && !options.includes(c)), rand).slice(0, 2 - options.length));
       options.forEach((c) => used.add(c.slug));
       return { role: r.role, options: options.map((c) => c.id) };
     });
@@ -297,18 +303,113 @@
     { id: 'nightmare', name: 'Nightmare', offset: 4, extraSummon: true, blurb: 'Four levels above you, and a third guard summon at 20% HP.' },
   ];
 
+
+  // ─── Mode library helpers (2026-10-15) ──────────────────────────────────
+
+  // Princess Gambit's 40-card pile for a match: a spread of roles, rolled from the seed
+  function gambitPool(seed) {
+    const rand = rng(seed ^ 0x6a3b);
+    const pick = (list, n, out) => { shuffle(list.filter((c) => !out.includes(c)), rand).slice(0, n).forEach((c) => out.push(c)); };
+    const out = [];
+    pick(BASE.filter((c) => isTroop(c) && c.winCondition), 5, out);
+    pick(BASE.filter((c) => c.spell && !c.friendly), 7, out);
+    pick(BASE.filter((c) => c.building), 4, out);
+    pick(BASE.filter((c) => isTroop(c) && (c.targets === 'any' || c.targets === 'air')), 8, out);
+    pick(BASE.filter((c) => isTroop(c)), 40 - out.length, out);
+    return out.slice(0, 40).map((c) => c.id);
+  }
+
+  // Elite Endurance: survival that keeps going, every wave a little bigger than the last
+  function endlessWaves(seed, base) {
+    const rand = rng(seed);
+    const b = clamp(Math.round(base || 1), 1, 14);
+    const waves = [];
+    for (let i = 0; i < 36; i++) {
+      const tierIdx = Math.min(WAVE_POOLS.length - 1, Math.floor(i / 3));
+      const level = clamp(b - 2 + Math.floor(i / 4), 1, 14);
+      const groups = Math.min(4, 1 + Math.floor(i / 5));
+      const units = [];
+      for (let g = 0; g < groups; g++) {
+        const pool = WAVE_POOLS[Math.max(0, tierIdx - (g % 2))];
+        units.push({ card: pool[Math.floor(rand() * pool.length)], n: 1, lane: (i + g) % 2, level });
+      }
+      waves.push({ at: 6 + i * 15, units });
+    }
+    return waves;
+  }
+
+  const BOSS_RUSH = [
+    { id: 'colossus', name: 'Iron Colossus', card: 'colossus', blurb: 'Stage 1: telegraphed slams and guard summons.' },
+    { id: 'warden', name: 'Stone Warden', card: 'stonewarden', blurb: 'Stage 2: slow, huge, wide slams; calls Rock Shards.' },
+    { id: 'queen', name: 'Hive Queen', card: 'hivequeen', blurb: 'Stage 3: fast, and calls air drones: bring anti-air.' },
+  ];
+
+  const LANE_X = [Sim.BRIDGES[0].cx, Sim.BRIDGES[1].cx];
+  const LIB_REWARDS = { play: 20, win: 80, first: { gold: 200, chest: true }, milestones: [{ wins: 3, gold: 150 }, { wins: 10, gold: 300, chest: true }] };
+
   // ─── The catalog ─────────────────────────────────────────────────────────
   //
   // deck:      'own' (your deck, checked against deckRules) | 'draft' | 'mirror' | 'roulette'
   // modes:     where it can be played: 'ai' (vs AI), 'pvp' (local), 'online'
-  // schedule:  'permanent' | 'rotating' (daily pool) — challenges are weekly
+  // schedule:  'permanent' | 'rotating' (daily pool, featured for rewards) | 'library' (always open) — challenges are weekly
   // tiers:     optional difficulty/intensity levels; `unlock` = win the previous tier first
   // rewards:   gold for playing / winning, a one-time first-win prize, and milestone prizes
   // build(c):  the engine rules (and decks) for one match. c: { seed, tier, decks, hasEvo, week }
 
   const STD_REWARDS = { play: 20, win: 90, first: { gold: 250, chest: true }, milestones: [{ wins: 3, gold: 200 }, { wins: 10, gold: 400, chest: true }] };
 
+  // ─── C.H.A.O.S. ──────────────────────────────────────────────────────────
+  //
+  // Card upgrades chosen mid-battle (the engine side is "C.H.A.O.S. card upgrades" in clash-sim.js).
+  // Every variant shares the same pool, upgrade table and choice engine; a variant only lists the
+  // settings it changes. deck / modes on a variant override the event's.
+  //
+  //   checkpoints  [{ at (match seconds), rarity }]: when each choice opens and the rarity both offers have
+  //   choiceSecs   how long a choice stays open before the left offer is taken
+  //   rules        extra engine rules for the variant
+  const CHAOS_STD_CHECKPOINTS = [{ at: 1, rarity: 'common' }, { at: 45, rarity: 'common' }, { at: 90, rarity: 'rare' }, { at: 135, rarity: 'rare' }, { at: 180, rarity: 'epic' }];
+  const CHAOS_VARIANTS = [
+    { id: 'standard', name: 'Standard', blurb: 'Build a deck from the pool. Upgrade it as you fight.', checkpoints: CHAOS_STD_CHECKPOINTS },
+    { id: 'draft', name: 'Draft', blurb: 'Draft your deck from the pool, then upgrade it.', deck: 'draft', modes: ['ai'], checkpoints: CHAOS_STD_CHECKPOINTS },
+    { id: 'blackout', name: 'Blackout', blurb: 'The arena is dark: you only see near your own troops and towers.', modes: ['ai', 'online'], checkpoints: CHAOS_STD_CHECKPOINTS, rules: { blackout: true } },
+    { id: 'surge', name: 'Power Surge', blurb: 'A choice every 30 s, Rare from the start, Epics from 1:30, and 1.5× elixir.',
+      checkpoints: [{ at: 1, rarity: 'rare' }, { at: 30, rarity: 'rare' }, { at: 60, rarity: 'rare' }, { at: 90, rarity: 'epic' }, { at: 120, rarity: 'epic' }, { at: 150, rarity: 'epic' }],
+      rules: { startElixir: 7, elixirPhases: [{ at: 0, mult: 1.5 }, { at: 120, mult: 2 }] } },
+  ];
+  const CHAOS_VARIANT_MAP = Object.fromEntries(CHAOS_VARIANTS.map((v) => [v.id, v]));
+  const CHAOS_LEVEL = 11;      // every card in a C.H.A.O.S. match plays at this level (the collection is untouched)
+  const CHAOS_CHOICE_SECS = 10;
+
   const EVENTS = [
+    {
+      id: 'upgrades', name: 'C.H.A.O.S.', icon: '🧬', art: 'upgrades', category: 'C.H.A.O.S.', difficulty: 3, deck: 'own', deckSource: 'chaos',
+      modes: ['ai', 'pvp', 'online'], schedule: 'permanent',
+      deckRules: { pool: Sim.CHAOS_POOL.slice() },
+      tagline: 'Pick an upgrade for one of your cards, again and again, mid-battle.',
+      desc: 'Build an 8-card deck from the C.H.A.O.S. pool. During the battle the clock stops at set moments and you choose one of two upgrades, each for a specific card in your deck: more HP, a shockwave punch, chain lightning, homing rockets, a Bone Giant that rises from a crypt. The card keeps it for the rest of the match. Your opponent drafts their own upgrades at the same time.',
+      rules: [
+        'Your C.H.A.O.S. deck: 8 cards from the pool (build it on this screen). Every card plays at level 11.',
+        'At each checkpoint the battle pauses and you get two upgrades for cards in your deck. Pick one in 10 s, or the left one is taken for you.',
+        'Upgrades are Common, Rare or Epic; later checkpoints offer rarer ones. A card can only have one upgrade.',
+        'An upgrade changes every copy of that card you play from then on (troops already on the field stay as they were).',
+        'No Evolutions; upgrades are this mode\'s power-ups. Nothing carries over after the match.',
+      ],
+      win: 'Normal battle rules: more crowns at full time, or destroy the King Tower.', loss: 'Lose your King Tower, or have fewer crowns at the end.',
+      random: 'Which two upgrades you are offered at each checkpoint (rolled from the match seed, separately for each side).',
+      fixed: 'The card pool, the level, when choices open and their rarity, and the battle rules.',
+      tiers: CHAOS_VARIANTS.map((v) => ({ id: v.id, name: v.name, blurb: v.blurb, unlock: null, deck: v.deck, modes: v.modes })),
+      rewards: { play: 25, win: 110, first: { gold: 300, chest: true, wild: 1 }, milestones: [{ wins: 3, gold: 250 }, { wins: 10, gold: 500, chest: true }, { wins: 25, badge: 'mutator' }] },
+      build(c) {
+        const v = CHAOS_VARIANT_MAP[c.tier] || CHAOS_VARIANTS[0];
+        const rules = { ...(v.rules || {}), cardLevel: CHAOS_LEVEL, evo: { disabled: true }, upgrades: { checkpoints: v.checkpoints, choiceSecs: CHAOS_CHOICE_SECS, pause: true, autoPick: 0, perCard: 1 } };
+        if (v.deck === 'draft') {
+          const rounds = c.rounds || draftRounds(c.seed, Sim.CHAOS_POOL);
+          const d = draftDecks(rounds, c.picks);
+          return { rules, decks: { A: entries(d.A, CHAOS_LEVEL), B: entries(d.B, CHAOS_LEVEL) }, rounds };
+        }
+        return { rules };
+      },
+    },
     {
       id: 'chaos', name: 'Chaos Mode', icon: '🌀', art: 'chaos', category: 'Chaos', difficulty: 3, deck: 'own',
       modes: ['ai', 'pvp', 'online'], schedule: 'permanent', featuredWeekend: true,
@@ -534,6 +635,169 @@
       },
       score(r) { return r.result === 'win' ? 1000 + Math.round((r.timeLeft || 0) * 10) + (r.towersStanding || 0) * 150 : Math.round((1 - (r.bossHpFrac == null ? 1 : r.bossHpFrac)) * 800); },
     },
+    // ─── Mode library (2026-10-15): added alongside everything above, never instead of it ───
+    {
+      id: 'double', name: 'Double Elixir', icon: '💧', art: 'elixir', category: 'Elixir', difficulty: 2, deck: 'own',
+      modes: ['ai', 'pvp', 'online'], schedule: 'library',
+      tagline: 'Twice the elixir, from the first second to the last.',
+      desc: 'Elixir generates at 2× for the whole match (and in overtime). Max elixir and card costs are unchanged, so it is about chaining bigger pushes without overcommitting.',
+      rules: ['2× elixir all match, including overtime.', 'Max elixir 10; costs unchanged.', 'Otherwise a normal battle.'],
+      win: 'Normal battle rules.', loss: 'Normal battle rules.', random: null, fixed: 'All rules.', rewards: LIB_REWARDS,
+      build() { return { rules: { elixirPhases: [{ at: 0, mult: 2 }], overtimeMult: 2 } }; },
+    },
+    {
+      id: 'triple', name: 'Triple Elixir', icon: '⚗️', art: 'elixir', category: 'Elixir', difficulty: 3, deck: 'own',
+      modes: ['ai', 'pvp', 'online'], schedule: 'library',
+      tagline: '3× elixir. Huge pushes, constant counter-attacks.',
+      desc: 'Elixir pours in at 3× all match. Expect stacked pushes and big spell trades. To keep the battle readable each side may have at most 40 units on the field at once.',
+      rules: ['3× elixir all match, including overtime.', 'Max elixir 10; costs unchanged.', 'Up to 40 units per side on the field (both sides alike).'],
+      win: 'Normal battle rules.', loss: 'Normal battle rules.', random: null, fixed: 'All rules.', rewards: LIB_REWARDS,
+      build() { return { rules: { elixirPhases: [{ at: 0, mult: 3 }], overtimeMult: 3, unitCap: 40 } }; },
+    },
+    {
+      id: 'infinite', name: 'Infinite Elixir', icon: '♾️', art: 'elixir', category: 'Elixir', difficulty: 3, deck: 'own',
+      modes: ['ai', 'pvp', 'online'], schedule: 'library',
+      tagline: 'Elixir never runs out. Composition and timing are everything.',
+      desc: 'Your elixir bar is always full. Hand cycling, card recharge times and deploy zones still apply, so what you play and where matters more than ever. Each side may have at most 30 units on the field.',
+      rules: ['Elixir is always full.', 'Cards still recharge after you play them, and your hand still cycles.', 'Up to 30 units per side on the field (both sides alike).'],
+      win: 'Normal battle rules.', loss: 'Normal battle rules.', random: null, fixed: 'All rules.', rewards: LIB_REWARDS,
+      build() { return { rules: { infiniteElixir: true, unitCap: 30 } }; },
+    },
+    {
+      id: 'rampup', name: 'Ramp-Up', icon: '📈', art: 'elixir', category: 'Elixir', difficulty: 2, deck: 'own',
+      modes: ['ai', 'pvp', 'online'], schedule: 'library',
+      tagline: 'Elixir speeds up in five stages through the match.',
+      desc: 'A careful 1× start, then 1.5× at 0:36, 2× at 1:12, 2.5× at 1:48 and 3× from 2:24 (and in overtime). Each step is announced on the arena. The same schedule for both players.',
+      rules: ['Elixir: 1× → 1.5× (0:36) → 2× (1:12) → 2.5× (1:48) → 3× (2:24 and overtime).', 'Every stage change is announced.'],
+      win: 'Normal battle rules.', loss: 'Normal battle rules.', random: null, fixed: 'All rules.', rewards: LIB_REWARDS,
+      build() { return { rules: { announceStages: true, elixirPhases: [{ at: 0, mult: 1 }, { at: 36, mult: 1.5 }, { at: 72, mult: 2 }, { at: 108, mult: 2.5 }, { at: 144, mult: 3 }], overtimeMult: 3 } }; },
+    },
+    {
+      id: 'rage', name: 'Rage Battle', icon: '😡', art: 'sudden', category: 'Combat', difficulty: 3, deck: 'own',
+      modes: ['ai', 'pvp', 'online'], schedule: 'library',
+      tagline: 'Every troop and building is permanently enraged.',
+      desc: 'All troops move 30% faster and every troop and building attacks 25% more often, for both sides, all match. Fights resolve fast; reactions matter.',
+      rules: ['Troops: +30% movement speed.', 'Troops and buildings: attack interval ×0.75.', 'Spells and towers are unchanged.'],
+      win: 'Normal battle rules.', loss: 'Normal battle rules.', random: null, fixed: 'All rules.', rewards: LIB_REWARDS,
+      build() { return { rules: { cardMods: [{ when: { all: true }, speed: 1.3, cd: 0.75 }] } }; },
+    },
+    {
+      id: 'towerrush', name: 'Tower Rush', icon: '🏹', art: 'sudden', category: 'Combat', difficulty: 3, deck: 'own',
+      modes: ['ai', 'pvp', 'online'], schedule: 'library',
+      tagline: 'Lighter towers, a shorter clock: keep the pressure on.',
+      desc: 'Princess Towers have 55% health and King Towers 60%. 2:00 on the clock plus 30 s of overtime, 1.5× elixir and a 7-elixir start. Unlike Sudden Death, one tower doesn\'t end it: sustained pressure takes all three crowns.',
+      rules: ['Princess Towers 55% HP, King Tower 60% HP (both sides).', '2:00 + 30 s overtime; 1.5× elixir; start with 7.', 'Normal crown rules.'],
+      win: 'More crowns at the end, or the King Tower.', loss: 'Fewer crowns, or your King Tower.', random: null, fixed: 'All rules.', rewards: LIB_REWARDS,
+      build() { return { rules: { towerHp: { princess: 0.55, king: 0.6 }, regulation: 120, overtime: 30, startElixir: 7, elixirPhases: [{ at: 0, mult: 1.5 }], overtimeMult: 2 } }; },
+    },
+    {
+      id: 'heist', name: 'Heist', icon: '💰', art: 'fortress', category: 'Objective', difficulty: 3, deck: 'own',
+      modes: ['ai', 'pvp', 'online'], schedule: 'library', deckRules: { minBuildings: 1 },
+      tagline: 'No Princess Towers. Crack their vault, guard yours.',
+      desc: 'Each side has one Vault (the King Tower, 2.2× health) and no Princess Towers. Vaults don\'t shoot: your defence is your cards, so buildings matter. Destroy the enemy Vault to win; at full time the Vault with more health left wins.',
+      rules: ['One Vault per side (2.2× King HP); it never attacks.', 'No Princess Towers; troops head straight for the Vault.', 'Your deck needs at least 1 building.', 'Time out: more Vault health wins (equal = draw).'],
+      win: 'Destroy the enemy Vault, or have more Vault health left.', loss: 'Your Vault falls, or has less health at the end.', random: null, fixed: 'All rules.', rewards: LIB_REWARDS,
+      build() { return { rules: { kingOnly: true, vault: { hp: 2.2, shoots: false } } }; },
+    },
+    {
+      id: 'touchdown', name: 'Touchdown', icon: '🏈', art: 'hill', category: 'Objective', difficulty: 3, deck: 'own',
+      modes: ['ai', 'pvp', 'online'], schedule: 'library',
+      tagline: 'No towers. Get a troop into their end zone. First to 3.',
+      desc: 'There are no towers. Troops with nothing to fight run for the enemy end zone (the back 2.5 tiles of their side); each troop that reaches it scores 1 and leaves the field. Defenders intercept. First to 3 wins; time out, more touchdowns wins; overtime is next score wins.',
+      rules: ['No towers: troops fight what they meet, otherwise run for the enemy end zone.', 'A troop in the enemy end zone scores 1 (spells and buildings can\'t score).', 'First to 3. Time out: more scores wins, level = overtime (next score wins), then a draw.'],
+      win: 'Score 3, or lead when time runs out.', loss: 'Concede 3, or trail at the end.', random: null, fixed: 'All rules.', rewards: LIB_REWARDS,
+      build() { return { rules: { noTowers: ['A', 'B'], touchdown: { depth: 2.5 }, scoreToWin: 3, overtime: 60 } }; },
+    },
+    {
+      id: 'capture', name: 'Capture the Point', icon: '🚩', art: 'hill', category: 'Objective', difficulty: 3, deck: 'own',
+      modes: ['ai', 'pvp', 'online'], schedule: 'library',
+      tagline: 'Hold the bridges. Only uncontested zones score.',
+      desc: 'Two capture zones sit on the bridges. A zone scores 4 points a second for the side whose troops are the only ones in it; if both sides are in it, nobody scores. No towers. First to 100 points wins (or more points at full time). Different from King of the Hill: both zones are always live, scoring is strict, and points, not crowns, decide it.',
+      rules: ['No towers. Troops with nothing to fight head for a zone.', 'A zone held by only your troops gives you 4 points/s; contested zones give nothing.', 'First to 100; time out: more points wins, level = overtime, then a draw.'],
+      win: 'Reach 100 points, or lead at the end.', loss: 'The opponent reaches 100, or leads at the end.', random: null, fixed: 'All rules.', rewards: LIB_REWARDS,
+      build() { return { rules: { noTowers: ['A', 'B'], capture: { spots: [{ x: LANE_X[0], y: 16 }, { x: LANE_X[1], y: 16 }], r: 2.3, rate: 4 }, scoreToWin: 100, overtime: 60 } }; },
+    },
+    {
+      id: 'payload', name: 'Payload Push', icon: '🛒', art: 'hill', category: 'Objective', difficulty: 3, deck: 'own',
+      modes: ['ai', 'pvp', 'online'], schedule: 'library',
+      tagline: 'Escort the cart into their base.',
+      desc: 'A cart starts on the left bridge. It rolls toward the enemy base while only your troops are near it, and stops while it is contested. No towers. Push it all the way to win; at full time the cart\'s side of the river decides, then overtime, then a draw.',
+      rules: ['The cart moves 0.45 tiles/s toward the enemy while only your troops are within 2.2 tiles.', 'Contested or empty: it stops.', 'Reach their base line to win. Time out: the side the cart is on loses.'],
+      win: 'Push the cart into their base, or have it on their side at the end.', loss: 'The cart reaches your base, or sits on your side at the end.', random: null, fixed: 'All rules.', rewards: LIB_REWARDS,
+      build() { return { rules: { noTowers: ['A', 'B'], payload: { x: LANE_X[0], r: 2.2, speed: 0.45, end: 3 }, overtime: 60 } }; },
+    },
+    {
+      id: 'treasure', name: 'Treasure Hunt', icon: '🗝️', art: 'scavenger', category: 'Objective', difficulty: 2, deck: 'own',
+      modes: ['ai', 'pvp', 'online'], schedule: 'library',
+      tagline: 'Chests appear in pairs. Hold one to claim it. First to 5.',
+      desc: 'Every 18 s a pair of chests appears, one on each side of the river at mirrored spots, with a 3 s warning marker. A chest is claimed by standing on it alone for 1.2 s: +1 point and +2 elixir. Unclaimed chests vanish after 20 s. No towers. First to 5 points.',
+      rules: ['No towers. Troops with nothing to fight head for the nearest chest.', 'Hold a chest alone for 1.2 s: +1 point, +2 elixir. Contested chests don\'t count down.', 'First to 5; time out: more points wins, level = overtime, then a draw.'],
+      win: 'Claim 5 chests, or more by the end.', loss: 'The opponent claims 5, or more by the end.', random: null, fixed: 'Chest timing and mirrored spots.', rewards: LIB_REWARDS,
+      build() { return { rules: { noTowers: ['A', 'B'], treasure: { every: 18, life: 20, r: 1.4, hold: 1.2, elixir: 2 }, scoreToWin: 5, overtime: 60 } }; },
+    },
+    {
+      id: 'gambit', name: 'Princess Gambit', icon: '👸', art: 'sudden', category: 'Party', difficulty: 3, deck: 'gambit',
+      modes: ['ai', 'pvp', 'online'], schedule: 'library',
+      tagline: 'No decks. A 40-card pile, no repeats. First Princess Tower wins.',
+      desc: 'Nobody brings a deck. Each side draws from the same 40-card pile in its own random order, and a played card is gone (it only returns if the pile runs dry). Every card with an Evolution comes out evolved, every time. All cards are level 11. Sudden death: destroy one Princess Tower to win.',
+      rules: ['No deck: draw from a 40-card pile (same cards for both sides, own order). Played cards don\'t come back.', 'Every card that has an Evolution is always evolved in this mode.', 'All cards and towers level 11. The first Princess Tower destroyed wins; 3:00, then the healthier weakest tower.'],
+      win: 'Destroy a Princess Tower first.', loss: 'Lose a Princess Tower first.', random: 'The 40-card pile and each side\'s draw order.', fixed: 'Pile size, levels, rules.', rewards: LIB_REWARDS,
+      build(c) { return { rules: { gambit: { pool: gambitPool(c.seed) }, cardLevel: 11, towerLevel: 11, crownsToWin: 1, overtime: 0, evo: { all: true, startCharged: true, cycleDelta: -3 } } }; },
+    },
+    {
+      id: 'backline', name: 'Back-Line Arena', icon: '🧱', art: 'fortress', category: 'Special arena', difficulty: 3, deck: 'own',
+      modes: ['ai', 'pvp', 'online'], schedule: 'library',
+      tagline: 'Deploy only deep in your own half.',
+      desc: 'A walled-off arena: troops and buildings can only be placed at least 4 tiles back from the river (spells anywhere). Every push has to walk the full length, so tanks lead and defences get a moment to set up. 1.5× elixir to keep it moving.',
+      rules: ['Troops and buildings: at least 4 tiles behind the river (both sides). Spells: anywhere.', 'No pocket deploys after a tower falls.', '1.5× elixir, 2× in the last minute.'],
+      win: 'Normal battle rules.', loss: 'Normal battle rules.', random: null, fixed: 'All rules.', rewards: LIB_REWARDS,
+      build() { return { rules: { deployDepth: 4, elixirPhases: [{ at: 0, mult: 1.5 }, { at: 120, mult: 2 }] } }; },
+    },
+    {
+      id: 'infernosiege', name: 'Inferno Siege', icon: '🔥', art: 'boss', category: 'PvE', difficulty: 4, deck: 'own',
+      modes: ['ai'], schedule: 'library', scoreLabel: 'Score',
+      tagline: 'A fortified base. 16 plays to break its King.',
+      desc: 'The enemy base never plays cards, but it is ringed by Inferno Spires and Bolt Turrets that don\'t expire. You have 16 card plays (elixir at 2×) to destroy its King Tower. Read the defences, bait the Spires, and spend your plays where they count.',
+      rules: ['The defenders: 3 Inferno Spires and 2 Bolt Turrets around the towers, permanent, at your level.', 'You get 16 plays and 2× elixir; you lose when you are out of plays with no troops left, or at 3:00.', 'Destroy the King Tower to win. Score = time left and plays left.'],
+      win: 'Destroy the King Tower.', loss: 'Out of plays with nothing left, or time runs out.', random: null, fixed: 'The base layout.', scripted: true,
+      rewards: { play: 30, win: 140, first: { gold: 300, chest: true }, milestones: [{ wins: 3, gold: 250 }] },
+      build(c) {
+        const L = clamp(c.level, 1, 14);
+        const defenses = [
+          { card: 'infernospire', side: 'B', x: 6, y: 9.5, level: L }, { card: 'infernospire', side: 'B', x: 12, y: 9.5, level: L },
+          { card: 'infernospire', side: 'B', x: 9, y: 6.2, level: L },
+          { card: 'boltturret', side: 'B', x: 3.5, y: 9.2, level: L }, { card: 'boltturret', side: 'B', x: 14.5, y: 9.2, level: L },
+        ];
+        return { rules: { defenses, playLimit: { A: 16, B: 0 }, startElixir: 10, elixirPhases: [{ at: 0, mult: 2 }], timeout: 'defend', overtime: 0 }, scripted: true };
+      },
+      score(r) { return r.result === 'win' ? 1000 + Math.round((r.timeLeft || 0) * 10) + (r.playsLeft || 0) * 50 : 0; },
+    },
+    {
+      id: 'bossrush', name: 'Boss Rush', icon: '👹', art: 'boss', category: 'PvE', difficulty: 4, deck: 'own',
+      modes: ['ai'], schedule: 'library', scoreLabel: 'Score',
+      tagline: 'Three bosses, three stages. Beat one to face the next.',
+      desc: 'A run of boss fights: the Iron Colossus, then the Stone Warden (slow, huge, wide slams, Rock Shard guards), then the Hive Queen (fast, calls air drones: bring anti-air). Each stage unlocks the next. Every boss telegraphs its slam, calls guards (half damage while they live) and enrages at low health.',
+      rules: ['Win a stage to unlock the next; replay any stage you have unlocked.', 'Bosses are at your card level; no enemy towers; 3:00 per stage.', 'Slams are marked 1.4–1.8 s ahead: don\'t drop troops into the circle.'],
+      win: 'Destroy the boss.', loss: 'Your King Tower falls, or time runs out.', random: null, fixed: 'All rules.', scripted: true,
+      tiers: BOSS_RUSH.map((b, i) => ({ id: b.id, name: b.name, blurb: b.blurb, unlock: i > 0 ? BOSS_RUSH[i - 1].id : null })),
+      rewards: { play: 30, win: 150, first: { gold: 350, chest: true, wild: 1 }, milestones: [{ wins: 3, gold: 300 }] },
+      build(c) {
+        const b = BOSS_RUSH.find((x) => x.id === c.tier) || BOSS_RUSH[0];
+        return { rules: { noTowers: ['B'], guard: true, timeout: 'defend', regulation: 180, overtime: 0, boss: { at: 3, card: b.card, lane: rng(c.seed)() < 0.5 ? 0 : 1, level: clamp(c.level, 1, 14) } }, scripted: true };
+      },
+      score(r) { return r.result === 'win' ? 1000 + Math.round((r.timeLeft || 0) * 10) : Math.round((1 - (r.bossHpFrac == null ? 1 : r.bossHpFrac)) * 800); },
+    },
+    {
+      id: 'endless', name: 'Elite Endurance', icon: '🏔️', art: 'survival', category: 'PvE', difficulty: 4, deck: 'own',
+      modes: ['ai'], schedule: 'library', scoreLabel: 'Waves',
+      tagline: 'Endless waves, each bigger. How far can you go?',
+      desc: 'The long survival: 36 waves, one every 15 s, growing in size and level the whole way. No enemy towers. Score = waves cleared (plus a bonus for towers standing). Surviving all 36 is a win; most runs end earlier, and your best is kept.',
+      rules: ['36 waves, one every 15 s; each wave is bigger and up to higher level than the last.', 'Normal elixir, 2× from 2:00. No enemy towers.', 'Your King Tower falls: run over. Score is your best wave.'],
+      win: 'Survive all 36 waves.', loss: 'Your King Tower falls.', random: 'Wave make-up (rolled once per week).', fixed: 'Timing and the growth curve.', scripted: true,
+      rewards: { play: 30, win: 300, first: { gold: 400, chest: true, wild: 2 }, milestones: [{ wins: 1, badge: 'survivor' }] },
+      build(c) { return { rules: { noTowers: ['B'], guard: true, timeout: 'survive', regulation: 560, overtime: 0, waves: endlessWaves(2000 + (c.week || 0), c.level) }, scripted: true }; },
+      score(r) { return (r.waves || 0) * 100 + (r.towersStanding || 0) * 100; },
+    },
   ];
   const EVENT_MAP = Object.fromEntries(EVENTS.map((e) => [e.id, e]));
 
@@ -581,7 +845,7 @@
     chaoslord: { icon: '🌀', name: 'Chaos Lord' }, hillking: { icon: '⛰️', name: 'Hill King' }, survivor: { icon: '🛡️', name: 'Survivor' },
     gauntlet: { icon: '🌪️', name: 'Gauntlet Champion' }, ladder: { icon: '🪜', name: 'Ladder Climber' }, colossus: { icon: '🤖', name: 'Colossus Breaker' },
     flawless: { icon: '💎', name: 'Flawless' }, explorer: { icon: '🧭', name: 'Explorer' }, total: { icon: '☢️', name: 'Agent of Chaos' },
-    streak: { icon: '🔥', name: 'On Fire' },
+    streak: { icon: '🔥', name: 'On Fire' }, mutator: { icon: '🧬', name: 'Mutator' },
   };
   const won = (r) => r.result === 'win';
   const ACHIEVEMENTS = [
@@ -596,6 +860,8 @@
     { id: 'gauntlet_done', icon: '🌪️', name: 'Through the Storm', desc: 'Complete the Chaos Gauntlet.', gold: 300, check: (r, P) => !!(P.challenges.gauntlet && P.challenges.gauntlet.completions > 0) },
     { id: 'ladder_done', icon: '🪜', name: 'Top Rung', desc: 'Complete the Rising Ladder.', gold: 300, check: (r, P) => !!(P.challenges.ladder && P.challenges.ladder.completions > 0) },
     { id: 'explorer', icon: '🧭', name: 'Explorer', desc: 'Win 6 different events.', gold: 300, badge: 'explorer', check: (r, P) => Object.keys(P.records).filter((id) => P.records[id].wins > 0).length >= 6 },
+    { id: 'upgrades_win', icon: '🧬', name: 'Survival of the Fittest', desc: 'Win a C.H.A.O.S. match.', gold: 150, check: (r) => won(r) && r.eventId === 'upgrades' },
+    { id: 'upgrades_epic', icon: '💥', name: 'Full Mutation', desc: 'Win a C.H.A.O.S. match with an Epic upgrade.', gold: 250, check: (r) => won(r) && r.eventId === 'upgrades' && (r.epicUpgrades || 0) > 0 },
     { id: 'streak5', icon: '🔥', name: 'On Fire', desc: 'Win 5 event matches in a row.', gold: 250, badge: 'streak', check: (r, P) => P.stats.streak >= 5 },
   ];
 
@@ -687,9 +953,10 @@
     if (CHALLENGE_MAP[id]) return id === rot.challenge ? { ok: true } : { ok: false, reason: `Returns in a later week.` };
     const ev = EVENT_MAP[id];
     if (!ev) return { ok: false, reason: 'Unknown event.' };
-    if (ev.schedule === 'permanent') return { ok: true };
-    if (rot.daily.includes(id)) return { ok: true };
-    return { ok: false, reason: rot.tomorrow.includes(id) ? 'Available tomorrow.' : 'Not in today\'s rotation.' };
+    if (ev.schedule === 'permanent' || ev.schedule === 'library') return { ok: true };
+    if (rot.daily.includes(id)) return { ok: true, featured: true };
+    // Rotation only decides what is featured: every event stays playable (casual: no event gold)
+    return { ok: true, casual: true, reason: rot.tomorrow.includes(id) ? 'Featured tomorrow; casual today (no event gold).' : 'Not featured today: casual (no event gold).' };
   }
 
   // ─── Match configs ───────────────────────────────────────────────────────
@@ -717,15 +984,38 @@
     return { eventId, tier: ev.tiers ? ctx.tier : null, rules, decks, scripted: !!built.scripted, law: built.law || null, rounds: built.rounds || null };
   }
 
+  /** How an event (and tier) gets its decks: 'own' | 'draft' | 'mirror' | 'roulette'. A tier can override the event. */
+  function deckKind(eventId, tier) {
+    const ev = EVENT_MAP[eventId];
+    if (!ev) return 'own';
+    const t = ev.tiers && ev.tiers.find((x) => x.id === tier);
+    return (t && t.deck) || ev.deck;
+  }
+
+  /** Where an event (and tier) can be played: 'ai', 'pvp', 'online'. */
+  function modesFor(eventId, tier) {
+    const ev = EVENT_MAP[eventId];
+    if (!ev) return [];
+    const t = ev.tiers && ev.tiers.find((x) => x.id === tier);
+    return ((t && t.modes) || ev.modes).filter((m) => ev.modes.includes(m));
+  }
+
+  /** Clean a saved C.H.A.O.S. deck: pool cards only, no repeats, at most 8. */
+  function cleanChaosDeck(ids) {
+    const out = [];
+    (Array.isArray(ids) ? ids : []).forEach((id) => { if (typeof id === 'string' && Sim.CHAOS_POOL.includes(id) && !out.includes(id) && out.length < Sim.MAX_DECK) out.push(id); });
+    return out;
+  }
+
   /**
    * Online and local entry point for own-deck events: returns a deck that is legal for the event.
    * An illegal deck is replaced by a loaner deck (the player is told why).
    */
-  function legalDeckFor(eventId, entriesIn, seed) {
+  function legalDeckFor(eventId, entriesIn, seed, tier) {
     const ev = EVENT_MAP[eventId];
     const list = Array.isArray(entriesIn) ? entriesIn : [];
     const ids = list.map((e) => (typeof e === 'string' ? e : e && e.id));
-    if (!ev || ev.deck !== 'own') return { entries: list, loaner: false };
+    if (!ev || deckKind(eventId, tier) !== 'own') return { entries: list, loaner: false };
     const check = validateDeck(eventId, ids);
     if (check.ok) return { entries: list, loaner: false, problems: [] };
     const avg = list.length ? Math.round(list.reduce((s, e) => s + (Number(e && e.level) || 1), 0) / list.length) : EVENT_LEVEL;
@@ -755,6 +1045,7 @@
       title: null,
       stats: { matches: 0, wins: 0, losses: 0, draws: 0, streak: 0, bestStreak: 0, chaosWins: 0, chaosTier: -1, bestWave: 0, bestBossTime: 0, challengeWins: 0 },
       seen: {},
+      chaosDeck: [],   // the C.H.A.O.S. deck (pool card ids), built on the event screen
     };
   }
 
@@ -822,6 +1113,7 @@
       });
     }
     if (r.seen && typeof r.seen === 'object') Object.keys(r.seen).slice(0, 50).forEach((k) => { P.seen[k] = 1; });
+    P.chaosDeck = cleanChaosDeck(r.chaosDeck);
     return P;
   }
 
@@ -832,7 +1124,8 @@
     const ev = EVENT_MAP[eventId];
     if (!ev || !ev.tiers) return true;
     const i = ev.tiers.findIndex((t) => t.id === tierId);
-    if (i <= 0) return i === 0;
+    if (i < 0) return false;
+    if (ev.tiers[i].unlock == null) return true; // no requirement (the first tier, and C.H.A.O.S. variants)
     return (P.records[eventId] ? P.records[eventId].bestTier : -1) >= i - 1;
   }
 
@@ -922,8 +1215,11 @@
       if (out.score > rec.best) { out.newBest = rec.best > 0 || out.score > 0; rec.best = out.score; }
     }
 
-    // Rewards: none for abandoned matches or admin/dev runs (local PvP returned above)
-    const paid = !r.abandoned && !r.noRewards;
+    // Rewards: none for abandoned matches or admin/dev runs (local PvP returned above), and no
+    // event gold for a rotating event played on a day it isn't featured (challenge rounds excepted)
+    const featured = ev.schedule !== 'rotating' || !!r.challenge || rotation(now).daily.includes(ev.id);
+    if (!featured) out.casual = true;
+    const paid = !r.abandoned && !r.noRewards && featured;
     const give = (kind, amount, label) => { if (amount) out.rewards.push({ kind, amount, label }); };
     if (paid) {
       const mult = AI_GOLD[r.mode === 'online' ? 'online' : r.ai] || 1;
@@ -1013,6 +1309,7 @@
 
   return {
     EVENTS, EVENT_MAP, CHALLENGES, CHALLENGE_MAP, CHAOS_TIERS, CHAOS_LAWS, BOSS_TIERS, ACHIEVEMENTS, BADGES,
+    CHAOS_VARIANTS, CHAOS_VARIANT_MAP, CHAOS_LEVEL, deckKind, modesFor, cleanChaosDeck, gambitPool, endlessWaves, BOSS_RUSH,
     EVENT_LEVEL, DAILY_WIN_CAP, DAILY_PLAY_CAP, DAY_MS,
     rng, validateDeck, loanerDeck, cardAllowed, draftRounds, draftDecks, buildChaosSchedule, survivalWaves,
     rotation, availability, dayOf, weekOf, weekStart, dailyFor,
